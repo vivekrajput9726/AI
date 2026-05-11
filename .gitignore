@@ -1,0 +1,43 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment files (keep .env.example, ignore actual .env)
+backend/.env
+frontend/.env
+.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.parcel-cache/
+
+# Build
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+
+# MongoDB data
+data/
+
+# Claude Code local config
+.claude/
