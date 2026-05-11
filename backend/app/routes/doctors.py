@@ -28,11 +28,6 @@ async def get_specializations():
     return {"specializations": sorted(specs)}
 
 
-@router.get("/{doctor_id}", summary="Get doctor by ID")
-async def get_doctor(doctor_id: str):
-    return await get_doctor_by_id(doctor_id)
-
-
 @router.put("/profile/update", summary="Doctor updates own profile")
 async def update_profile(
     data: DoctorUpdateRequest,
@@ -48,3 +43,8 @@ async def doctor_appointments(
     current_user: dict = Depends(require_doctor)
 ):
     return await get_doctor_appointments(current_user["id"], status)
+
+
+@router.get("/{doctor_id}", summary="Get doctor by ID")
+async def get_doctor(doctor_id: str):
+    return await get_doctor_by_id(doctor_id)

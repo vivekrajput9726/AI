@@ -1,6 +1,8 @@
 import axios from 'axios'
-import { store } from '../redux/store'
 import { logout, setTokens } from '../redux/slices/authSlice'
+
+let store
+export const injectStore = (_store) => { store = _store }
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
