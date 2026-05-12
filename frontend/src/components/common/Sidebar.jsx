@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Stethoscope, Users, Calendar, Video, User, Settings,
-  Heart, LogOut, Shield, Activity
+  Heart, LogOut, Shield, Activity, FolderOpen, Pill, MapPin, ScanLine
 } from 'lucide-react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
@@ -11,6 +11,10 @@ const patientLinks = [
   { to: '/patient/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/patient/symptoms', icon: Activity, label: 'Symptom Checker' },
   { to: '/patient/doctors', icon: Stethoscope, label: 'Find Doctors' },
+  { to: '/patient/records', icon: FolderOpen, label: 'Health Records' },
+  { to: '/patient/medicines', icon: Pill, label: 'Medicine Reminder' },
+  { to: '/patient/nearby', icon: MapPin, label: 'Nearby Places' },
+  { to: '/patient/ai-reader', icon: ScanLine, label: 'AI Reader' },
   { to: '/patient/profile', icon: User, label: 'Profile' },
 ]
 

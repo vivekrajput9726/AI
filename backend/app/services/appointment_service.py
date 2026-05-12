@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from app.database.connection import get_db
 from app.utils.helpers import serialize_doc, str_to_objectid
 from app.schemas.appointment_schema import AppointmentCreateRequest
+from app.utils.email_utils import send_appointment_booked_email, send_appointment_confirmed_email, send_appointment_cancelled_email
 
 
 async def create_appointment(patient: dict, data: AppointmentCreateRequest) -> dict:
@@ -32,6 +33,16 @@ async def create_appointment(patient: dict, data: AppointmentCreateRequest) -> d
 
     result = await db.appointments.insert_one(appointment_doc)
     appointment_doc["_id"] = result.inserted_id
+
+    # Send email notification
+    send_appointment_booked_email(
+        patient_email=patient.get("email", ""),
+        patient_name=patient["full_name"],
+        doctor_name=doctor["name"],
+        date=data.appointment_date,
+        time=data.appointment_time
+    )
+
     return serialize_doc(appointment_doc)
 
 
@@ -71,6 +82,26 @@ async def update_appointment_status(appointment_id: str, new_status: str, actor:
         {"$set": {"status": new_status, "updated_at": datetime.utcnow()}},
         return_document=True
     )
+
+    # Send email based on new status
+    patient = await db.users.find_one({"_id": str_to_objectid(appointment["patient_id"])})
+    if patient:
+        if new_status == "confirmed":
+            send_appointment_confirmed_email(
+                patient_email=patient.get("email", ""),
+                patient_name=appointment.get("patient_name", ""),
+                doctor_name=appointment.get("doctor_name", ""),
+                date=appointment.get("appointment_date", ""),
+                time=appointment.get("appointment_time", "")
+            )
+        elif new_status == "cancelled":
+            send_appointment_cancelled_email(
+                patient_email=patient.get("email", ""),
+                patient_name=appointment.get("patient_name", ""),
+                doctor_name=appointment.get("doctor_name", ""),
+                date=appointment.get("appointment_date", "")
+            )
+
     return serialize_doc(result)
 
 

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { Calendar, Clock, CheckCircle, XCircle, User, Video, FileText } from 'lucide-react'
+import { Calendar, Clock, CheckCircle, XCircle, User, Video, FileText, MessageCircle } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import LoadingSpinner from '../components/common/LoadingSpinner'
+import Chat from '../components/common/Chat'
 import api from '../services/api'
 import { formatDate, getStatusColor } from '../utils/helpers'
 import toast from 'react-hot-toast'
@@ -14,6 +15,15 @@ function DoctorDashboard() {
   const [stats, setStats] = useState({ total: 0, pending: 0, confirmed: 0, completed: 0 })
   const [prescriptionModal, setPrescriptionModal] = useState(null)
   const [prescription, setPrescription] = useState('')
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatRoom, setChatRoom] = useState(null)
+  const [chatName, setChatName] = useState('')
+
+  const openChat = (appointment) => {
+    setChatRoom(`appointment_${appointment.id}`)
+    setChatName(appointment.patient_name)
+    setChatOpen(true)
+  }
 
   useEffect(() => {
     loadAppointments()
@@ -148,10 +158,16 @@ function DoctorDashboard() {
                         <Video size={14} /> Start Video Call
                       </a>
                       <button
+                        onClick={() => openChat(apt)}
+                        className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1"
+                      >
+                        <MessageCircle size={14} /> Chat
+                      </button>
+                      <button
                         onClick={() => setPrescriptionModal(apt.id)}
                         className="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1"
                       >
-                        <FileText size={14} /> Add Prescription
+                        <FileText size={14} /> Prescription
                       </button>
                     </div>
                   )}
@@ -168,6 +184,14 @@ function DoctorDashboard() {
           )}
         </div>
       </div>
+
+      {chatOpen && chatRoom && (
+        <Chat
+          roomId={chatRoom}
+          otherPersonName={chatName}
+          onClose={() => setChatOpen(false)}
+        />
+      )}
 
       {/* Prescription Modal */}
       {prescriptionModal && (

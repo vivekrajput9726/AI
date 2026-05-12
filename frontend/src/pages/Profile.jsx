@@ -1,15 +1,41 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
-import { User, Mail, Phone, MapPin, Calendar, Shield, Edit3, Save, X } from 'lucide-react'
+import { User, Mail, Phone, MapPin, Calendar, Shield, Edit3, Save, X, Camera } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 import { updateProfile } from '../redux/slices/authSlice'
 import { getInitials } from '../utils/helpers'
+import api from '../services/api'
+import toast from 'react-hot-toast'
 
 function Profile() {
   const { user, loading } = useSelector(s => s.auth)
   const dispatch = useDispatch()
   const [editing, setEditing] = useState(false)
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const fileInputRef = useRef(null)
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be under 2MB')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = async () => {
+      setPhotoUploading(true)
+      try {
+        await dispatch(updateProfile({ profile_image: reader.result }))
+        toast.success('Profile photo updated!')
+      } catch {
+        toast.error('Failed to upload photo')
+      } finally {
+        setPhotoUploading(false)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
   const [form, setForm] = useState({
     full_name: user?.full_name || '',
     phone: user?.phone || '',
@@ -59,12 +85,22 @@ function Profile() {
 
         {/* Avatar Section */}
         <div className="card text-center">
-          <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4">
-            {user?.profile_image ? (
-              <img src={user.profile_image} alt="" className="w-full h-full rounded-3xl object-cover" />
-            ) : (
-              getInitials(user?.full_name)
-            )}
+          <div className="relative w-24 h-24 mx-auto mb-4">
+            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-3xl font-bold overflow-hidden">
+              {user?.profile_image ? (
+                <img src={user.profile_image} alt="" className="w-full h-full object-cover" />
+              ) : (
+                getInitials(user?.full_name)
+              )}
+            </div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={photoUploading}
+              className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center shadow-md transition-colors"
+            >
+              {photoUploading ? <LoadingSpinner size="sm" /> : <Camera size={14} />}
+            </button>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
           </div>
           <h2 className="font-bold text-xl text-gray-900">{user?.full_name}</h2>
           <p className="text-gray-500 text-sm capitalize">{user?.role} Account</p>

@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux'
 import { Users, Stethoscope, Calendar, CheckCircle, Shield, XCircle, ToggleLeft, ToggleRight } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import LoadingSpinner from '../components/common/LoadingSpinner'
+import { PlatformStatsChart, SpecializationPieChart, AppointmentBarChart } from '../components/common/Charts'
 import api from '../services/api'
 import { formatDate } from '../utils/helpers'
 import toast from 'react-hot-toast'
@@ -208,6 +209,17 @@ function AdminDashboard() {
 
         {/* Overview Tab */}
         {tab === 'overview' && (
+          <>
+          {/* Charts */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <PlatformStatsChart stats={stats} />
+            <SpecializationPieChart data={
+              [...new Set(doctors.map(d => d.specialization))].slice(0, 6).map(spec => ({
+                name: spec?.length > 12 ? spec.slice(0, 12) + '...' : spec,
+                value: doctors.filter(d => d.specialization === spec).length
+              }))
+            } />
+          </div>
           <div className="card">
             <h2 className="font-semibold text-gray-900 mb-4">Platform Summary</h2>
             <div className="grid md:grid-cols-2 gap-6">
@@ -246,6 +258,7 @@ function AdminDashboard() {
               </div>
             </div>
           </div>
+          </>
         )}
       </div>
     </DashboardLayout>

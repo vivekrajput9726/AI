@@ -10,7 +10,8 @@ async def get_all_doctors(
     limit: int = 12,
     specialization: Optional[str] = None,
     search: Optional[str] = None,
-    min_rating: Optional[float] = None
+    min_rating: Optional[float] = None,
+    max_fee: Optional[float] = None
 ) -> dict:
     db = get_db()
     query = {"is_active": True}
@@ -25,6 +26,8 @@ async def get_all_doctors(
         ]
     if min_rating:
         query["rating"] = {"$gte": min_rating}
+    if max_fee:
+        query["consultation_fee"] = {"$lte": max_fee}
 
     skip, lim = paginate_query(page, limit)
     total = await db.doctors.count_documents(query)

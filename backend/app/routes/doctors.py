@@ -15,9 +15,10 @@ async def list_doctors(
     limit: int = Query(12, ge=1, le=50),
     specialization: Optional[str] = None,
     search: Optional[str] = None,
-    min_rating: Optional[float] = None
+    min_rating: Optional[float] = None,
+    max_fee: Optional[float] = None
 ):
-    return await get_all_doctors(page, limit, specialization, search, min_rating)
+    return await get_all_doctors(page, limit, specialization, search, min_rating, max_fee)
 
 
 @router.get("/specializations", summary="Get list of available specializations")
