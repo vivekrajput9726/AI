@@ -1,10 +1,13 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
-import { Activity, Calendar, Clock, Stethoscope, Brain, ChevronRight, AlertCircle } from 'lucide-react'
+import { Activity, Calendar, Clock, Stethoscope, Brain, ChevronRight, AlertCircle, MessageCircle } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import DoctorCard from '../components/common/DoctorCard'
 import LoadingSpinner from '../components/common/LoadingSpinner'
+import Chat from '../components/common/Chat'
+import api from '../services/api'
+import { DiseaseBarChart } from '../components/common/Charts'
 import { fetchMyAppointments } from '../redux/slices/appointmentSlice'
 import { fetchDoctors } from '../redux/slices/doctorSlice'
 import { formatDate, getStatusColor } from '../utils/helpers'
@@ -34,10 +37,21 @@ function PatientDashboard() {
   const { user } = useSelector(s => s.auth)
   const { list: appointments, loading: aptLoading } = useSelector(s => s.appointments)
   const { list: doctors, loading: docLoading } = useSelector(s => s.doctors)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatRoom, setChatRoom] = useState(null)
+  const [chatName, setChatName] = useState('')
+  const [diseaseData, setDiseaseData] = useState([])
+
+  const openChat = (appointment) => {
+    setChatRoom(`appointment_${appointment.id}`)
+    setChatName(appointment.doctor_name)
+    setChatOpen(true)
+  }
 
   useEffect(() => {
     dispatch(fetchMyAppointments())
     dispatch(fetchDoctors({ limit: 4 }))
+    api.get('/ai/disease-stats').then(res => setDiseaseData(res.data.data)).catch(() => {})
   }, [dispatch])
 
   const pending = appointments.filter(a => a.status === 'pending').length
@@ -94,9 +108,18 @@ function PatientDashboard() {
                       <p className="font-medium text-sm text-gray-900 truncate">{apt.doctor_name}</p>
                       <p className="text-xs text-gray-400">{formatDate(apt.appointment_date)} · {apt.appointment_time}</p>
                     </div>
-                    <span className={getStatusColor(apt.status) + ' capitalize'}>
-                      {apt.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={getStatusColor(apt.status) + ' capitalize'}>
+                        {apt.status}
+                      </span>
+                      <button
+                        onClick={() => openChat(apt)}
+                        className="p-1.5 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                        title="Chat with doctor"
+                      >
+                        <MessageCircle size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -136,6 +159,9 @@ function PatientDashboard() {
           </div>
         </div>
 
+        {/* Disease History Chart */}
+        <DiseaseBarChart data={diseaseData} />
+
         {/* Featured Doctors */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -155,6 +181,13 @@ function PatientDashboard() {
           )}
         </div>
       </div>
+      {chatOpen && chatRoom && (
+        <Chat
+          roomId={chatRoom}
+          otherPersonName={chatName}
+          onClose={() => setChatOpen(false)}
+        />
+      )}
     </DashboardLayout>
   )
 }

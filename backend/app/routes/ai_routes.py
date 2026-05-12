@@ -64,3 +64,20 @@ async def get_ai_history(current_user: dict = Depends(get_current_user)):
     db = get_db()
     cursor = db.medical_reports.find({"patient_id": current_user["id"]}).sort("created_at", -1).limit(10)
     return [serialize_doc(doc) async for doc in cursor]
+
+
+@router.get("/disease-stats", summary="Get disease frequency stats for patient")
+async def get_disease_stats(current_user: dict = Depends(get_current_user)):
+    db = get_db()
+    cursor = db.medical_reports.find({"patient_id": current_user["id"]})
+    reports = await cursor.to_list(length=100)
+
+    disease_count = {}
+    for report in reports:
+        conditions = report.get("ai_analysis", {}).get("possible_conditions", [])
+        for condition in conditions:
+            name = condition.get("name", "Unknown")
+            disease_count[name] = disease_count.get(name, 0) + 1
+
+    data = [{"disease": k, "count": v} for k, v in sorted(disease_count.items(), key=lambda x: -x[1])]
+    return {"data": data[:10]}

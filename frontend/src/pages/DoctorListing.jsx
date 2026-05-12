@@ -12,6 +12,7 @@ function DoctorListing() {
   const [search, setSearch] = useState('')
   const [selectedSpec, setSelectedSpec] = useState('')
   const [minRating, setMinRating] = useState('')
+  const [maxFee, setMaxFee] = useState('')
   const [page, setPage] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
   const limit = 12
@@ -25,8 +26,9 @@ function DoctorListing() {
     if (search) params.search = search
     if (selectedSpec) params.specialization = selectedSpec
     if (minRating) params.min_rating = minRating
+    if (maxFee) params.max_fee = maxFee
     dispatch(fetchDoctors(params))
-  }, [dispatch, page, search, selectedSpec, minRating])
+  }, [dispatch, page, search, selectedSpec, minRating, maxFee])
 
   const handleSearch = (e) => {
     setSearch(e.target.value)
@@ -37,11 +39,12 @@ function DoctorListing() {
     setSearch('')
     setSelectedSpec('')
     setMinRating('')
+    setMaxFee('')
     setPage(1)
   }
 
   const totalPages = Math.ceil(total / limit)
-  const hasFilters = search || selectedSpec || minRating
+  const hasFilters = search || selectedSpec || minRating || maxFee
 
   return (
     <DashboardLayout>
@@ -106,6 +109,20 @@ function DoctorListing() {
                   <option value="4.5">4.5+ Stars</option>
                   <option value="4.7">4.7+ Stars</option>
                   <option value="4.9">4.9 Stars</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Max Consultation Fee (₹)</label>
+                <select
+                  value={maxFee}
+                  onChange={e => { setMaxFee(e.target.value); setPage(1) }}
+                  className="input-field"
+                >
+                  <option value="">Any Fee</option>
+                  <option value="500">Up to ₹500</option>
+                  <option value="1000">Up to ₹1000</option>
+                  <option value="1500">Up to ₹1500</option>
+                  <option value="2000">Up to ₹2000</option>
                 </select>
               </div>
             </div>

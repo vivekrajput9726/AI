@@ -12,6 +12,10 @@ import DoctorListing from './pages/DoctorListing'
 import AppointmentBooking from './pages/AppointmentBooking'
 import VideoConsultation from './pages/VideoConsultation'
 import Profile from './pages/Profile'
+import HealthRecords from './pages/HealthRecords'
+import MedicineReminder from './pages/MedicineReminder'
+import NearbyPlaces from './pages/NearbyPlaces'
+import PrescriptionReader from './pages/PrescriptionReader'
 import ProtectedRoute from './routes/ProtectedRoute'
 
 function App() {
@@ -59,6 +63,26 @@ function App() {
         <Route path="/patient/profile" element={
           <ProtectedRoute roles={['patient']}>
             <Profile />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/records" element={
+          <ProtectedRoute roles={['patient']}>
+            <HealthRecords />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/medicines" element={
+          <ProtectedRoute roles={['patient']}>
+            <MedicineReminder />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/nearby" element={
+          <ProtectedRoute roles={['patient']}>
+            <NearbyPlaces />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/ai-reader" element={
+          <ProtectedRoute roles={['patient']}>
+            <PrescriptionReader />
           </ProtectedRoute>
         } />
 
