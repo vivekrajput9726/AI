@@ -17,7 +17,8 @@ async def analyze(data: SymptomAnalysisRequest, current_user: dict = Depends(get
         patient_age=data.patient_age,
         patient_gender=data.patient_gender,
         duration=data.duration,
-        severity=data.severity
+        severity=data.severity,
+        report_context=data.report_context
     )
 
     specialist_type = analysis.get("specialist_type", "General Physician")
@@ -54,7 +55,8 @@ async def chat(data: ChatRequest, current_user: dict = Depends(get_current_user)
         message=data.message,
         history=history,
         patient_age=data.patient_age,
-        patient_gender=data.patient_gender
+        patient_gender=data.patient_gender,
+        report_context=data.report_context
     )
     return {"response": response, "disclaimer": "This is not a medical diagnosis. Please consult a doctor."}
 

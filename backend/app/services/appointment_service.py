@@ -1,10 +1,16 @@
 from datetime import datetime
 from typing import Optional
+import uuid
 from fastapi import HTTPException, status
 from app.database.connection import get_db
 from app.utils.helpers import serialize_doc, str_to_objectid
 from app.schemas.appointment_schema import AppointmentCreateRequest
 from app.utils.email_utils import send_appointment_booked_email, send_appointment_confirmed_email, send_appointment_cancelled_email
+
+
+def generate_meeting_link(appointment_id: str) -> str:
+    room = f"AIHealthcare-{appointment_id[-8:]}-{uuid.uuid4().hex[:6]}"
+    return f"https://meet.jit.si/{room}"
 
 
 async def create_appointment(patient: dict, data: AppointmentCreateRequest) -> dict:
@@ -77,9 +83,16 @@ async def update_appointment_status(appointment_id: str, new_status: str, actor:
             detail=f"Cannot transition from {current} to {new_status}"
         )
 
+    update_fields = {"status": new_status, "updated_at": datetime.utcnow()}
+
+    meeting_link = None
+    if new_status == "confirmed":
+        meeting_link = generate_meeting_link(appointment_id)
+        update_fields["meeting_link"] = meeting_link
+
     result = await db.appointments.find_one_and_update(
         {"_id": str_to_objectid(appointment_id)},
-        {"$set": {"status": new_status, "updated_at": datetime.utcnow()}},
+        {"$set": update_fields},
         return_document=True
     )
 
@@ -92,7 +105,8 @@ async def update_appointment_status(appointment_id: str, new_status: str, actor:
                 patient_name=appointment.get("patient_name", ""),
                 doctor_name=appointment.get("doctor_name", ""),
                 date=appointment.get("appointment_date", ""),
-                time=appointment.get("appointment_time", "")
+                time=appointment.get("appointment_time", ""),
+                meeting_link=meeting_link
             )
         elif new_status == "cancelled":
             send_appointment_cancelled_email(

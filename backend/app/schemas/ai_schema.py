@@ -8,6 +8,7 @@ class SymptomAnalysisRequest(BaseModel):
     patient_gender: Optional[str] = None
     duration: Optional[str] = None
     severity: Optional[str] = None
+    report_context: Optional[str] = None  # JSON string of pre-analyzed report data
 
 
 class DoctorRecommendation(BaseModel):
@@ -41,5 +42,12 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: List[ChatMessage] = []
+    patient_age: Optional[int] = None
+    patient_gender: Optional[str] = None
+    report_context: Optional[str] = None  # JSON string of analyzed report data
+
+
+class ReportTextAnalysisRequest(BaseModel):
+    description: str  # User-described report content
     patient_age: Optional[int] = None
     patient_gender: Optional[str] = None

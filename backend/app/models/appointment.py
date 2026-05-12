@@ -20,6 +20,7 @@ class AppointmentModel(BaseModel):
     prescription: Optional[str] = None
     consultation_fee: float = 0
     video_session_id: Optional[str] = None
+    meeting_link: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

@@ -142,7 +142,8 @@ async def analyze_symptoms(
     patient_age: Optional[int] = None,
     patient_gender: Optional[str] = None,
     duration: Optional[str] = None,
-    severity: Optional[str] = None
+    severity: Optional[str] = None,
+    report_context: Optional[str] = None
 ) -> dict:
     """Analyze symptoms using OpenAI with rule-based fallback."""
 
@@ -155,6 +156,8 @@ async def analyze_symptoms(
         patient_context += f"\nDuration: {duration}"
     if severity:
         patient_context += f"\nSelf-reported severity: {severity}"
+    if report_context:
+        patient_context += f"\n\nPatient has also uploaded a medical report. Use this data to refine your analysis:\n{report_context}"
 
     if settings.OPENAI_API_KEY:
         try:
@@ -182,11 +185,29 @@ async def analyze_symptoms(
     return rule_based_analysis(symptoms)
 
 
-async def chat_with_ai(message: str, history: list, patient_age: Optional[int] = None, patient_gender: Optional[str] = None) -> str:
-    """Conversational AI for health queries."""
-    system = """You are a compassionate AI health assistant. Help users understand their symptoms and guide them to appropriate care.
+async def chat_with_ai(
+    message: str,
+    history: list,
+    patient_age: Optional[int] = None,
+    patient_gender: Optional[str] = None,
+    report_context: Optional[str] = None
+) -> str:
+    """Conversational AI for health queries, optionally grounded in an uploaded report."""
+    base_system = """You are a compassionate AI health assistant. Help users understand their symptoms and guide them to appropriate care.
     Always remind users to consult real doctors. Be warm, clear, and professional.
     Never make definitive diagnoses. Add the disclaimer at the end of each response."""
+
+    if report_context:
+        system = base_system + f"""
+
+IMPORTANT: The patient has uploaded a medical report. Use the following report data to give specific, accurate, and personalised answers. Explain values in simple language, highlight any abnormal findings, and recommend appropriate next steps.
+
+REPORT DATA:
+{report_context}
+
+When answering, reference the specific values from the report where relevant. If the user asks about a value in the report, explain what it means in plain language."""
+    else:
+        system = base_system
 
     messages = [{"role": "system", "content": system}]
     for h in history[-10:]:

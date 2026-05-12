@@ -33,28 +33,36 @@ async def register_user(data: UserRegisterRequest) -> dict:
     user_doc["_id"] = result.inserted_id
 
     if data.role == "doctor":
-        doctor_doc = {
-            "user_id": str(result.inserted_id),
-            "name": data.full_name,
-            "email": data.email,
-            "specialization": "General Physician",
-            "experience_years": 0,
-            "qualification": "",
-            "hospital": "",
-            "location": "",
-            "consultation_fee": 500,
-            "rating": 0.0,
-            "total_reviews": 0,
-            "profile_image": "",
-            "availability": [],
-            "languages": ["English"],
-            "is_verified": False,
-            "is_active": True,
-            "is_static": False,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
-        }
-        await db.doctors.insert_one(doctor_doc)
+        # Link to existing seeded doctor profile if email matches, otherwise create new
+        existing_doctor = await db.doctors.find_one({"email": data.email})
+        if existing_doctor:
+            await db.doctors.update_one(
+                {"_id": existing_doctor["_id"]},
+                {"$set": {"user_id": str(result.inserted_id), "updated_at": datetime.utcnow()}}
+            )
+        else:
+            doctor_doc = {
+                "user_id": str(result.inserted_id),
+                "name": data.full_name,
+                "email": data.email,
+                "specialization": "General Physician",
+                "experience_years": 0,
+                "qualification": "",
+                "hospital": "",
+                "location": "",
+                "consultation_fee": 500,
+                "rating": 0.0,
+                "total_reviews": 0,
+                "profile_image": "",
+                "availability": [],
+                "languages": ["English"],
+                "is_verified": False,
+                "is_active": True,
+                "is_static": False,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+            await db.doctors.insert_one(doctor_doc)
 
     serialized = serialize_doc(user_doc)
     access_token = create_access_token({"sub": serialized["id"], "role": data.role})

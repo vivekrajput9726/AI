@@ -3,7 +3,8 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import {
   Send, Brain, AlertCircle, AlertTriangle, CheckCircle,
-  Stethoscope, ChevronRight, RefreshCw, User, Bot
+  Stethoscope, ChevronRight, RefreshCw, User, Bot,
+  Upload, FileText, ChevronDown, ChevronUp, X, Loader
 } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import DoctorCard from '../components/common/DoctorCard'
@@ -11,6 +12,8 @@ import LoadingSpinner from '../components/common/LoadingSpinner'
 import { analyzeSymptoms, addChatMessage, clearAnalysis } from '../redux/slices/aiSlice'
 import { sendChatMessage } from '../redux/slices/aiSlice'
 import { severityColor } from '../utils/helpers'
+import api from '../services/api'
+import toast from 'react-hot-toast'
 
 const QUICK_SYMPTOMS = [
   'Fever, headache, body pain',
@@ -46,17 +49,68 @@ function SymptomChecker() {
   const [age, setAge] = useState('')
   const [gender, setGender] = useState('')
   const chatEndRef = useRef(null)
+  const fileInputRef = useRef(null)
+
+  // Report attachment state
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportMode, setReportMode] = useState('text') // text | image
+  const [reportText, setReportText] = useState('')
+  const [reportImageBase64, setReportImageBase64] = useState(null)
+  const [reportImagePreview, setReportImagePreview] = useState(null)
+  const [reportAnalysis, setReportAnalysis] = useState(null) // analyzed result
+  const [reportAnalyzing, setReportAnalyzing] = useState(false)
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatHistory])
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return }
+    const reader = new FileReader()
+    reader.onload = (ev) => { setReportImageBase64(ev.target.result); setReportImagePreview(ev.target.result) }
+    reader.readAsDataURL(file)
+  }
+
+  const analyzeReport = async () => {
+    setReportAnalyzing(true)
+    try {
+      let res
+      if (reportMode === 'image' && reportImageBase64) {
+        res = await api.post('/ai/analyze-report', { image_base64: reportImageBase64 })
+      } else if (reportMode === 'text' && reportText.trim()) {
+        res = await api.post('/ai/analyze-report-text', {
+          description: reportText.trim(),
+          patient_age: age ? parseInt(age) : undefined,
+          patient_gender: gender || undefined,
+        })
+      }
+      if (res?.data?.success) {
+        setReportAnalysis(res.data.data)
+        toast.success('Report attached! AI will use it in the analysis.')
+      } else {
+        toast.error(res?.data?.error || 'Could not analyze report')
+      }
+    } catch {
+      toast.error('Report analysis failed')
+    } finally {
+      setReportAnalyzing(false)
+    }
+  }
+
+  const clearReport = () => {
+    setReportText(''); setReportImageBase64(null); setReportImagePreview(null)
+    setReportAnalysis(null); setReportOpen(false)
+  }
+
   const handleAnalyze = async () => {
     if (!symptoms.trim()) return
-    const result = await dispatch(analyzeSymptoms({
+    dispatch(analyzeSymptoms({
       symptoms,
       patient_age: age ? parseInt(age) : null,
       patient_gender: gender || null,
+      report_context: reportAnalysis ? JSON.stringify(reportAnalysis) : null,
     }))
   }
 
@@ -71,6 +125,7 @@ function SymptomChecker() {
       history: chatHistory,
       patient_age: age ? parseInt(age) : null,
       patient_gender: gender || null,
+      report_context: reportAnalysis ? JSON.stringify(reportAnalysis) : null,
     }))
   }
 
@@ -165,6 +220,84 @@ function SymptomChecker() {
               placeholder="e.g. I have a high fever of 102°F, severe headache, body aches, and fatigue for the past 2 days. I also have a slight cough..."
               className="input-field h-32 resize-none mb-4"
             />
+
+            {/* Report Attachment Section */}
+            <div className="mb-4 border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setReportOpen(o => !o)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-sm"
+              >
+                <span className="flex items-center gap-2 font-medium text-gray-700">
+                  <FileText size={15} className="text-teal-600" />
+                  Attach Medical Report
+                  {reportAnalysis && (
+                    <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-semibold">Attached</span>
+                  )}
+                  <span className="text-xs text-gray-400 font-normal">(Optional — improves AI accuracy)</span>
+                </span>
+                {reportOpen ? <ChevronUp size={15} className="text-gray-400" /> : <ChevronDown size={15} className="text-gray-400" />}
+              </button>
+
+              {reportOpen && (
+                <div className="p-4 space-y-3">
+                  {reportAnalysis ? (
+                    <div className="flex items-start gap-3 bg-teal-50 rounded-xl p-3">
+                      <CheckCircle size={16} className="text-teal-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-teal-800">Report attached</p>
+                        <p className="text-xs text-teal-600 mt-0.5 truncate">{reportAnalysis.report_type || 'Medical Report'} · {reportAnalysis.overall_summary?.slice(0, 80)}…</p>
+                      </div>
+                      <button onClick={clearReport} className="text-teal-500 hover:text-red-500 transition-colors flex-shrink-0">
+                        <X size={15} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Mode toggle */}
+                      <div className="flex gap-1.5 p-1 bg-gray-100 rounded-lg w-fit">
+                        {['text', 'image'].map(m => (
+                          <button key={m} onClick={() => setReportMode(m)}
+                            className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${reportMode === m ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-500'}`}>
+                            {m === 'text' ? 'Describe / Paste' : 'Upload Image'}
+                          </button>
+                        ))}
+                      </div>
+
+                      {reportMode === 'text' ? (
+                        <textarea
+                          value={reportText}
+                          onChange={e => setReportText(e.target.value)}
+                          placeholder={"Paste or type your report values:\ne.g. Hemoglobin: 9.5 g/dL (low), Blood Sugar: 126 mg/dL, WBC: 11,000..."}
+                          className="input-field h-24 resize-none text-sm"
+                        />
+                      ) : (
+                        <div>
+                          <div onClick={() => fileInputRef.current?.click()}
+                            className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition-colors">
+                            {reportImagePreview
+                              ? <img src={reportImagePreview} alt="Report" className="max-h-28 mx-auto rounded-lg object-contain" />
+                              : <><Upload size={22} className="mx-auto text-gray-300 mb-1" /><p className="text-xs text-gray-500">Click to upload report image (JPG/PNG, max 5MB)</p></>
+                            }
+                          </div>
+                          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                        </div>
+                      )}
+
+                      <button
+                        onClick={analyzeReport}
+                        disabled={reportAnalyzing || (reportMode === 'text' ? !reportText.trim() : !reportImageBase64)}
+                        className="btn-primary text-sm py-2 flex items-center gap-2 w-full justify-center"
+                      >
+                        {reportAnalyzing
+                          ? <><Loader size={14} className="animate-spin" /> Analyzing Report...</>
+                          : <><FileText size={14} /> Attach & Analyze Report</>}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-3">
               {analysis && (
                 <button
@@ -179,7 +312,7 @@ function SymptomChecker() {
                 disabled={loading || !symptoms.trim()}
                 className="btn-primary flex items-center gap-2 flex-1 justify-center"
               >
-                {loading ? <LoadingSpinner size="sm" /> : <><Brain size={16} /> Analyze Symptoms</>}
+                {loading ? <LoadingSpinner size="sm" /> : <><Brain size={16} /> {reportAnalysis ? 'Analyze with Report' : 'Analyze Symptoms'}</>}
               </button>
             </div>
           </div>

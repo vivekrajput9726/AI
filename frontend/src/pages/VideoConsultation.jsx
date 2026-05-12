@@ -39,6 +39,14 @@ function VideoConsultation() {
       const aptRes = await api.get(`/appointments/${appointmentId}`)
       setAppointment(aptRes.data)
 
+      // Use the pre-generated Jitsi meeting link if available
+      if (aptRes.data.meeting_link) {
+        setSession({ room_url: aptRes.data.meeting_link })
+        setCallState('ready_external')
+        setLoading(false)
+        return
+      }
+
       const sessionRes = await api.post(`/video/session/${appointmentId}`)
       setSession(sessionRes.data)
 
@@ -137,24 +145,75 @@ function VideoConsultation() {
   }
 
   if (session?.room_url) {
+    const isMeetLink = session.room_url.includes('meet.jit.si') || session.room_url.includes('meet.google.com')
     return (
       <DashboardLayout>
-        <div className="max-w-5xl mx-auto">
-          <div className="mb-4">
-            <h1 className="text-xl font-bold text-gray-900">Video Consultation</h1>
+        <div className="max-w-3xl mx-auto space-y-4">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Video size={20} className="text-blue-600" /> Video Consultation
+            </h1>
             {appointment && (
-              <p className="text-gray-500 text-sm">
+              <p className="text-gray-500 text-sm mt-0.5">
                 {user?.role === 'doctor' ? `Patient: ${appointment.patient_name}` : `Doctor: ${appointment.doctor_name}`}
+                {appointment.appointment_date && ` · ${appointment.appointment_date} at ${appointment.appointment_time}`}
               </p>
             )}
           </div>
-          <div className="rounded-2xl overflow-hidden shadow-lg" style={{ height: '600px' }}>
-            <iframe
-              src={session.room_url}
-              allow="camera; microphone; fullscreen; speaker; display-capture"
-              style={{ width: '100%', height: '100%', border: 'none' }}
-              title="Video Consultation"
-            />
+
+          {/* Meeting Card */}
+          <div className="card text-center py-10 space-y-5">
+            <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto">
+              <Video size={36} className="text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Your Meeting Room is Ready</h2>
+              <p className="text-gray-500 text-sm mt-1">
+                {user?.role === 'doctor'
+                  ? `Share the link with ${appointment?.patient_name || 'your patient'} so they can join.`
+                  : 'Click the button below to join your video consultation.'}
+              </p>
+            </div>
+
+            {/* Meeting link display */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 max-w-md mx-auto">
+              <Monitor size={15} className="text-gray-400 flex-shrink-0" />
+              <p className="text-xs text-gray-600 truncate flex-1">{session.room_url}</p>
+              <button
+                onClick={() => { navigator.clipboard.writeText(session.room_url); toast.success('Link copied!') }}
+                className="text-xs text-blue-600 hover:underline flex-shrink-0"
+              >
+                Copy
+              </button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <a
+                href={session.room_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary flex items-center justify-center gap-2 text-base py-3 px-8"
+              >
+                <Video size={18} /> Join Video Call
+              </a>
+              <button
+                onClick={() => navigate(-1)}
+                className="btn-secondary flex items-center justify-center gap-2 py-3 px-6"
+              >
+                <PhoneOff size={16} /> Back
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-400 mt-2">
+              Opens in a new tab · No downloads required · Works on all browsers
+            </p>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
+            <AlertCircle size={15} className="text-blue-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-700">
+              Both doctor and patient must click "Join Video Call" to connect. Make sure your camera and microphone are enabled in the browser.
+            </p>
           </div>
         </div>
       </DashboardLayout>

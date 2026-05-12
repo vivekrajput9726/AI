@@ -16,6 +16,7 @@ import HealthRecords from './pages/HealthRecords'
 import MedicineReminder from './pages/MedicineReminder'
 import NearbyPlaces from './pages/NearbyPlaces'
 import PrescriptionReader from './pages/PrescriptionReader'
+import ReportAnalyzer from './pages/ReportAnalyzer'
 import ProtectedRoute from './routes/ProtectedRoute'
 
 function App() {
@@ -83,6 +84,11 @@ function App() {
         <Route path="/patient/ai-reader" element={
           <ProtectedRoute roles={['patient']}>
             <PrescriptionReader />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/report-analyzer" element={
+          <ProtectedRoute roles={['patient']}>
+            <ReportAnalyzer />
           </ProtectedRoute>
         } />
 
