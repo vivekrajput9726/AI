@@ -85,39 +85,89 @@ Return ONLY a valid JSON object in this exact format (no extra text):
         return {"success": False, "error": str(e)}
 
 
-@router.post("/analyze-report", summary="AI analyzes health report")
-async def analyze_report(data: PrescriptionRequest, current_user: dict = Depends(get_current_user)):
-    if not settings.GEMINI_API_KEY:
-        return {"success": False, "error": "Gemini API key not configured"}
+REPORT_PROMPT = """You are an expert medical report analyzer with OCR capability.
+CAREFULLY read ALL text visible in this image. Extract EVERY number, value, and parameter you can see.
 
-    try:
-        prompt = """You are a medical report analyzer. Analyze this health/lab report image carefully.
+This image may be a lab report, blood test, X-ray, MRI, ECG, prescription, or medical document.
 
-Return ONLY a valid JSON object in this exact format (no extra text):
+IMPORTANT RULES:
+- Read the ACTUAL values shown in the image, do not guess or make up values
+- If you can see text/numbers, extract them exactly as written
+- If the image is blurry or unreadable, set overall_summary to explain this
+
+Return ONLY a valid JSON object (no extra text, no markdown):
 {
-  "report_type": "Type of report",
-  "date": "Date if visible or empty string",
-  "lab_name": "Laboratory name if visible or empty string",
+  "report_type": "Exact type detected (Blood Test / X-Ray / Prescription / ECG / MRI / Urine Test / etc.)",
+  "severity": "Normal or Mild Concern or Moderate Concern or Urgent",
+  "overall_summary": "2-3 sentence plain-language summary of what you found in this report",
   "parameters": [
     {
-      "name": "Parameter name",
-      "value": "Measured value",
-      "unit": "Unit of measurement",
-      "normal_range": "Normal range if shown",
-      "status": "normal or high or low",
-      "interpretation": "Brief explanation"
+      "name": "Exact parameter name from the report",
+      "value": "Exact value shown in report",
+      "unit": "Unit shown (g/dL, mg/dL, cells/mcL, etc.)",
+      "normal_range": "Normal range if shown in report",
+      "status": "normal or high or low or unknown",
+      "interpretation": "What this value means for the patient in simple words"
     }
   ],
-  "overall_summary": "Overall health summary in simple language",
-  "concerns": ["List of concerning values if any"],
-  "recommendations": ["List of recommendations"],
-  "doctor_to_consult": "Type of specialist to consult if needed"
+  "concerns": ["List specific abnormal values or findings with their actual numbers"],
+  "recommendations": ["Specific actionable recommendations based on these results"],
+  "doctor_to_consult": "Specific specialist type based on findings"
 }"""
 
-        result = call_gemini(data.image_base64, prompt)
+
+async def analyze_with_openai(image_base64: str) -> dict:
+    """Use OpenAI GPT-4o-mini vision to analyze an image."""
+    from openai import AsyncOpenAI
+    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+    if not image_base64.startswith("data:"):
+        image_base64 = f"data:image/jpeg;base64,{image_base64}"
+
+    response = await client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": REPORT_PROMPT},
+                    {"type": "image_url", "image_url": {"url": image_base64, "detail": "high"}}
+                ]
+            }
+        ],
+        max_tokens=1200,
+        temperature=0.2
+    )
+    content = response.choices[0].message.content.strip()
+    json_match = re.search(r'\{.*\}', content, re.DOTALL)
+    if json_match:
+        return json.loads(json_match.group())
+    return None
+
+
+@router.post("/analyze-report", summary="AI analyzes health report or camera image")
+async def analyze_report(data: PrescriptionRequest, current_user: dict = Depends(get_current_user)):
+    try:
+        result = None
+
+        # Try OpenAI Vision first (fast, reliable)
+        if settings.OPENAI_API_KEY:
+            try:
+                result = await analyze_with_openai(data.image_base64)
+            except Exception as e:
+                logger.warning(f"OpenAI vision failed, trying Gemini: {e}")
+
+        # Fallback to Gemini
+        if not result and settings.GEMINI_API_KEY:
+            try:
+                result = call_gemini(data.image_base64, REPORT_PROMPT)
+            except Exception as e:
+                logger.warning(f"Gemini also failed: {e}")
+
         if result:
             return {"success": True, "data": result}
-        return {"success": False, "error": "Could not analyze report"}
+
+        return {"success": False, "error": "AI analysis failed. Please ensure image is clear and try again."}
 
     except Exception as e:
         logger.error(f"Report AI error: {e}")
