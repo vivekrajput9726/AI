@@ -17,6 +17,11 @@ import MedicineReminder from './pages/MedicineReminder'
 import NearbyPlaces from './pages/NearbyPlaces'
 import PrescriptionReader from './pages/PrescriptionReader'
 import ReportAnalyzer from './pages/ReportAnalyzer'
+import Laboratory from './pages/Laboratory'
+import HealthScanner from './pages/HealthScanner'
+import MedicalHistory from './pages/MedicalHistory'
+import AIHealthAnalyzer from './pages/AIHealthAnalyzer'
+import MyRecords from './pages/MyRecords'
 import ProtectedRoute from './routes/ProtectedRoute'
 
 function App() {
@@ -89,6 +94,31 @@ function App() {
         <Route path="/patient/report-analyzer" element={
           <ProtectedRoute roles={['patient']}>
             <ReportAnalyzer />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/laboratory" element={
+          <ProtectedRoute roles={['patient']}>
+            <Laboratory />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/health-scanner" element={
+          <ProtectedRoute roles={['patient']}>
+            <HealthScanner />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/ai-analyzer" element={
+          <ProtectedRoute roles={['patient']}>
+            <AIHealthAnalyzer />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/medical-history" element={
+          <ProtectedRoute roles={['patient']}>
+            <MedicalHistory />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/my-records" element={
+          <ProtectedRoute roles={['patient']}>
+            <MyRecords />
           </ProtectedRoute>
         } />
 

@@ -1,15 +1,101 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { Calendar, Clock, Video, MapPin, Star, IndianRupee, ArrowLeft, CheckCircle } from 'lucide-react'
+import {
+  Video, MapPin, Star, IndianRupee, ArrowLeft, CheckCircle,
+  Phone, Mail, CreditCard, Smartphone, Building2, Wallet,
+  ShieldCheck, Lock, MessageCircle, CalendarPlus, Clock, Calendar
+} from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 import { fetchDoctorById } from '../redux/slices/doctorSlice'
 import { bookAppointment } from '../redux/slices/appointmentSlice'
 import { generateTimeSlots } from '../utils/helpers'
+import toast from 'react-hot-toast'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
+const TYPES = [
+  { type: 'video', label: 'Video Call', icon: <Video size={20} />, desc: 'Face-to-face online' },
+  { type: 'voice', label: 'Voice Call', icon: <Phone size={20} />, desc: 'Audio consultation' },
+  { type: 'in-person', label: 'In-Person', icon: <MapPin size={20} />, desc: 'Visit the clinic' },
+  { type: 'email', label: 'Email Consult', icon: <Mail size={20} />, desc: 'Written consultation' },
+]
+
+const PAYMENT_METHODS = [
+  { id: 'upi', label: 'UPI', icon: Smartphone, desc: 'GPay, PhonePe, Paytm' },
+  { id: 'card', label: 'Credit / Debit Card', icon: CreditCard, desc: 'Visa, Mastercard, RuPay' },
+  { id: 'netbanking', label: 'Net Banking', icon: Building2, desc: 'All major banks' },
+  { id: 'wallet', label: 'Wallet', icon: Wallet, desc: 'Paytm, MobiKwik' },
+]
+
+const STEPS = [
+  { n: 1, label: 'Type' },
+  { n: 2, label: 'Date & Time' },
+  { n: 3, label: 'Details' },
+  { n: 4, label: 'Confirm' },
+  { n: 5, label: 'Payment' },
+]
+
+// ── Calendar Picker ───────────────────────────────────────────────────────────
+function CalendarPicker({ selectedDate, onSelect, minDate, maxDate, availableDays }) {
+  const [viewDate, setViewDate] = useState(new Date())
+  const year = viewDate.getFullYear()
+  const month = viewDate.getMonth()
+  const monthName = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const firstDay = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  const isSelectable = (day) => {
+    const m = String(month + 1).padStart(2, '0')
+    const d = String(day).padStart(2, '0')
+    const str = `${year}-${m}-${d}`
+    if (str < minDate || str > maxDate) return false
+    const dayName = new Date(year, month, day).toLocaleDateString('en-US', { weekday: 'long' })
+    return availableDays.includes(dayName)
+  }
+
+  const toDateStr = (day) => {
+    const m = String(month + 1).padStart(2, '0')
+    const d = String(day).padStart(2, '0')
+    return `${year}-${m}-${d}`
+  }
+
+  return (
+    <div className="bg-gray-50 rounded-2xl p-4 select-none">
+      <div className="flex items-center justify-between mb-3">
+        <button type="button" onClick={() => setViewDate(new Date(year, month - 1))}
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white transition-colors text-gray-500 font-bold text-lg">‹</button>
+        <p className="font-bold text-gray-800 text-sm">{monthName}</p>
+        <button type="button" onClick={() => setViewDate(new Date(year, month + 1))}
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white transition-colors text-gray-500 font-bold text-lg">›</button>
+      </div>
+      <div className="grid grid-cols-7 mb-1">
+        {weekDays.map(d => <p key={d} className="text-center text-xs text-gray-400 font-medium py-1">{d}</p>)}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
+        {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+          const ds = toDateStr(day)
+          const ok = isSelectable(day)
+          const sel = ds === selectedDate
+          return (
+            <button type="button" key={day} disabled={!ok} onClick={() => onSelect(ds)}
+              className={`h-9 w-full rounded-xl text-xs font-semibold transition-all
+                ${sel ? 'bg-blue-600 text-white shadow-sm' :
+                  ok ? 'hover:bg-blue-100 text-gray-800 cursor-pointer' :
+                    'text-gray-300 cursor-not-allowed'}`}>
+              {day}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 function AppointmentBooking() {
   const { doctorId } = useParams()
   const navigate = useNavigate()
@@ -18,37 +104,41 @@ function AppointmentBooking() {
   const { bookingLoading } = useSelector(s => s.appointments)
 
   const [step, setStep] = useState(1)
+  const [appointmentType, setAppointmentType] = useState('video')
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedTime, setSelectedTime] = useState('')
-  const [appointmentType, setAppointmentType] = useState('video')
   const [symptoms, setSymptoms] = useState('')
   const [notes, setNotes] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('upi')
+  const [upiId, setUpiId] = useState('')
+  const [paying, setPaying] = useState(false)
   const [booked, setBooked] = useState(false)
 
-  useEffect(() => {
-    dispatch(fetchDoctorById(doctorId))
-  }, [doctorId, dispatch])
+  useEffect(() => { dispatch(fetchDoctorById(doctorId)) }, [doctorId, dispatch])
 
-  const getMinDate = () => {
-    const d = new Date()
-    d.setDate(d.getDate() + 1)
-    return d.toISOString().split('T')[0]
+  const toLocalDateStr = (d) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
   }
 
-  const getMaxDate = () => {
-    const d = new Date()
-    d.setDate(d.getDate() + 30)
-    return d.toISOString().split('T')[0]
-  }
+  const getMinDate = () => { const d = new Date(); d.setDate(d.getDate() + 1); return toLocalDateStr(d) }
+  const getMaxDate = () => { const d = new Date(); d.setDate(d.getDate() + 30); return toLocalDateStr(d) }
 
   const availableDays = doctor?.availability?.filter(a => a.is_available).map(a => a.day) || DAYS
 
-  const isDateAvailable = (dateStr) => {
-    const day = new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long' })
-    return availableDays.includes(day)
+  const isDateAvailable = (ds) => {
+    const [y, m, day] = ds.split('-').map(Number)
+    const d = new Date(y, m - 1, day) // local timezone — no UTC shift
+    return availableDays.includes(d.toLocaleDateString('en-US', { weekday: 'long' }))
   }
 
-  const handleBook = async () => {
+  const typeLabel = (t) => ({ video: 'Video Call', voice: 'Voice Call', 'in-person': 'In-Person', email: 'Email Consultation' }[t] || t)
+
+  const handlePayAndBook = async () => {
+    setPaying(true)
+    await new Promise(r => setTimeout(r, 1500))
     const result = await dispatch(bookAppointment({
       doctor_id: doctorId,
       appointment_date: selectedDate,
@@ -57,26 +147,39 @@ function AppointmentBooking() {
       symptoms,
       notes,
     }))
+    setPaying(false)
     if (result.meta.requestStatus === 'fulfilled') {
       setBooked(true)
     }
   }
 
+  // ── Success Screen ──────────────────────────────────────────────────────────
   if (booked) {
+    const calUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Dr. ' + doctor?.name)}&dates=${selectedDate?.replace(/-/g, '')}T090000/${selectedDate?.replace(/-/g, '')}T100000`
+    const waMsg = encodeURIComponent(`🏥 Appointment booked!\n👨‍⚕️ ${doctor?.name}\n📅 ${selectedDate} at ${selectedTime}\n📋 ${typeLabel(appointmentType)}\n💰 ₹${doctor?.consultation_fee}`)
+
     return (
       <DashboardLayout>
-        <div className="max-w-md mx-auto text-center py-16 animate-fade-in">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+        <div className="max-w-md mx-auto text-center py-12 animate-fade-in">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
             <CheckCircle size={40} className="text-green-600" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Appointment Booked!</h2>
-          <p className="text-gray-500 mb-2">Your appointment with <strong>{doctor?.name}</strong> has been scheduled.</p>
-          <p className="text-sm text-gray-400 mb-8">
-            {selectedDate} at {selectedTime} · {appointmentType === 'video' ? 'Video Call' : 'In-Person'}
-          </p>
+          <p className="text-gray-500 mb-1">Your appointment with <strong>{doctor?.name}</strong> is confirmed.</p>
+          <p className="text-sm text-gray-400 mb-6">{selectedDate} at {selectedTime} · {typeLabel(appointmentType)}</p>
+          <div className="flex flex-col gap-2 mb-6">
+            <a href={calUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full bg-blue-50 border border-blue-200 text-blue-700 font-medium py-3 rounded-xl hover:bg-blue-100 transition-colors text-sm">
+              <CalendarPlus size={15} /> Add to Google Calendar
+            </a>
+            <a href={`https://wa.me/?text=${waMsg}`} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full bg-green-50 border border-green-200 text-green-700 font-medium py-3 rounded-xl hover:bg-green-100 transition-colors text-sm">
+              <MessageCircle size={15} /> Share on WhatsApp
+            </a>
+          </div>
           <div className="flex gap-3 justify-center">
             <button onClick={() => navigate('/patient/dashboard')} className="btn-secondary">Dashboard</button>
-            <button onClick={() => navigate('/patient/doctors')} className="btn-primary">Find More Doctors</button>
+            <button onClick={() => navigate('/patient/doctors')} className="btn-primary">Book Another</button>
           </div>
         </div>
       </DashboardLayout>
@@ -93,178 +196,292 @@ function AppointmentBooking() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-2xl mx-auto animate-fade-in">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6 text-sm">
+      <div className="max-w-2xl mx-auto animate-fade-in pb-10">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-5 text-sm">
           <ArrowLeft size={16} /> Back
         </button>
 
-        {/* Doctor Info Card */}
-        <div className="card mb-6">
+        {/* Doctor Card */}
+        <div className="card mb-5">
           <div className="flex items-center gap-4">
-            {doctor.profile_image ? (
-              <img src={doctor.profile_image} alt={doctor.name} className="w-16 h-16 rounded-2xl object-cover" />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-blue-500 flex items-center justify-center text-white font-bold text-xl">
-                {doctor.name?.charAt(0)}
-              </div>
-            )}
-            <div className="flex-1">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-teal-400 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
+              {doctor.name?.charAt(0)}
+            </div>
+            <div className="flex-1 min-w-0">
               <h2 className="font-bold text-gray-900">{doctor.name}</h2>
               <p className="text-blue-600 text-sm">{doctor.specialization}</p>
-              <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                <span className="flex items-center gap-1"><Star size={12} className="text-yellow-400 fill-yellow-400" />{doctor.rating}</span>
+              <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                <span className="flex items-center gap-1"><Star size={11} className="text-yellow-400 fill-yellow-400" />{doctor.rating}</span>
                 <span>{doctor.experience_years} yrs exp</span>
+                <span className="flex items-center gap-1"><MapPin size={11} />{doctor.hospital}</span>
               </div>
             </div>
-            <div className="text-right">
-              <div className="flex items-center gap-1 text-green-700 font-bold">
+            <div className="text-right flex-shrink-0">
+              <div className="flex items-center gap-0.5 text-green-700 font-bold">
                 <IndianRupee size={14} />{doctor.consultation_fee}
               </div>
               <span className="text-xs text-gray-400">per consult</span>
             </div>
           </div>
-          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-1 text-sm text-gray-500">
-            <MapPin size={13} />{doctor.hospital}, {doctor.location}
-          </div>
         </div>
 
-        {/* Steps */}
-        <div className="flex items-center gap-2 mb-6">
-          {[1, 2, 3].map(s => (
-            <div key={s} className="flex items-center gap-2 flex-1">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${step >= s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                {step > s ? <CheckCircle size={16} /> : s}
+        {/* Step Indicator */}
+        <div className="flex items-center mb-4">
+          {STEPS.map(({ n, label }) => (
+            <div key={n} className="flex items-center flex-1 last:flex-none">
+              <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all
+                  ${step > n ? 'bg-blue-600 text-white' :
+                    step === n ? 'bg-blue-600 text-white ring-4 ring-blue-100' :
+                      'bg-gray-100 text-gray-400'}`}>
+                  {step > n ? <CheckCircle size={14} /> : n}
+                </div>
+                <span className={`text-xs font-medium whitespace-nowrap ${step === n ? 'text-blue-600' : 'text-gray-400'}`}>{label}</span>
               </div>
-              {s < 3 && <div className={`flex-1 h-0.5 transition-colors ${step > s ? 'bg-blue-600' : 'bg-gray-100'}`} />}
+              {n < 5 && <div className={`flex-1 h-0.5 mx-1 mb-4 ${step > n ? 'bg-blue-600' : 'bg-gray-200'}`} />}
             </div>
           ))}
         </div>
 
-        {/* Step 1: Date & Time */}
-        {step === 1 && (
-          <div className="card space-y-5 animate-slide-up">
-            <h3 className="font-semibold text-gray-900">Select Date & Time</h3>
-
-            <div>
-              <label className="label">Consultation Type</label>
-              <div className="grid grid-cols-2 gap-3">
-                {['video', 'in-person'].map(type => (
-                  <button
-                    key={type}
-                    onClick={() => setAppointmentType(type)}
-                    className={`p-3 rounded-xl border-2 transition-colors text-sm font-medium flex items-center justify-center gap-2 ${appointmentType === type ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'}`}
-                  >
-                    {type === 'video' ? <Video size={16} /> : <MapPin size={16} />}
-                    {type === 'video' ? 'Video Call' : 'In-Person'}
-                  </button>
-                ))}
-              </div>
+        {/* Selected Type Badge — visible on steps 2–5 */}
+        {step > 1 && (
+          <div className="flex items-center gap-2 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white flex-shrink-0">
+              {appointmentType === 'video' ? <Video size={14} /> :
+               appointmentType === 'voice' ? <Phone size={14} /> :
+               appointmentType === 'in-person' ? <MapPin size={14} /> :
+               <Mail size={14} />}
             </div>
-
-            <div>
-              <label className="label flex items-center gap-2"><Calendar size={14} /> Appointment Date</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={e => setSelectedDate(e.target.value)}
-                min={getMinDate()}
-                max={getMaxDate()}
-                className="input-field"
-              />
-              {selectedDate && !isDateAvailable(selectedDate) && (
-                <p className="text-xs text-red-500 mt-1">Doctor is not available on this day. Available: {availableDays.join(', ')}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="label flex items-center gap-2"><Clock size={14} /> Select Time Slot</label>
-              <div className="grid grid-cols-4 gap-2">
-                {timeSlots.map(slot => (
-                  <button
-                    key={slot}
-                    onClick={() => setSelectedTime(slot)}
-                    className={`py-2 px-3 rounded-xl text-sm font-medium border transition-colors ${selectedTime === slot ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300'}`}
-                  >
-                    {slot}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={() => setStep(2)}
-              disabled={!selectedDate || !selectedTime || !isDateAvailable(selectedDate)}
-              className="btn-primary w-full disabled:opacity-40"
-            >
-              Continue
+            <span className="text-sm font-semibold text-blue-700">{typeLabel(appointmentType)}</span>
+            <span className="text-xs text-blue-400 ml-1">selected</span>
+            <button type="button" onClick={() => setStep(1)} className="ml-auto text-xs text-blue-500 hover:text-blue-700 underline font-medium">
+              Change
             </button>
           </div>
         )}
 
-        {/* Step 2: Symptoms */}
+        {/* ── Step 1: Consultation Type ── */}
+        {step === 1 && (
+          <div className="card space-y-5">
+            <div>
+              <h3 className="font-bold text-gray-900 text-lg">Select Consultation Type</h3>
+              <p className="text-sm text-gray-400 mt-0.5">Choose how you want to consult the doctor</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {TYPES.map(({ type, label, icon, desc }) => {
+                const isSelected = appointmentType === type
+                return (
+                  <button key={type} type="button" onClick={() => setAppointmentType(type)}
+                    className={`p-4 rounded-2xl border-2 transition-all text-left flex flex-col gap-3 relative
+                      ${isSelected
+                        ? 'border-blue-600 bg-blue-50 shadow-md shadow-blue-100'
+                        : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'}`}>
+                    {/* Selected checkmark top-right */}
+                    {isSelected && (
+                      <div className="absolute top-3 right-3 w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
+                        <CheckCircle size={12} className="text-white" />
+                      </div>
+                    )}
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center
+                      ${isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                      {icon}
+                    </div>
+                    <div>
+                      <p className={`text-sm font-bold ${isSelected ? 'text-blue-700' : 'text-gray-800'}`}>{label}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Selected type summary */}
+            <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-2">
+              <CheckCircle size={15} className="text-green-500" />
+              <span className="text-sm text-gray-600">Selected: <strong className="text-blue-700">{typeLabel(appointmentType)}</strong></span>
+            </div>
+
+            <button type="button" onClick={() => setStep(2)} className="btn-primary w-full text-base py-3">
+              Continue with {typeLabel(appointmentType)} →
+            </button>
+          </div>
+        )}
+
+        {/* ── Step 2: Date & Time ── */}
         {step === 2 && (
-          <div className="card space-y-5 animate-slide-up">
-            <h3 className="font-semibold text-gray-900">Describe Your Concern</h3>
-            <div>
-              <label className="label">Symptoms (optional but recommended)</label>
-              <textarea
-                value={symptoms}
-                onChange={e => setSymptoms(e.target.value)}
-                placeholder="Describe your symptoms so the doctor can prepare for the consultation..."
-                className="input-field h-28 resize-none"
-              />
+          <div className="card space-y-4">
+            <h3 className="font-bold text-gray-900">Select Date & Time</h3>
+            <div className="grid md:grid-cols-2 gap-5">
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5"><Calendar size={14} className="text-blue-500" /> Pick a Date</p>
+                <CalendarPicker
+                  selectedDate={selectedDate}
+                  onSelect={(d) => { setSelectedDate(d); setSelectedTime('') }}
+                  minDate={getMinDate()}
+                  maxDate={getMaxDate()}
+                  availableDays={availableDays}
+                />
+                {selectedDate && !isDateAvailable(selectedDate) && (
+                  <p className="text-xs text-red-500 mt-2">Doctor unavailable. Available: {availableDays.join(', ')}</p>
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5"><Clock size={14} className="text-blue-500" /> Available Slots</p>
+                {!selectedDate ? (
+                  <div className="bg-blue-50 rounded-2xl p-6 text-center text-blue-400 text-sm">
+                    Pick a date first to see available slots
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {timeSlots.map(slot => (
+                      <button type="button" key={slot} onClick={() => setSelectedTime(slot)}
+                        className={`w-full py-3 px-4 rounded-xl text-sm font-medium border transition-all text-left
+                          ${selectedTime === slot ? 'bg-blue-600 text-white border-blue-600 shadow-sm' :
+                            'bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'}`}>
+                        {slot}
+                        {selectedTime === slot && <span className="float-right text-xs">✓ Selected</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <label className="label">Additional Notes (optional)</label>
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder="Any medical history, allergies, or other information..."
-                className="input-field h-20 resize-none"
-              />
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setStep(1)} className="btn-secondary flex-1">Back</button>
-              <button onClick={() => setStep(3)} className="btn-primary flex-1">Continue</button>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={() => setStep(1)} className="btn-secondary flex-1">Back</button>
+              <button type="button" onClick={() => setStep(3)}
+                disabled={!selectedDate || !selectedTime || !isDateAvailable(selectedDate)}
+                className="btn-primary flex-1 disabled:opacity-40">
+                Continue
+              </button>
             </div>
           </div>
         )}
 
-        {/* Step 3: Confirm */}
+        {/* ── Step 3: Details ── */}
         {step === 3 && (
-          <div className="card space-y-5 animate-slide-up">
-            <h3 className="font-semibold text-gray-900">Confirm Appointment</h3>
-            <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+          <div className="card space-y-4">
+            <h3 className="font-bold text-gray-900">Describe Your Concern</h3>
+            <div>
+              <label className="label">Symptoms <span className="text-gray-400 font-normal">(optional but recommended)</span></label>
+              <textarea value={symptoms} onChange={e => setSymptoms(e.target.value)}
+                placeholder="Describe your symptoms so the doctor can prepare..."
+                className="input-field h-28 resize-none" />
+            </div>
+            <div>
+              <label className="label">Additional Notes <span className="text-gray-400 font-normal">(optional)</span></label>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)}
+                placeholder="Medical history, allergies, or other information..."
+                className="input-field h-20 resize-none" />
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setStep(2)} className="btn-secondary flex-1">Back</button>
+              <button type="button" onClick={() => setStep(4)} className="btn-primary flex-1">Continue</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 4: Confirm ── */}
+        {step === 4 && (
+          <div className="card space-y-4">
+            <h3 className="font-bold text-gray-900">Confirm Appointment</h3>
+            <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
               {[
                 { label: 'Doctor', value: doctor.name },
                 { label: 'Specialization', value: doctor.specialization },
+                { label: 'Type', value: typeLabel(appointmentType) },
                 { label: 'Date', value: selectedDate },
                 { label: 'Time', value: selectedTime },
-                { label: 'Type', value: appointmentType === 'video' ? 'Video Consultation' : 'In-Person' },
                 { label: 'Fee', value: `₹${doctor.consultation_fee}` },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between text-sm">
                   <span className="text-gray-500">{label}</span>
-                  <span className="font-medium text-gray-900">{value}</span>
+                  <span className="font-semibold text-gray-900">{value}</span>
                 </div>
               ))}
             </div>
+            {(appointmentType === 'voice' || appointmentType === 'email') && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700">
+                {appointmentType === 'voice'
+                  ? '📞 The doctor will call your registered phone number at the scheduled time.'
+                  : '📧 The doctor will send a detailed response to your registered email address.'}
+              </div>
+            )}
             {symptoms && (
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-1">Your symptoms:</p>
+                <p className="text-xs font-semibold text-gray-500 mb-1">Your symptoms:</p>
                 <p className="text-sm text-gray-700 bg-blue-50 p-3 rounded-xl">{symptoms}</p>
               </div>
             )}
             <div className="flex gap-3">
-              <button onClick={() => setStep(2)} className="btn-secondary flex-1">Back</button>
-              <button
-                onClick={handleBook}
-                disabled={bookingLoading}
-                className="btn-primary flex-1 flex items-center justify-center gap-2"
-              >
-                {bookingLoading ? <LoadingSpinner size="sm" /> : 'Confirm Booking'}
+              <button type="button" onClick={() => setStep(3)} className="btn-secondary flex-1">Back</button>
+              <button type="button" onClick={() => setStep(5)} className="btn-primary flex-1">Proceed to Payment</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 5: Payment ── */}
+        {step === 5 && (
+          <div className="card space-y-4">
+            <div className="flex items-center gap-2">
+              <Lock size={16} className="text-green-600" />
+              <h3 className="font-bold text-gray-900">Secure Payment</h3>
+              <span className="ml-auto flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2.5 py-1 rounded-full font-medium">
+                <ShieldCheck size={12} /> SSL Secured
+              </span>
+            </div>
+
+            {/* Amount */}
+            <div className="bg-blue-50 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-blue-500 font-medium">Consultation Fee</p>
+                <div className="flex items-center gap-1 text-blue-800 font-extrabold text-2xl">
+                  <IndianRupee size={18} />{doctor.consultation_fee}
+                </div>
+                <p className="text-xs text-blue-400 mt-0.5">{doctor.name} · {typeLabel(appointmentType)}</p>
+              </div>
+              <div className="text-right text-xs text-blue-400">
+                <p>{selectedDate}</p>
+                <p>{selectedTime}</p>
+              </div>
+            </div>
+
+            {/* Payment Methods */}
+            <div className="space-y-2">
+              {PAYMENT_METHODS.map(({ id, label, icon: Icon, desc }) => (
+                <button type="button" key={id} onClick={() => setPaymentMethod(id)}
+                  className={`w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all
+                    ${paymentMethod === id ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-200'}`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+                    ${paymentMethod === id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    <Icon size={17} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className={`text-sm font-semibold ${paymentMethod === id ? 'text-blue-700' : 'text-gray-700'}`}>{label}</p>
+                    <p className="text-xs text-gray-400">{desc}</p>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center
+                    ${paymentMethod === id ? 'border-blue-600 bg-blue-600' : 'border-gray-300'}`}>
+                    {paymentMethod === id && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {paymentMethod === 'upi' && (
+              <input type="text" value={upiId} onChange={e => setUpiId(e.target.value)}
+                placeholder="Enter UPI ID (e.g. name@upi)" className="input-field" />
+            )}
+
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setStep(4)} disabled={paying} className="btn-secondary flex-1">Back</button>
+              <button type="button" onClick={handlePayAndBook} disabled={paying || bookingLoading}
+                className="btn-primary flex-1 flex items-center justify-center gap-2">
+                {paying || bookingLoading
+                  ? <><LoadingSpinner size="sm" /> Processing...</>
+                  : <><ShieldCheck size={15} /> Pay ₹{doctor.consultation_fee}</>}
               </button>
             </div>
+            <p className="text-center text-xs text-gray-400">Simulated payment — no real money charged.</p>
           </div>
         )}
       </div>

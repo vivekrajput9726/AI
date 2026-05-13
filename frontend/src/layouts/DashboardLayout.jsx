@@ -4,7 +4,7 @@ import Sidebar from '../components/common/Sidebar'
 import BottomNav from '../components/common/BottomNav'
 
 function DashboardLayout({ children }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">

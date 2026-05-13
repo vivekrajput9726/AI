@@ -43,6 +43,16 @@ async def get_records(current_user: dict = Depends(get_current_user)):
     return [serialize_doc(r) async for r in cursor]
 
 
+@router.get("/patient/{patient_id}", summary="Get health records of a patient (doctor access)")
+async def get_patient_records(patient_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["doctor", "admin"]:
+        from fastapi import HTTPException, status
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Doctors only")
+    db = get_db()
+    cursor = db.health_records.find({"patient_id": patient_id}).sort("created_at", -1)
+    return [serialize_doc(r) async for r in cursor]
+
+
 @router.delete("/{record_id}", summary="Delete health record")
 async def delete_record(record_id: str, current_user: dict = Depends(get_current_user)):
     db = get_db()

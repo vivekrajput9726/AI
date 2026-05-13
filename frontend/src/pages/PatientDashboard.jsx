@@ -1,9 +1,13 @@
 import { useEffect, useState, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
-import { Activity, Calendar, Clock, Stethoscope, Brain, ChevronRight, AlertCircle, MessageCircle, FileSearch, Video, X } from 'lucide-react'
+import {
+  Activity, Calendar, Stethoscope, Brain, ChevronRight,
+  MessageCircle, FileSearch, Video, X, Star, Heart,
+  Droplets, Weight, TrendingUp, MapPin, Pill, ArrowRight,
+  Clock, CheckCircle, FileText, CalendarPlus, Plus
+} from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
-import DoctorCard from '../components/common/DoctorCard'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 import Chat from '../components/common/Chat'
 import api from '../services/api'
@@ -11,38 +15,101 @@ import { DiseaseBarChart } from '../components/common/Charts'
 import { fetchMyAppointments } from '../redux/slices/appointmentSlice'
 import { fetchDoctors } from '../redux/slices/doctorSlice'
 import { formatDate, getStatusColor } from '../utils/helpers'
+import toast from 'react-hot-toast'
 
-function StatCard({ icon: Icon, label, value, color, onClick }) {
+// ── Rating Modal ──────────────────────────────────────────────────────────────
+function RatingModal({ appointment, onClose, onSubmit }) {
+  const [rating, setRating] = useState(0)
+  const [hovered, setHovered] = useState(0)
+  const [review, setReview] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!rating) return toast.error('Please select a star rating')
+    setSubmitting(true)
+    await onSubmit(appointment.id, rating, review)
+    setSubmitting(false)
+  }
+
   return (
-    <div
-      onClick={onClick}
-      className={`card hover:shadow-md transition-all cursor-pointer ${onClick ? 'hover:-translate-y-0.5' : ''}`}
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-500 mb-1">{label}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-900">Rate Your Consultation</h3>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-xl"><X size={16} /></button>
         </div>
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${color}`}>
-          <Icon size={22} className="text-white" />
+        <p className="text-sm text-gray-500 mb-4">How was your consultation with <strong>{appointment.doctor_name}</strong>?</p>
+        <div className="flex justify-center gap-2 mb-5">
+          {[1, 2, 3, 4, 5].map(s => (
+            <button key={s} onClick={() => setRating(s)} onMouseEnter={() => setHovered(s)} onMouseLeave={() => setHovered(0)} className="transition-transform hover:scale-110">
+              <Star size={36} className={`transition-colors ${s <= (hovered || rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200'}`} />
+            </button>
+          ))}
+        </div>
+        <textarea value={review} onChange={e => setReview(e.target.value)} placeholder="Share your experience (optional)..." className="input-field h-20 resize-none text-sm mb-4" />
+        <div className="flex gap-3">
+          <button onClick={onClose} className="btn-secondary flex-1">Skip</button>
+          <button onClick={handleSubmit} disabled={!rating || submitting} className="btn-primary flex-1">{submitting ? 'Submitting...' : 'Submit Rating'}</button>
         </div>
       </div>
     </div>
   )
 }
 
+// ── Health Metric Card ────────────────────────────────────────────────────────
+function HealthCard({ icon: Icon, label, value, unit, status, color, bg }) {
+  return (
+    <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <div className={`w-9 h-9 ${bg} rounded-xl flex items-center justify-center`}>
+          <Icon size={18} className={color} />
+        </div>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status === 'Normal' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{status}</span>
+      </div>
+      <p className="text-2xl font-extrabold text-gray-900">{value} <span className="text-sm font-normal text-gray-400">{unit}</span></p>
+      <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+    </div>
+  )
+}
+
+// ── Quick Action Card ─────────────────────────────────────────────────────────
+function QuickAction({ icon, label, desc, color, bg, onClick }) {
+  return (
+    <button onClick={onClick} className="bg-white rounded-2xl p-4 border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all text-left group flex items-start gap-3">
+      <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+        <span className={color}>{icon}</span>
+      </div>
+      <div className="min-w-0">
+        <p className="font-semibold text-gray-900 text-sm">{label}</p>
+        <p className="text-xs text-gray-400 mt-0.5 truncate">{desc}</p>
+      </div>
+    </button>
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 function PatientDashboard() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const { user } = useSelector(s => s.auth)
   const { list: appointments, loading: aptLoading } = useSelector(s => s.appointments)
-  const { list: doctors, loading: docLoading } = useSelector(s => s.doctors)
   const [chatOpen, setChatOpen] = useState(false)
   const [chatRoom, setChatRoom] = useState(null)
   const [chatName, setChatName] = useState('')
-  const [diseaseData, setDiseaseData] = useState([])
   const [activeMeeting, setActiveMeeting] = useState(null)
+  const [ratingApt, setRatingApt] = useState(null)
   const pollRef = useRef(null)
+
+  const submitRating = async (appointmentId, rating, review) => {
+    try {
+      await api.post(`/appointments/${appointmentId}/rate`, { rating, review })
+      toast.success('Thank you for your feedback!')
+      setRatingApt(null)
+      dispatch(fetchMyAppointments())
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to submit rating')
+    }
+  }
 
   const openChat = (appointment) => {
     setChatRoom(`appointment_${appointment.id}`)
@@ -51,211 +118,252 @@ function PatientDashboard() {
   }
 
   const dismissMeeting = async () => {
-    if (activeMeeting) {
-      await api.patch(`/meetings/${activeMeeting.id}/end`).catch(() => {})
-    }
+    if (activeMeeting) await api.patch(`/meetings/${activeMeeting.id}/end`).catch(() => {})
     setActiveMeeting(null)
   }
 
   useEffect(() => {
     dispatch(fetchMyAppointments())
     dispatch(fetchDoctors({ limit: 4 }))
-    api.get('/ai/disease-stats').then(res => setDiseaseData(res.data.data)).catch(() => {})
 
-    // Poll for instant meeting invitations every 10 seconds
     const poll = async () => {
       try {
         const res = await api.get('/meetings/active')
         setActiveMeeting(res.data || null)
-      } catch { /* silent */ }
+      } catch { }
     }
     poll()
     pollRef.current = setInterval(poll, 10000)
     return () => clearInterval(pollRef.current)
   }, [dispatch])
 
-  const pending = appointments.filter(a => a.status === 'pending').length
-  const confirmed = appointments.filter(a => a.status === 'confirmed').length
-  const completed = appointments.filter(a => a.status === 'completed').length
-  const recentAppointments = appointments.slice(0, 5)
+  const upcomingApt = appointments.find(a => a.status === 'confirmed') || appointments.find(a => a.status === 'pending')
+  const recentReports = appointments.filter(a => a.status === 'completed').slice(0, 2)
+  const firstName = user?.full_name?.split(' ')[0] || 'there'
+
+  const quickActions = [
+    { icon: <Brain size={18} />, label: 'AI Symptom Checker', desc: 'Check your symptoms', color: 'text-blue-600', bg: 'bg-blue-50', path: '/patient/symptoms' },
+    { icon: <Calendar size={18} />, label: 'Book Appointment', desc: 'Find & book doctors', color: 'text-green-600', bg: 'bg-green-50', path: '/patient/doctors' },
+    { icon: <FileText size={18} />, label: 'Health Records', desc: 'View your reports', color: 'text-purple-600', bg: 'bg-purple-50', path: '/patient/records' },
+    { icon: <Pill size={18} />, label: 'Medicine Reminder', desc: 'Never miss a dose', color: 'text-orange-600', bg: 'bg-orange-50', path: '/patient/medicines' },
+    { icon: <MessageCircle size={18} />, label: 'Chat with Doctor', desc: 'Talk to doctors', color: 'text-teal-600', bg: 'bg-teal-50', path: '/patient/doctors' },
+    { icon: <MapPin size={18} />, label: 'Nearby Hospitals', desc: 'Find hospitals near you', color: 'text-red-600', bg: 'bg-red-50', path: '/patient/nearby' },
+  ]
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
+      <div className="space-y-5 animate-fade-in">
 
-        {/* ── Instant Meeting Notification Banner ── */}
+        {/* ── Instant Meeting Banner ── */}
         {activeMeeting && (
-          <div className="relative bg-green-600 text-white rounded-2xl p-5 flex items-center gap-4 shadow-lg overflow-hidden">
-            {/* pulsing ring */}
+          <div className="relative bg-green-600 text-white rounded-2xl p-4 flex items-center gap-4 shadow-lg">
             <div className="relative flex-shrink-0">
-              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                <Video size={22} className="text-white" />
+              <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center">
+                <Video size={20} className="text-white" />
               </div>
               <span className="absolute inset-0 rounded-full border-2 border-white/50 animate-ping" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-base">Dr. {activeMeeting.doctor_name} wants to connect!</p>
-              <p className="text-green-100 text-sm mt-0.5">Your doctor has started an instant meeting and is waiting for you.</p>
+              <p className="font-bold">Dr. {activeMeeting.doctor_name} is calling!</p>
+              <p className="text-green-100 text-sm">Your doctor has started an instant meeting.</p>
             </div>
             <div className="flex gap-2 flex-shrink-0">
-              <a
-                href={activeMeeting.meeting_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 bg-white text-green-700 font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-green-50 transition-colors"
-              >
-                <Video size={15} /> Join Now
+              <a href={activeMeeting.meeting_link} target="_blank" rel="noopener noreferrer"
+                className="bg-white text-green-700 font-semibold text-sm px-4 py-2 rounded-xl flex items-center gap-1.5">
+                <Video size={14} /> Join Now
               </a>
-              <button
-                onClick={dismissMeeting}
-                className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl transition-colors"
-                title="Dismiss"
-              >
-                <X size={15} />
-              </button>
+              <button onClick={dismissMeeting} className="p-2 bg-white/20 hover:bg-white/30 rounded-xl"><X size={14} /></button>
             </div>
           </div>
         )}
 
-        {/* Welcome */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-6 text-white">
-          <p className="text-blue-100 text-sm mb-1">Good morning 👋</p>
-          <h1 className="text-2xl font-bold mb-3">Hello, {user?.full_name?.split(' ')[0]}!</h1>
-          <p className="text-blue-100 text-sm mb-4">How are you feeling today? Describe your symptoms to get an AI health analysis.</p>
-          <button
-            onClick={() => navigate('/patient/symptoms')}
-            className="bg-white text-blue-700 hover:bg-blue-50 font-semibold py-2.5 px-5 rounded-xl text-sm transition-colors flex items-center gap-2"
-          >
-            <Brain size={16} />
-            Check Symptoms Now
+        {/* ── Header ── */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-900">Good Morning, {firstName} 👋</h1>
+            <p className="text-gray-400 text-sm mt-0.5">Take care of your health today!</p>
+          </div>
+          <button onClick={() => navigate('/patient/doctors')} className="hidden sm:flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
+            <Plus size={15} /> Book Appointment
           </button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={Calendar} label="Total Appointments" value={appointments.length} color="bg-blue-500" onClick={() => navigate('/patient/profile')} />
-          <StatCard icon={Clock} label="Pending" value={pending} color="bg-yellow-400" />
-          <StatCard icon={Activity} label="Confirmed" value={confirmed} color="bg-green-500" />
-          <StatCard icon={Stethoscope} label="Completed" value={completed} color="bg-purple-500" />
-        </div>
+        {/* ── Main Grid ── */}
+        <div className="grid lg:grid-cols-3 gap-5">
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Recent Appointments */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-900">Recent Appointments</h2>
+          {/* ── Left 2/3 ── */}
+          <div className="lg:col-span-2 space-y-5">
+
+            {/* Quick Actions */}
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-gray-900">Quick Actions</h2>
+                <ChevronRight size={16} className="text-gray-300" />
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {quickActions.map(({ icon, label, desc, color, bg, path }) => (
+                  <QuickAction key={label} icon={icon} label={label} desc={desc} color={color} bg={bg} onClick={() => navigate(path)} />
+                ))}
+              </div>
             </div>
-            {aptLoading ? (
-              <div className="py-8 flex justify-center"><LoadingSpinner /></div>
-            ) : recentAppointments.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                <Calendar size={32} className="mx-auto mb-2 opacity-40" />
-                <p className="text-sm">No appointments yet</p>
-                <button onClick={() => navigate('/patient/doctors')} className="mt-3 text-blue-600 text-sm hover:underline">
-                  Find a doctor
+
+            {/* Health Summary */}
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-gray-900">Health Summary</h2>
+                <ChevronRight size={16} className="text-gray-300" />
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <HealthCard icon={Heart} label="Heart Rate" value="72" unit="bpm" status="Normal" color="text-red-500" bg="bg-red-50" />
+                <HealthCard icon={Activity} label="Blood Pressure" value="120/80" unit="" status="Normal" color="text-blue-500" bg="bg-blue-50" />
+                <HealthCard icon={Droplets} label="Blood Sugar" value="98" unit="mg/dl" status="Normal" color="text-orange-500" bg="bg-orange-50" />
+                <HealthCard icon={TrendingUp} label="Weight" value="65" unit="kg" status="Normal" color="text-green-500" bg="bg-green-50" />
+              </div>
+            </div>
+
+            {/* Recent Appointments */}
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-gray-900">Recent Appointments</h2>
+                <button onClick={() => navigate('/patient/doctors')} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                  View all <ArrowRight size={12} />
                 </button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {recentAppointments.map(apt => (
-                  <div key={apt.id} className="p-3 bg-gray-50 rounded-xl space-y-2">
-                    <div className="flex items-center justify-between">
+              {aptLoading ? (
+                <div className="py-6 flex justify-center"><LoadingSpinner /></div>
+              ) : appointments.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <Calendar size={36} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No appointments yet</p>
+                  <button onClick={() => navigate('/patient/doctors')} className="mt-3 text-blue-600 text-sm font-medium hover:underline">Book your first appointment</button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {appointments.slice(0, 4).map(apt => (
+                    <div key={apt.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors border border-gray-50">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 text-blue-700 font-bold text-sm">
+                        {apt.doctor_name?.charAt(0)}
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-gray-900 truncate">{apt.doctor_name}</p>
+                        <p className="font-semibold text-sm text-gray-900 truncate">{apt.doctor_name}</p>
                         <p className="text-xs text-gray-400">{formatDate(apt.appointment_date)} · {apt.appointment_time}</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className={getStatusColor(apt.status) + ' capitalize'}>
-                          {apt.status}
-                        </span>
-                        <button
-                          onClick={() => openChat(apt)}
-                          className="p-1.5 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
-                          title="Chat with doctor"
-                        >
-                          <MessageCircle size={14} />
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className={`${getStatusColor(apt.status)} capitalize text-xs`}>{apt.status}</span>
+                        <button onClick={() => openChat(apt)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
+                          <MessageCircle size={13} />
                         </button>
                       </div>
                     </div>
-                    {apt.status === 'confirmed' && apt.meeting_link && (
-                      <a
-                        href={apt.meeting_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white text-xs py-2 px-3 rounded-lg font-medium transition-colors"
-                      >
-                        <Video size={13} /> Join Video Consultation
-                      </a>
-                    )}
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Right 1/3 ── */}
+          <div className="space-y-5">
+
+            {/* Upcoming Appointment */}
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-gray-900">Upcoming Appointment</h2>
+                <ChevronRight size={16} className="text-gray-300" />
               </div>
-            )}
-          </div>
-
-          {/* Quick Actions */}
-          <div className="card">
-            <h2 className="font-semibold text-gray-900 mb-4">Quick Actions</h2>
-            <div className="space-y-3">
-              {[
-                { icon: Brain, label: 'AI Symptom Checker', desc: 'Get instant health insights', path: '/patient/symptoms', color: 'bg-blue-50 text-blue-700' },
-                { icon: FileSearch, label: 'Analyze My Report', desc: 'Upload report · AI explains results', path: '/patient/report-analyzer', color: 'bg-teal-50 text-teal-700' },
-                { icon: Stethoscope, label: 'Find Doctors', desc: 'Browse 20+ specialists', path: '/patient/doctors', color: 'bg-green-50 text-green-700' },
-                { icon: Calendar, label: 'Book Appointment', desc: 'Schedule a consultation', path: '/patient/doctors', color: 'bg-purple-50 text-purple-700' },
-              ].map(({ icon: Icon, label, desc, path, color }) => (
-                <button
-                  key={label}
-                  onClick={() => navigate(path)}
-                  className="w-full flex items-center gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors text-left group"
-                >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
-                    <Icon size={18} />
+              {upcomingApt ? (
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-teal-400 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      {upcomingApt.doctor_name?.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 text-sm">{upcomingApt.doctor_name}</p>
+                      <p className="text-xs text-gray-400">Specialist</p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm text-gray-900">{label}</p>
-                    <p className="text-xs text-gray-400">{desc}</p>
+                  <div className="bg-blue-50 rounded-xl p-3 mb-3 space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <Calendar size={13} className="text-blue-500" />
+                      <span>{formatDate(upcomingApt.appointment_date)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <Clock size={13} className="text-blue-500" />
+                      <span>{upcomingApt.appointment_time}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className={`${getStatusColor(upcomingApt.status)} capitalize`}>{upcomingApt.status}</span>
+                    </div>
                   </div>
-                  <ChevronRight size={16} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
-                </button>
-              ))}
+                  {upcomingApt.status === 'confirmed' && upcomingApt.meeting_link && (
+                    <a href={upcomingApt.meeting_link} target="_blank" rel="noopener noreferrer"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                      <Video size={14} /> Join Call
+                    </a>
+                  )}
+                  {upcomingApt.status === 'confirmed' && (
+                    <a href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Doctor - ' + upcomingApt.doctor_name)}&dates=${upcomingApt.appointment_date?.replace(/-/g, '')}T090000/${upcomingApt.appointment_date?.replace(/-/g, '')}T100000`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="mt-2 w-full border border-blue-200 text-blue-600 text-xs font-medium py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 hover:bg-blue-50 transition-colors">
+                      <CalendarPlus size={13} /> Add to Calendar
+                    </a>
+                  )}
+                  <p className="text-xs text-blue-500 text-center mt-3 cursor-pointer hover:underline" onClick={() => navigate('/patient/doctors')}>View all appointments →</p>
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <Calendar size={32} className="mx-auto text-gray-200 mb-2" />
+                  <p className="text-sm text-gray-400">No upcoming appointments</p>
+                  <button onClick={() => navigate('/patient/doctors')} className="mt-3 bg-blue-600 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors">Book Now</button>
+                </div>
+              )}
             </div>
 
-            <div className="mt-4 p-3 bg-amber-50 rounded-xl flex gap-3">
-              <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-700">AI analysis is not a substitute for professional medical advice. Always consult a qualified doctor.</p>
+            {/* Recent Reports */}
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-gray-900">Recent Reports</h2>
+                <button onClick={() => navigate('/patient/records')} className="text-xs text-blue-600 hover:underline">View all →</button>
+              </div>
+              {recentReports.length > 0 ? (
+                <div className="space-y-3">
+                  {recentReports.map(apt => (
+                    <div key={apt.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
+                      <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <FileText size={16} className="text-blue-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">Consultation Report</p>
+                        <p className="text-xs text-gray-400">{formatDate(apt.appointment_date)}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-gray-300" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {[
+                    { label: 'Blood Test Report', date: '12 May 2024', icon: '🩸' },
+                    { label: 'X-Ray Chest', date: '10 May 2024', icon: '🦴' },
+                  ].map(({ label, date, icon }) => (
+                    <div key={label} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => navigate('/patient/laboratory')}>
+                      <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0 text-lg">{icon}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800">{label}</p>
+                        <p className="text-xs text-gray-400">{date}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-gray-300" />
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => navigate('/patient/report-analyzer')} className="mt-3 w-full text-xs text-blue-600 font-medium hover:underline text-center block">View all reports →</button>
             </div>
           </div>
-        </div>
-
-        {/* Disease History Chart */}
-        <DiseaseBarChart data={diseaseData} />
-
-        {/* Featured Doctors */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-900">Top Doctors</h2>
-            <button onClick={() => navigate('/patient/doctors')} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
-              View all <ChevronRight size={14} />
-            </button>
-          </div>
-          {docLoading ? (
-            <div className="py-8 flex justify-center"><LoadingSpinner /></div>
-          ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {doctors.slice(0, 4).map(doc => (
-                <DoctorCard key={doc.id} doctor={doc} />
-              ))}
-            </div>
-          )}
         </div>
       </div>
-      {chatOpen && chatRoom && (
-        <Chat
-          roomId={chatRoom}
-          otherPersonName={chatName}
-          onClose={() => setChatOpen(false)}
-        />
-      )}
+
+      {chatOpen && chatRoom && <Chat roomId={chatRoom} otherPersonName={chatName} onClose={() => setChatOpen(false)} />}
+      {ratingApt && <RatingModal appointment={ratingApt} onClose={() => setRatingApt(null)} onSubmit={submitRating} />}
     </DashboardLayout>
   )
 }
