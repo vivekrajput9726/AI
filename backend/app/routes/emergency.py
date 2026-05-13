@@ -3,7 +3,6 @@ from app.middleware.auth_middleware import get_current_user, require_patient
 from app.database.connection import get_db
 from app.utils.helpers import serialize_doc, str_to_objectid
 from app.utils.sms_utils import send_sms
-from app.utils.email_utils import send_email
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
@@ -50,11 +49,11 @@ async def trigger_sos(data: SOSRequest, current_user: dict = Depends(require_pat
 
     location_text = ""
     if data.latitude and data.longitude:
-        location_text = f"\n📍 Location: https://maps.google.com/?q={data.latitude},{data.longitude}"
+        location_text = f"\nLocation: https://maps.google.com/?q={data.latitude},{data.longitude}"
     elif data.address:
-        location_text = f"\n📍 Address: {data.address}"
+        location_text = f"\nAddress: {data.address}"
 
-    msg = f"🚨 EMERGENCY ALERT!\n{current_user['full_name']} needs help!\n{data.message}{location_text}\n\nPlease contact them immediately or call emergency services."
+    msg = f"EMERGENCY ALERT!\n{current_user['full_name']} needs help!\n{data.message}{location_text}\n\nPlease contact them immediately or call emergency services."
 
     sent = 0
     for contact in contacts:
@@ -62,7 +61,6 @@ async def trigger_sos(data: SOSRequest, current_user: dict = Depends(require_pat
             send_sms(to_phone=contact["phone"], message=msg)
             sent += 1
 
-    # Log SOS event
     await db.sos_events.insert_one({
         "patient_id": current_user["id"],
         "patient_name": current_user["full_name"],

@@ -121,7 +121,6 @@ async def analyze_with_openai(image_base64: str) -> dict:
     from openai import AsyncOpenAI
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
-    # Ensure proper data URL format
     if not image_base64.startswith("data:"):
         image_base64 = f"data:image/jpeg;base64,{image_base64}"
 
