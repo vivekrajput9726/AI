@@ -396,25 +396,102 @@ function SymptomChecker() {
 
             {/* Possible Conditions */}
             <div className="card">
-              <h3 className="font-semibold text-gray-900 mb-4">Possible Conditions</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900">Possible Conditions</h3>
+                {analysis.confidence_score && (
+                  <span className="text-xs bg-blue-50 text-blue-700 font-semibold px-2.5 py-1 rounded-full">
+                    AI Confidence: {analysis.confidence_score}%
+                  </span>
+                )}
+              </div>
               <div className="space-y-3">
                 {analysis.possible_conditions?.map((cond, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
-                    <div className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
-                      cond.probability === 'High' ? 'bg-red-100 text-red-700' :
-                      cond.probability === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-green-100 text-green-700'
-                    }`}>
-                      {cond.probability}
+                  <div key={i} className="p-3 bg-gray-50 rounded-xl">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="font-semibold text-sm text-gray-900">{cond.name}</p>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        cond.probability === 'High' ? 'bg-red-100 text-red-700' :
+                        cond.probability === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-green-100 text-green-700'
+                      }`}>{cond.probability}</span>
                     </div>
-                    <div>
-                      <p className="font-medium text-sm text-gray-900">{cond.name}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{cond.description}</p>
-                    </div>
+                    {cond.confidence && (
+                      <div className="mb-1.5">
+                        <div className="flex justify-between text-xs text-gray-400 mb-0.5">
+                          <span>Match probability</span>
+                          <span>{cond.confidence}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div className={`h-1.5 rounded-full ${
+                            cond.confidence > 70 ? 'bg-red-500' :
+                            cond.confidence > 40 ? 'bg-yellow-500' : 'bg-green-500'
+                          }`} style={{ width: `${cond.confidence}%` }} />
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500">{cond.description}</p>
                   </div>
                 ))}
               </div>
             </div>
+
+            {/* SHAP / LIME Insights */}
+            {analysis.shap_insights?.length > 0 && (
+              <div className="card">
+                <div className="flex items-center gap-2 mb-1">
+                  <Brain size={16} className="text-purple-600" />
+                  <h3 className="font-semibold text-gray-900">AI Explainability (SHAP Insights)</h3>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">Shows which symptoms contributed most to the AI's diagnosis</p>
+                <div className="space-y-3">
+                  {analysis.shap_insights.map((item, i) => (
+                    <div key={i}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                            item.impact === 'positive' ? 'bg-red-500' : 'bg-blue-400'
+                          }`} />
+                          <span className="text-sm font-medium text-gray-800 capitalize">{item.symptom}</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-600">{item.importance}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${
+                            item.impact === 'positive' ? 'bg-gradient-to-r from-red-400 to-red-600' :
+                            'bg-gradient-to-r from-blue-400 to-blue-600'
+                          }`}
+                          style={{ width: `${item.importance}%` }}
+                        />
+                      </div>
+                      {item.explanation && (
+                        <p className="text-xs text-gray-400 mt-0.5">{item.explanation}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-400">
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" /> High contribution</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 inline-block" /> Moderate contribution</span>
+                </div>
+              </div>
+            )}
+
+            {/* Risk Factors */}
+            {analysis.risk_factors?.length > 0 && (
+              <div className="card">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <AlertTriangle size={15} className="text-orange-500" /> Risk Factors
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {analysis.risk_factors.map((rf, i) => (
+                    <span key={i} className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-full font-medium">
+                      {rf}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Precautions */}
             <div className="card">

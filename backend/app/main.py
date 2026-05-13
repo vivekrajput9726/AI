@@ -5,7 +5,7 @@ from loguru import logger
 
 from app.config.settings import settings
 from app.database.connection import connect_db, disconnect_db
-from app.routes import auth, users, doctors, appointments, ai_routes, admin, video, chat, health_records, prescription_ai, meetings, emergency, family, wellness, extras
+from app.routes import auth, users, doctors, appointments, ai_routes, admin, video, chat, health_records, prescription_ai, meetings, whatsapp, emergency, family, wellness, extras
 
 
 @asynccontextmanager
@@ -45,6 +45,7 @@ app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 app.include_router(health_records.router, prefix="/api/health-records", tags=["Health Records"])
 app.include_router(prescription_ai.router, prefix="/api/ai", tags=["AI Services"])
 app.include_router(meetings.router, prefix="/api/meetings", tags=["Instant Meetings"])
+app.include_router(whatsapp.router, prefix="/api/whatsapp", tags=["WhatsApp Bot"])
 app.include_router(emergency.router, prefix="/api/emergency", tags=["Emergency SOS"])
 app.include_router(family.router, prefix="/api/family", tags=["Family Health"])
 app.include_router(wellness.router, prefix="/api/wellness", tags=["Wellness"])

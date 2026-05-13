@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     DAILY_API_KEY: str = ""
     DAILY_API_URL: str = "https://api.daily.co/v1"
 
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_PHONE_NUMBER: str = ""
+
     class Config:
         env_file = ".env"
 

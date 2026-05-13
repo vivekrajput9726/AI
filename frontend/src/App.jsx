@@ -17,6 +17,21 @@ import MedicineReminder from './pages/MedicineReminder'
 import NearbyPlaces from './pages/NearbyPlaces'
 import PrescriptionReader from './pages/PrescriptionReader'
 import ReportAnalyzer from './pages/ReportAnalyzer'
+import Laboratory from './pages/Laboratory'
+import HealthScanner from './pages/HealthScanner'
+import MedicalHistory from './pages/MedicalHistory'
+import AIHealthAnalyzer from './pages/AIHealthAnalyzer'
+import MyRecords from './pages/MyRecords'
+import EmergencySOS from './pages/EmergencySOS'
+import PrescriptionPDF from './pages/PrescriptionPDF'
+import DrugChecker from './pages/DrugChecker'
+import FamilyHealth from './pages/FamilyHealth'
+import MentalHealth from './pages/MentalHealth'
+import WellnessHub from './pages/WellnessHub'
+import BMICalculator from './pages/BMICalculator'
+import SymptomDiary from './pages/SymptomDiary'
+import VaccinationTracker from './pages/VaccinationTracker'
+import AIChatbot from './components/common/AIChatbot'
 import ProtectedRoute from './routes/ProtectedRoute'
 
 function App() {
@@ -91,6 +106,76 @@ function App() {
             <ReportAnalyzer />
           </ProtectedRoute>
         } />
+        <Route path="/patient/laboratory" element={
+          <ProtectedRoute roles={['patient']}>
+            <Laboratory />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/health-scanner" element={
+          <ProtectedRoute roles={['patient']}>
+            <HealthScanner />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/ai-analyzer" element={
+          <ProtectedRoute roles={['patient']}>
+            <AIHealthAnalyzer />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/medical-history" element={
+          <ProtectedRoute roles={['patient']}>
+            <MedicalHistory />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/my-records" element={
+          <ProtectedRoute roles={['patient']}>
+            <MyRecords />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/emergency" element={
+          <ProtectedRoute roles={['patient']}>
+            <EmergencySOS />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/prescription-pdf" element={
+          <ProtectedRoute roles={['patient', 'doctor']}>
+            <PrescriptionPDF />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/drug-checker" element={
+          <ProtectedRoute roles={['patient']}>
+            <DrugChecker />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/family" element={
+          <ProtectedRoute roles={['patient']}>
+            <FamilyHealth />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/mental-health" element={
+          <ProtectedRoute roles={['patient']}>
+            <MentalHealth />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/wellness" element={
+          <ProtectedRoute roles={['patient']}>
+            <WellnessHub />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/bmi" element={
+          <ProtectedRoute roles={['patient']}>
+            <BMICalculator />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/diary" element={
+          <ProtectedRoute roles={['patient']}>
+            <SymptomDiary />
+          </ProtectedRoute>
+        } />
+        <Route path="/patient/vaccines" element={
+          <ProtectedRoute roles={['patient']}>
+            <VaccinationTracker />
+          </ProtectedRoute>
+        } />
 
         <Route path="/doctor/dashboard" element={
           <ProtectedRoute roles={['doctor']}>
@@ -116,6 +201,7 @@ function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {user && <AIChatbot />}
     </BrowserRouter>
   )
 }

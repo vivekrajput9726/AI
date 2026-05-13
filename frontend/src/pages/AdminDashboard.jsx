@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { Users, Stethoscope, Calendar, CheckCircle, Shield, XCircle, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Users, Stethoscope, Calendar, CheckCircle, Shield, XCircle, ToggleLeft, ToggleRight, TrendingUp, IndianRupee, BarChart2, Bot, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import LoadingSpinner from '../components/common/LoadingSpinner'
-import { PlatformStatsChart, SpecializationPieChart, AppointmentBarChart } from '../components/common/Charts'
+import { PlatformStatsChart, SpecializationPieChart, WeeklyAppointmentChart, MonthlyTrendChart, RevenueChart, AppointmentTypeDonutChart, TopSpecializationsChart } from '../components/common/Charts'
 import api from '../services/api'
 import { formatDate } from '../utils/helpers'
 import toast from 'react-hot-toast'
@@ -11,25 +11,26 @@ import toast from 'react-hot-toast'
 function AdminDashboard() {
   const { user } = useSelector(s => s.auth)
   const [stats, setStats] = useState(null)
+  const [analytics, setAnalytics] = useState(null)
   const [users, setUsers] = useState([])
   const [doctors, setDoctors] = useState([])
   const [tab, setTab] = useState('overview')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  useEffect(() => { loadData() }, [])
 
   const loadData = async () => {
     try {
-      const [statsRes, usersRes, doctorsRes] = await Promise.all([
+      const [statsRes, usersRes, doctorsRes, analyticsRes] = await Promise.all([
         api.get('/admin/stats'),
         api.get('/admin/users'),
         api.get('/admin/doctors'),
+        api.get('/admin/analytics'),
       ])
       setStats(statsRes.data)
       setUsers(usersRes.data.users)
       setDoctors(doctorsRes.data.doctors)
+      setAnalytics(analyticsRes.data)
     } catch {
       toast.error('Failed to load admin data')
     } finally {
@@ -104,7 +105,7 @@ function AdminDashboard() {
 
         {/* Tab Navigation */}
         <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
-          {['overview', 'users', 'doctors'].map(t => (
+          {['overview', 'analytics', 'users', 'doctors'].map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -207,10 +208,86 @@ function AdminDashboard() {
           </div>
         )}
 
+        {/* Analytics Tab */}
+        {tab === 'analytics' && analytics && (
+          <div className="space-y-4 animate-fade-in">
+            {/* KPI Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { label: 'Total Revenue', value: `₹${analytics.total_revenue.toLocaleString('en-IN')}`, icon: IndianRupee, color: 'bg-green-500', sub: 'from completed consults' },
+                { label: 'New Patients', value: `+${analytics.new_patients_this_month}`, icon: TrendingUp, color: 'bg-blue-500', sub: 'this month' },
+                { label: 'New Doctors', value: `+${analytics.new_doctors_this_month}`, icon: Stethoscope, color: 'bg-purple-500', sub: 'this month' },
+                { label: 'Appt Types', value: analytics.appointment_types.length, icon: BarChart2, color: 'bg-orange-500', sub: 'consultation modes' },
+              ].map(({ label, value, icon: Icon, color, sub }) => (
+                <div key={label} className="card">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-gray-400">{label}</p>
+                    <div className={`w-8 h-8 ${color} rounded-xl flex items-center justify-center`}>
+                      <Icon size={15} className="text-white" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">{value}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{sub}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* AI Insights Panel */}
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-5 text-white">
+              <div className="flex items-center gap-2 mb-3">
+                <Bot size={18} />
+                <span className="font-semibold">AI Insights</span>
+                <span className="ml-auto text-xs bg-white/20 px-2 py-0.5 rounded-full">Auto-generated</span>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-4 text-sm">
+                <div className="bg-white/15 rounded-xl p-3">
+                  <p className="text-emerald-100 text-xs mb-1">Completion Rate</p>
+                  <p className="font-bold text-lg">
+                    {stats?.total_appointments > 0
+                      ? `${Math.round(((analytics.monthly_trends.reduce((s, m) => s + m.completed, 0)) / Math.max(analytics.monthly_trends.reduce((s, m) => s + m.total, 0), 1)) * 100)}%`
+                      : '0%'}
+                  </p>
+                  <p className="text-emerald-200 text-xs">of appointments completed</p>
+                </div>
+                <div className="bg-white/15 rounded-xl p-3">
+                  <p className="text-emerald-100 text-xs mb-1">Avg Revenue / Appt</p>
+                  <p className="font-bold text-lg">
+                    ₹{stats?.total_appointments > 0 ? Math.round(analytics.total_revenue / Math.max(stats.total_appointments, 1)).toLocaleString('en-IN') : 0}
+                  </p>
+                  <p className="text-emerald-200 text-xs">per consultation</p>
+                </div>
+                <div className="bg-white/15 rounded-xl p-3">
+                  <p className="text-emerald-100 text-xs mb-1">Doctor Verification</p>
+                  <p className="font-bold text-lg">
+                    {stats?.total_doctors > 0 ? `${Math.round((stats.verified_doctors / stats.total_doctors) * 100)}%` : '0%'}
+                  </p>
+                  <p className="text-emerald-200 text-xs">doctors verified</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Charts Row 1 */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <WeeklyAppointmentChart data={analytics.weekly_appointments} />
+              <AppointmentTypeDonutChart data={analytics.appointment_types} />
+            </div>
+
+            {/* Charts Row 2 */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <MonthlyTrendChart data={analytics.monthly_trends} />
+              <RevenueChart data={analytics.monthly_trends} />
+            </div>
+
+            {/* Top Specializations */}
+            {analytics.top_specializations.length > 0 && (
+              <TopSpecializationsChart data={analytics.top_specializations} />
+            )}
+          </div>
+        )}
+
         {/* Overview Tab */}
         {tab === 'overview' && (
           <>
-          {/* Charts */}
           <div className="grid md:grid-cols-2 gap-4">
             <PlatformStatsChart stats={stats} />
             <SpecializationPieChart data={

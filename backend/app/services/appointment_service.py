@@ -6,6 +6,7 @@ from app.database.connection import get_db
 from app.utils.helpers import serialize_doc, str_to_objectid
 from app.schemas.appointment_schema import AppointmentCreateRequest
 from app.utils.email_utils import send_appointment_booked_email, send_appointment_confirmed_email, send_appointment_cancelled_email
+from app.utils.sms_utils import send_appointment_booked_sms, send_appointment_confirmed_sms, send_appointment_cancelled_sms
 
 
 def generate_meeting_link(appointment_id: str) -> str:
@@ -40,9 +41,16 @@ async def create_appointment(patient: dict, data: AppointmentCreateRequest) -> d
     result = await db.appointments.insert_one(appointment_doc)
     appointment_doc["_id"] = result.inserted_id
 
-    # Send email notification
+    # Send email + SMS notifications
     send_appointment_booked_email(
         patient_email=patient.get("email", ""),
+        patient_name=patient["full_name"],
+        doctor_name=doctor["name"],
+        date=data.appointment_date,
+        time=data.appointment_time
+    )
+    send_appointment_booked_sms(
+        phone=patient.get("phone", ""),
         patient_name=patient["full_name"],
         doctor_name=doctor["name"],
         date=data.appointment_date,
@@ -108,9 +116,23 @@ async def update_appointment_status(appointment_id: str, new_status: str, actor:
                 time=appointment.get("appointment_time", ""),
                 meeting_link=meeting_link
             )
+            send_appointment_confirmed_sms(
+                phone=patient.get("phone", ""),
+                patient_name=appointment.get("patient_name", ""),
+                doctor_name=appointment.get("doctor_name", ""),
+                date=appointment.get("appointment_date", ""),
+                time=appointment.get("appointment_time", ""),
+                meeting_link=meeting_link
+            )
         elif new_status == "cancelled":
             send_appointment_cancelled_email(
                 patient_email=patient.get("email", ""),
+                patient_name=appointment.get("patient_name", ""),
+                doctor_name=appointment.get("doctor_name", ""),
+                date=appointment.get("appointment_date", "")
+            )
+            send_appointment_cancelled_sms(
+                phone=patient.get("phone", ""),
                 patient_name=appointment.get("patient_name", ""),
                 doctor_name=appointment.get("doctor_name", ""),
                 date=appointment.get("appointment_date", "")

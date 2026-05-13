@@ -1,20 +1,31 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Stethoscope, Users, Calendar, Video, User, Settings,
-  Heart, LogOut, Shield, Activity, FolderOpen, Pill, MapPin, ScanLine
+  LayoutDashboard, Stethoscope, Calendar, User,
+  Heart, LogOut, Shield, Activity, FolderOpen, Pill,
+  MapPin, FlaskConical, MessageCircle, AlertTriangle,
+  FileText, Settings, Plus, ChevronRight, ClipboardList,
+  Microscope, Users, Brain, Zap
 } from 'lucide-react'
+// Shield and Activity already imported above
 import { useSelector, useDispatch } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
 import { logout } from '../../redux/slices/authSlice'
 
 const patientLinks = [
   { to: '/patient/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/patient/symptoms', icon: Activity, label: 'Symptom Checker' },
-  { to: '/patient/doctors', icon: Stethoscope, label: 'Find Doctors' },
-  { to: '/patient/records', icon: FolderOpen, label: 'Health Records' },
+  { to: '/patient/doctors', icon: Calendar, label: 'Appointments' },
+  { to: '/patient/symptoms', icon: Activity, label: 'AI Symptom Checker' },
+  { to: '/patient/my-records', icon: FolderOpen, label: 'My Records' },
   { to: '/patient/medicines', icon: Pill, label: 'Medicine Reminder' },
-  { to: '/patient/nearby', icon: MapPin, label: 'Nearby Places' },
-  { to: '/patient/ai-reader', icon: ScanLine, label: 'AI Reader' },
+  { to: '/patient/laboratory', icon: FlaskConical, label: 'Laboratory' },
+  { to: '/patient/ai-analyzer', icon: Microscope, label: 'AI Health Analyzer' },
+  { to: '/patient/nearby', icon: MapPin, label: 'Nearby Hospitals' },
+  { to: '/patient/wellness', icon: Heart, label: 'Wellness Hub' },
+  { to: '/patient/drug-checker', icon: Pill, label: 'Drug Checker' },
+  { to: '/patient/emergency', icon: AlertTriangle, label: 'Emergency SOS' },
+  { to: '/patient/prescription-pdf', icon: FileText, label: 'Prescription PDF' },
+  { to: '/patient/bmi', icon: Activity, label: 'BMI Calculator' },
+  { to: '/patient/diary', icon: ClipboardList, label: 'Symptom Diary' },
+  { to: '/patient/vaccines', icon: Shield, label: 'Vaccination Tracker' },
   { to: '/patient/profile', icon: User, label: 'Profile' },
 ]
 
@@ -42,10 +53,7 @@ function Sidebar({ isOpen, onClose }) {
   return (
     <>
       {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black/30 z-30 lg:hidden" onClick={onClose} />
       )}
       <aside className={`
         fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-100 z-40 flex flex-col
@@ -53,48 +61,58 @@ function Sidebar({ isOpen, onClose }) {
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0 lg:static lg:z-auto
       `}>
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-400 rounded-xl flex items-center justify-center">
-              <Heart size={20} className="text-white" />
+        {/* Logo */}
+        <div className="p-5 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-teal-500 rounded-xl flex items-center justify-center shadow">
+              <Plus size={18} className="text-white" strokeWidth={3} />
             </div>
             <div>
-              <p className="font-bold text-gray-900">AI Healthcare</p>
+              <p className="font-extrabold text-gray-900">Synora <span className="text-blue-600">Health</span></p>
               <p className="text-xs text-gray-400 capitalize">{user?.role} Portal</p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 p-4 overflow-y-auto">
-          <ul className="space-y-1">
+        {/* Nav Links */}
+        <nav className="flex-1 p-3 overflow-y-auto">
+          <ul className="space-y-0.5">
             {links.map(({ to, icon: Icon, label }) => (
               <li key={to}>
                 <NavLink
                   to={to}
                   onClick={onClose}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150
+                    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
                     ${isActive
-                      ? 'bg-blue-50 text-blue-700'
+                      ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`
                   }
                 >
-                  <Icon size={18} />
-                  {label}
+                  {({ isActive }) => (
+                    <>
+                      <Icon size={17} className={isActive ? 'text-white' : 'text-gray-400'} />
+                      <span className="flex-1">{label}</span>
+                      {isActive && <ChevronRight size={14} className="text-white/70" />}
+                    </>
+                  )}
                 </NavLink>
               </li>
             ))}
           </ul>
         </nav>
 
-        <div className="p-4 border-t border-gray-100">
+        {/* Bottom — Settings + Logout */}
+        <div className="p-3 border-t border-gray-100 space-y-0.5">
+          <button className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 w-full transition-colors">
+            <Settings size={17} className="text-gray-400" /> Settings
+          </button>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 w-full transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 w-full transition-colors"
           >
-            <LogOut size={18} />
-            Sign Out
+            <LogOut size={17} className="text-red-400" /> Logout
           </button>
         </div>
       </aside>

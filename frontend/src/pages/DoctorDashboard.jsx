@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import {
   Calendar, Clock, CheckCircle, XCircle, User, Video,
-  FileText, MessageCircle, Plus, Trash2, Save, Edit2,
+  FileText, MessageCircle, Plus, Trash2, Edit2,
   ToggleLeft, ToggleRight, Users, Phone, Mail, Activity,
   ChevronRight, X, Stethoscope, Zap, Copy, ExternalLink
 } from 'lucide-react'
@@ -16,6 +16,76 @@ import toast from 'react-hot-toast'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const EMPTY_SLOT = { day: 'Monday', start_time: '09:00', end_time: '17:00', is_available: true }
+
+// ─── Revenue Tab ──────────────────────────────────────────────────────────────
+function RevenueTab() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.get('/extras/doctor-revenue').then(r => setData(r.data)).catch(() => toast.error('Failed to load revenue')).finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div className="py-10 flex justify-center"><LoadingSpinner text="Loading revenue..." /></div>
+  if (!data) return null
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Revenue', value: `₹${(data.total_revenue||0).toLocaleString('en-IN')}`, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Completed', value: data.completed, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Pending', value: data.pending, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+          { label: 'Total Appointments', value: data.total_appointments, color: 'text-purple-600', bg: 'bg-purple-50' },
+        ].map(({ label, value, color, bg }) => (
+          <div key={label} className={`card ${bg}`}>
+            <p className="text-xs text-gray-500">{label}</p>
+            <p className={`text-2xl font-extrabold ${color} mt-0.5`}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {data.monthly?.length > 0 && (
+        <div className="card">
+          <h3 className="font-bold text-gray-900 mb-1">Monthly Revenue</h3>
+          <p className="text-xs text-gray-400 mb-4">Last 6 months earnings (₹)</p>
+          <div className="space-y-2">
+            {data.monthly.map(({ month, revenue }) => (
+              <div key={month} className="flex items-center gap-3">
+                <span className="text-xs text-gray-500 w-14">{month}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-3">
+                  <div className="h-3 rounded-full bg-green-500 transition-all"
+                    style={{ width: `${Math.min(100, (revenue / Math.max(...data.monthly.map(m=>m.revenue))) * 100)}%` }} />
+                </div>
+                <span className="text-xs font-bold text-gray-700 w-16 text-right">₹{revenue.toLocaleString('en-IN')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.by_type?.length > 0 && (
+        <div className="card">
+          <h3 className="font-bold text-gray-900 mb-3">Revenue by Consultation Type</h3>
+          <div className="space-y-2">
+            {data.by_type.map(({ type, revenue }) => (
+              <div key={type} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl">
+                <span className="text-sm text-gray-700 capitalize font-medium">{type}</span>
+                <span className="text-sm font-bold text-green-600">₹{revenue.toLocaleString('en-IN')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.total_revenue === 0 && (
+        <div className="card text-center py-10">
+          <p className="text-gray-400 text-sm">No revenue yet. Complete appointments to see earnings.</p>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── Availability Section ──────────────────────────────────────────────────
 
@@ -184,6 +254,23 @@ function PatientModal({ data, onClose, onStartChat, onStartVideo }) {
   const confirmedApt = appointments.find(a => a.status === 'confirmed')
   const [connecting, setConnecting] = useState(false)
   const [instantMeeting, setInstantMeeting] = useState(null)
+  const [healthRecords, setHealthRecords] = useState([])
+  const [loadingRecords, setLoadingRecords] = useState(false)
+  const [showRecords, setShowRecords] = useState(false)
+
+  const loadHealthRecords = async () => {
+    if (showRecords) { setShowRecords(false); return }
+    setLoadingRecords(true)
+    try {
+      const res = await api.get(`/health-records/patient/${patient.id}`)
+      setHealthRecords(res.data)
+      setShowRecords(true)
+    } catch {
+      toast.error('Could not load health records')
+    } finally {
+      setLoadingRecords(false)
+    }
+  }
 
   const handleConnectNow = async () => {
     setConnecting(true)
@@ -355,6 +442,58 @@ function PatientModal({ data, onClose, onStartChat, onStartVideo }) {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Health Records */}
+          <div>
+            <button
+              onClick={loadHealthRecords}
+              className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
+            >
+              <span className="font-semibold text-blue-800 text-sm flex items-center gap-2">
+                <FileText size={15} className="text-blue-500" /> Patient Lab Reports & Health Records
+              </span>
+              <span className="text-xs text-blue-500">{showRecords ? 'Hide ▲' : 'View ▼'}</span>
+            </button>
+
+            {loadingRecords && (
+              <div className="py-4 flex justify-center">
+                <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+
+            {showRecords && (
+              <div className="mt-2 space-y-2">
+                {healthRecords.length === 0 ? (
+                  <div className="text-center py-6 bg-gray-50 rounded-xl">
+                    <FileText size={24} className="mx-auto text-gray-300 mb-2" />
+                    <p className="text-sm text-gray-400">No health records uploaded yet</p>
+                  </div>
+                ) : (
+                  healthRecords.map(record => (
+                    <div key={record.id} className="p-3 bg-white border border-gray-100 rounded-xl flex items-center gap-3 shadow-sm">
+                      <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0 text-lg">
+                        {record.record_type === 'lab_report' ? '🧪' :
+                         record.record_type === 'prescription' ? '💊' : '📋'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{record.title}</p>
+                        <p className="text-xs text-gray-400">{record.date}</p>
+                        {record.description && (
+                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{record.description}</p>
+                        )}
+                      </div>
+                      {record.file_data && (
+                        <a href={record.file_data} target="_blank" rel="noopener noreferrer"
+                          className="flex-shrink-0 text-xs bg-blue-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">
+                          View
+                        </a>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -691,6 +830,7 @@ function DoctorDashboard() {
     { key: 'appointments', label: 'Appointments', icon: Calendar },
     { key: 'patients', label: 'My Patients', icon: Users },
     { key: 'availability', label: 'Availability', icon: Clock },
+    { key: 'revenue', label: 'Revenue', icon: Activity },
   ]
 
   return (
@@ -725,6 +865,27 @@ function DoctorDashboard() {
           ))}
         </div>
 
+        {/* Pending Approval Banner */}
+        {stats.pending > 0 && (
+          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-2xl p-4 flex items-center gap-4">
+            <div className="w-10 h-10 bg-yellow-400 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Clock size={20} className="text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-yellow-800">
+                {stats.pending} Appointment{stats.pending > 1 ? 's' : ''} Awaiting Your Approval
+              </p>
+              <p className="text-sm text-yellow-600">Review and confirm or cancel pending requests from patients.</p>
+            </div>
+            <button
+              onClick={() => setActiveTab('appointments')}
+              className="flex-shrink-0 bg-yellow-400 hover:bg-yellow-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+            >
+              Review Now
+            </button>
+          </div>
+        )}
+
         {/* Tab Navigation */}
         <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit">
           {TABS.map(({ key, label, icon: Icon }) => (
@@ -736,6 +897,9 @@ function DoctorDashboard() {
               }`}
             >
               <Icon size={15} /> {label}
+              {key === 'appointments' && stats.pending > 0 && (
+                <span className="bg-yellow-400 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">{stats.pending}</span>
+              )}
             </button>
           ))}
         </div>
@@ -765,6 +929,8 @@ function DoctorDashboard() {
         )}
 
         {activeTab === 'availability' && <AvailabilitySection />}
+
+        {activeTab === 'revenue' && <RevenueTab />}
       </div>
 
       {/* Chat overlay */}

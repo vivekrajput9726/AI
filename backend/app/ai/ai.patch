@@ -1,0 +1,3423 @@
+diff --git a/backend/app/config/settings.py b/backend/app/config/settings.py
+index e100c5c..eb8476c 100644
+--- a/backend/app/config/settings.py
++++ b/backend/app/config/settings.py
+@@ -16,6 +16,7 @@ class Settings(BaseSettings):
+     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+ 
+     OPENAI_API_KEY: str = ""
++    GEMINI_API_KEY: str = ""
+ 
+     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+ 
+diff --git a/backend/app/main.py b/backend/app/main.py
+index 3f071df..5681c22 100644
+--- a/backend/app/main.py
++++ b/backend/app/main.py
+@@ -5,7 +5,7 @@ from loguru import logger
+ 
+ from app.config.settings import settings
+ from app.database.connection import connect_db, disconnect_db
+-from app.routes import auth, users, doctors, appointments, ai_routes, admin, video
++from app.routes import auth, users, doctors, appointments, ai_routes, admin, video, chat, health_records, prescription_ai
+ 
+ 
+ @asynccontextmanager
+@@ -41,6 +41,9 @@ app.include_router(appointments.router, prefix="/api/appointments", tags=["Appoi
+ app.include_router(ai_routes.router, prefix="/api/ai", tags=["AI Services"])
+ app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+ app.include_router(video.router, prefix="/api/video", tags=["Video Sessions"])
++app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
++app.include_router(health_records.router, prefix="/api/health-records", tags=["Health Records"])
++app.include_router(prescription_ai.router, prefix="/api/ai", tags=["AI Services"])
+ 
+ 
+ @app.get("/health", tags=["Health"])
+diff --git a/backend/app/routes/ai_routes.py b/backend/app/routes/ai_routes.py
+index e496c19..592ed73 100644
+--- a/backend/app/routes/ai_routes.py
++++ b/backend/app/routes/ai_routes.py
+@@ -64,3 +64,20 @@ async def get_ai_history(current_user: dict = Depends(get_current_user)):
+     db = get_db()
+     cursor = db.medical_reports.find({"patient_id": current_user["id"]}).sort("created_at", -1).limit(10)
+     return [serialize_doc(doc) async for doc in cursor]
++
++
++@router.get("/disease-stats", summary="Get disease frequency stats for patient")
++async def get_disease_stats(current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    cursor = db.medical_reports.find({"patient_id": current_user["id"]})
++    reports = await cursor.to_list(length=100)
++
++    disease_count = {}
++    for report in reports:
++        conditions = report.get("ai_analysis", {}).get("possible_conditions", [])
++        for condition in conditions:
++            name = condition.get("name", "Unknown")
++            disease_count[name] = disease_count.get(name, 0) + 1
++
++    data = [{"disease": k, "count": v} for k, v in sorted(disease_count.items(), key=lambda x: -x[1])]
++    return {"data": data[:10]}
+diff --git a/backend/app/routes/chat.py b/backend/app/routes/chat.py
+new file mode 100644
+index 0000000..271895b
+--- /dev/null
++++ b/backend/app/routes/chat.py
+@@ -0,0 +1,79 @@
++from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
++from app.database.connection import get_db
++from app.utils.jwt_utils import decode_token
++from app.utils.helpers import serialize_doc
++from app.middleware.auth_middleware import get_current_user
++from datetime import datetime
++from typing import Dict, List
++
++router = APIRouter()
++
++# Store active connections: {room_id: [websocket, ...]}
++class ConnectionManager:
++    def __init__(self):
++        self.active_connections: Dict[str, List[WebSocket]] = {}
++
++    async def connect(self, websocket: WebSocket, room_id: str):
++        await websocket.accept()
++        if room_id not in self.active_connections:
++            self.active_connections[room_id] = []
++        self.active_connections[room_id].append(websocket)
++
++    def disconnect(self, websocket: WebSocket, room_id: str):
++        if room_id in self.active_connections:
++            self.active_connections[room_id].remove(websocket)
++
++    async def broadcast(self, message: dict, room_id: str):
++        if room_id in self.active_connections:
++            for connection in self.active_connections[room_id]:
++                await connection.send_json(message)
++
++
++manager = ConnectionManager()
++
++
++@router.websocket("/ws/{room_id}")
++async def websocket_chat(websocket: WebSocket, room_id: str, token: str):
++    # Verify token
++    payload = decode_token(token)
++    if not payload or payload.get("type") != "access":
++        await websocket.close(code=4001)
++        return
++
++    user_id = payload.get("sub")
++    role = payload.get("role")
++
++    db = get_db()
++
++    await manager.connect(websocket, room_id)
++    try:
++        while True:
++            data = await websocket.receive_json()
++            message_doc = {
++                "room_id": room_id,
++                "sender_id": user_id,
++                "sender_role": role,
++                "message": data.get("message", ""),
++                "timestamp": datetime.utcnow().isoformat(),
++            }
++            # Save to MongoDB
++            await db.chat_messages.insert_one(message_doc)
++
++            # Broadcast to all in room
++            await manager.broadcast({
++                "sender_id": user_id,
++                "sender_role": role,
++                "message": data.get("message", ""),
++                "timestamp": message_doc["timestamp"],
++            }, room_id)
++
++    except WebSocketDisconnect:
++        manager.disconnect(websocket, room_id)
++
++
++@router.get("/history/{room_id}")
++async def get_chat_history(room_id: str, current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    cursor = db.chat_messages.find({"room_id": room_id}).sort("timestamp", 1).limit(100)
++    messages = await cursor.to_list(length=100)
++    return [serialize_doc(m) for m in messages]
+diff --git a/backend/app/routes/doctors.py b/backend/app/routes/doctors.py
+index 3e2436a..e1ab27e 100644
+--- a/backend/app/routes/doctors.py
++++ b/backend/app/routes/doctors.py
+@@ -15,9 +15,10 @@ async def list_doctors(
+     limit: int = Query(12, ge=1, le=50),
+     specialization: Optional[str] = None,
+     search: Optional[str] = None,
+-    min_rating: Optional[float] = None
++    min_rating: Optional[float] = None,
++    max_fee: Optional[float] = None
+ ):
+-    return await get_all_doctors(page, limit, specialization, search, min_rating)
++    return await get_all_doctors(page, limit, specialization, search, min_rating, max_fee)
+ 
+ 
+ @router.get("/specializations", summary="Get list of available specializations")
+diff --git a/backend/app/routes/health_records.py b/backend/app/routes/health_records.py
+new file mode 100644
+index 0000000..80ffa5b
+--- /dev/null
++++ b/backend/app/routes/health_records.py
+@@ -0,0 +1,54 @@
++from fastapi import APIRouter, Depends
++from app.middleware.auth_middleware import get_current_user
++from app.database.connection import get_db
++from app.utils.helpers import serialize_doc
++from datetime import datetime
++from pydantic import BaseModel
++from typing import Optional
++
++router = APIRouter()
++
++
++class HealthRecordCreate(BaseModel):
++    title: str
++    record_type: str  # prescription, lab_report, diagnosis, other
++    description: Optional[str] = ""
++    file_data: Optional[str] = ""  # base64 file
++    doctor_name: Optional[str] = ""
++    date: Optional[str] = ""
++
++
++@router.post("/", summary="Add health record")
++async def add_record(data: HealthRecordCreate, current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    doc = {
++        "patient_id": current_user["id"],
++        "title": data.title,
++        "record_type": data.record_type,
++        "description": data.description,
++        "file_data": data.file_data,
++        "doctor_name": data.doctor_name,
++        "date": data.date or datetime.utcnow().strftime("%Y-%m-%d"),
++        "created_at": datetime.utcnow(),
++    }
++    result = await db.health_records.insert_one(doc)
++    doc["_id"] = result.inserted_id
++    return serialize_doc(doc)
++
++
++@router.get("/", summary="Get my health records")
++async def get_records(current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    cursor = db.health_records.find({"patient_id": current_user["id"]}).sort("created_at", -1)
++    return [serialize_doc(r) async for r in cursor]
++
++
++@router.delete("/{record_id}", summary="Delete health record")
++async def delete_record(record_id: str, current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    from app.utils.helpers import str_to_objectid
++    await db.health_records.delete_one({
++        "_id": str_to_objectid(record_id),
++        "patient_id": current_user["id"]
++    })
++    return {"success": True}
+diff --git a/backend/app/routes/prescription_ai.py b/backend/app/routes/prescription_ai.py
+new file mode 100644
+index 0000000..4560615
+--- /dev/null
++++ b/backend/app/routes/prescription_ai.py
+@@ -0,0 +1,117 @@
++from fastapi import APIRouter, Depends
++from pydantic import BaseModel
++from app.middleware.auth_middleware import get_current_user
++from app.config.settings import settings
++from loguru import logger
++import json
++import re
++import base64
++
++router = APIRouter()
++
++
++class PrescriptionRequest(BaseModel):
++    image_base64: str
++
++
++def call_gemini(image_base64: str, prompt: str) -> dict:
++    import google.generativeai as genai
++    from PIL import Image
++    import io
++
++    genai.configure(api_key=settings.GEMINI_API_KEY)
++    model = genai.GenerativeModel("gemini-1.5-flash")
++
++    # Convert base64 to image
++    if "base64," in image_base64:
++        image_data = image_base64.split("base64,")[1]
++    else:
++        image_data = image_base64
++
++    image_bytes = base64.b64decode(image_data)
++    image = Image.open(io.BytesIO(image_bytes))
++
++    response = model.generate_content([prompt, image])
++    content = response.text.strip()
++
++    json_match = re.search(r'\{.*\}', content, re.DOTALL)
++    if json_match:
++        return json.loads(json_match.group())
++    return None
++
++
++@router.post("/read-prescription", summary="AI reads prescription image")
++async def read_prescription(data: PrescriptionRequest, current_user: dict = Depends(get_current_user)):
++    if not settings.GEMINI_API_KEY:
++        return {"success": False, "error": "Gemini API key not configured"}
++
++    try:
++        prompt = """You are a medical prescription reader. Analyze this prescription image carefully.
++
++Return ONLY a valid JSON object in this exact format (no extra text):
++{
++  "doctor_name": "Doctor name if visible or empty string",
++  "patient_name": "Patient name if visible or empty string",
++  "date": "Date if visible or empty string",
++  "hospital": "Hospital or clinic name if visible or empty string",
++  "medicines": [
++    {
++      "name": "Medicine name",
++      "dosage": "Dosage amount",
++      "frequency": "How often to take",
++      "duration": "How long to take",
++      "instructions": "Special instructions"
++    }
++  ],
++  "diagnosis": "Diagnosis if mentioned or empty string",
++  "notes": "Additional notes or empty string",
++  "follow_up": "Follow up date if mentioned or empty string"
++}"""
++
++        result = call_gemini(data.image_base64, prompt)
++        if result:
++            return {"success": True, "data": result}
++        return {"success": False, "error": "Could not read prescription"}
++
++    except Exception as e:
++        logger.error(f"Prescription AI error: {e}")
++        return {"success": False, "error": str(e)}
++
++
++@router.post("/analyze-report", summary="AI analyzes health report")
++async def analyze_report(data: PrescriptionRequest, current_user: dict = Depends(get_current_user)):
++    if not settings.GEMINI_API_KEY:
++        return {"success": False, "error": "Gemini API key not configured"}
++
++    try:
++        prompt = """You are a medical report analyzer. Analyze this health/lab report image carefully.
++
++Return ONLY a valid JSON object in this exact format (no extra text):
++{
++  "report_type": "Type of report",
++  "date": "Date if visible or empty string",
++  "lab_name": "Laboratory name if visible or empty string",
++  "parameters": [
++    {
++      "name": "Parameter name",
++      "value": "Measured value",
++      "unit": "Unit of measurement",
++      "normal_range": "Normal range if shown",
++      "status": "normal or high or low",
++      "interpretation": "Brief explanation"
++    }
++  ],
++  "overall_summary": "Overall health summary in simple language",
++  "concerns": ["List of concerning values if any"],
++  "recommendations": ["List of recommendations"],
++  "doctor_to_consult": "Type of specialist to consult if needed"
++}"""
++
++        result = call_gemini(data.image_base64, prompt)
++        if result:
++            return {"success": True, "data": result}
++        return {"success": False, "error": "Could not analyze report"}
++
++    except Exception as e:
++        logger.error(f"Report AI error: {e}")
++        return {"success": False, "error": str(e)}
+diff --git a/backend/app/services/appointment_service.py b/backend/app/services/appointment_service.py
+index 992be70..dd2a35a 100644
+--- a/backend/app/services/appointment_service.py
++++ b/backend/app/services/appointment_service.py
+@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
+ from app.database.connection import get_db
+ from app.utils.helpers import serialize_doc, str_to_objectid
+ from app.schemas.appointment_schema import AppointmentCreateRequest
++from app.utils.email_utils import send_appointment_booked_email, send_appointment_confirmed_email, send_appointment_cancelled_email
+ 
+ 
+ async def create_appointment(patient: dict, data: AppointmentCreateRequest) -> dict:
+@@ -32,6 +33,16 @@ async def create_appointment(patient: dict, data: AppointmentCreateRequest) -> d
+ 
+     result = await db.appointments.insert_one(appointment_doc)
+     appointment_doc["_id"] = result.inserted_id
++
++    # Send email notification
++    send_appointment_booked_email(
++        patient_email=patient.get("email", ""),
++        patient_name=patient["full_name"],
++        doctor_name=doctor["name"],
++        date=data.appointment_date,
++        time=data.appointment_time
++    )
++
+     return serialize_doc(appointment_doc)
+ 
+ 
+@@ -71,6 +82,26 @@ async def update_appointment_status(appointment_id: str, new_status: str, actor:
+         {"$set": {"status": new_status, "updated_at": datetime.utcnow()}},
+         return_document=True
+     )
++
++    # Send email based on new status
++    patient = await db.users.find_one({"_id": str_to_objectid(appointment["patient_id"])})
++    if patient:
++        if new_status == "confirmed":
++            send_appointment_confirmed_email(
++                patient_email=patient.get("email", ""),
++                patient_name=appointment.get("patient_name", ""),
++                doctor_name=appointment.get("doctor_name", ""),
++                date=appointment.get("appointment_date", ""),
++                time=appointment.get("appointment_time", "")
++            )
++        elif new_status == "cancelled":
++            send_appointment_cancelled_email(
++                patient_email=patient.get("email", ""),
++                patient_name=appointment.get("patient_name", ""),
++                doctor_name=appointment.get("doctor_name", ""),
++                date=appointment.get("appointment_date", "")
++            )
++
+     return serialize_doc(result)
+ 
+ 
+diff --git a/backend/app/services/doctor_service.py b/backend/app/services/doctor_service.py
+index 044ea79..7007372 100644
+--- a/backend/app/services/doctor_service.py
++++ b/backend/app/services/doctor_service.py
+@@ -10,7 +10,8 @@ async def get_all_doctors(
+     limit: int = 12,
+     specialization: Optional[str] = None,
+     search: Optional[str] = None,
+-    min_rating: Optional[float] = None
++    min_rating: Optional[float] = None,
++    max_fee: Optional[float] = None
+ ) -> dict:
+     db = get_db()
+     query = {"is_active": True}
+@@ -25,6 +26,8 @@ async def get_all_doctors(
+         ]
+     if min_rating:
+         query["rating"] = {"$gte": min_rating}
++    if max_fee:
++        query["consultation_fee"] = {"$lte": max_fee}
+ 
+     skip, lim = paginate_query(page, limit)
+     total = await db.doctors.count_documents(query)
+diff --git a/backend/app/utils/email_utils.py b/backend/app/utils/email_utils.py
+new file mode 100644
+index 0000000..8da7bf0
+--- /dev/null
++++ b/backend/app/utils/email_utils.py
+@@ -0,0 +1,84 @@
++import smtplib
++from email.mime.text import MIMEText
++from email.mime.multipart import MIMEMultipart
++from app.config.settings import settings
++from loguru import logger
++
++
++def send_email(to_email: str, subject: str, html_body: str):
++    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
++        logger.warning("Email not configured — skipping email send")
++        return
++
++    try:
++        msg = MIMEMultipart("alternative")
++        msg["Subject"] = subject
++        msg["From"] = settings.SMTP_USER
++        msg["To"] = to_email
++        msg.attach(MIMEText(html_body, "html"))
++
++        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
++            server.starttls()
++            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
++            server.sendmail(settings.SMTP_USER, to_email, msg.as_string())
++        logger.info(f"Email sent to {to_email}: {subject}")
++    except Exception as e:
++        logger.error(f"Failed to send email to {to_email}: {e}")
++
++
++def send_appointment_booked_email(patient_email: str, patient_name: str, doctor_name: str, date: str, time: str):
++    send_email(
++        to_email=patient_email,
++        subject="Appointment Booked - AI Healthcare",
++        html_body=f"""
++        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
++            <h2 style="color: #2563eb;">Appointment Confirmed!</h2>
++            <p>Hi <b>{patient_name}</b>,</p>
++            <p>Your appointment has been booked successfully.</p>
++            <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; margin: 16px 0;">
++                <p><b>Doctor:</b> {doctor_name}</p>
++                <p><b>Date:</b> {date}</p>
++                <p><b>Time:</b> {time}</p>
++            </div>
++            <p>Please be on time for your appointment.</p>
++            <p style="color: #6b7280;">AI Healthcare Platform</p>
++        </div>
++        """
++    )
++
++
++def send_appointment_confirmed_email(patient_email: str, patient_name: str, doctor_name: str, date: str, time: str):
++    send_email(
++        to_email=patient_email,
++        subject="Appointment Confirmed by Doctor - AI Healthcare",
++        html_body=f"""
++        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
++            <h2 style="color: #16a34a;">Appointment Confirmed!</h2>
++            <p>Hi <b>{patient_name}</b>,</p>
++            <p>Your appointment has been confirmed by the doctor.</p>
++            <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0;">
++                <p><b>Doctor:</b> {doctor_name}</p>
++                <p><b>Date:</b> {date}</p>
++                <p><b>Time:</b> {time}</p>
++            </div>
++            <p>You can now chat with your doctor and join a video consultation.</p>
++            <p style="color: #6b7280;">AI Healthcare Platform</p>
++        </div>
++        """
++    )
++
++
++def send_appointment_cancelled_email(patient_email: str, patient_name: str, doctor_name: str, date: str):
++    send_email(
++        to_email=patient_email,
++        subject="Appointment Cancelled - AI Healthcare",
++        html_body=f"""
++        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
++            <h2 style="color: #dc2626;">Appointment Cancelled</h2>
++            <p>Hi <b>{patient_name}</b>,</p>
++            <p>Your appointment with <b>{doctor_name}</b> on <b>{date}</b> has been cancelled.</p>
++            <p>Please book a new appointment at your convenience.</p>
++            <p style="color: #6b7280;">AI Healthcare Platform</p>
++        </div>
++        """
++    )
+diff --git a/backend/fix_appointments.py b/backend/fix_appointments.py
+new file mode 100644
+index 0000000..80ab414
+--- /dev/null
++++ b/backend/fix_appointments.py
+@@ -0,0 +1,27 @@
++import asyncio
++from app.database.connection import connect_db, get_db
++from bson import ObjectId
++
++async def fix():
++    await connect_db()
++    db = get_db()
++
++    # Get registered doctor _id
++    doctor = await db.doctors.find_one({"user_id": "6a0306935da7320b66535f0a"})
++    registered_id = str(doctor["_id"])
++    print("Registered doctor _id:", registered_id)
++
++    # Update ALL appointments to point to registered doctor
++    result = await db.appointments.update_many(
++        {},
++        {"$set": {"doctor_id": registered_id, "doctor_name": "Dr. Sobha Jain"}}
++    )
++    print("Appointments updated:", result.modified_count)
++
++    # Verify
++    appointments = await db.appointments.find({}).to_list(length=20)
++    print("All appointments now:")
++    for a in appointments:
++        print(" doctor_id:", a.get("doctor_id"), "| patient:", a.get("patient_name"), "| status:", a.get("status"))
++
++asyncio.run(fix())
+diff --git a/backend/fix_doctor.py b/backend/fix_doctor.py
+new file mode 100644
+index 0000000..6587ce7
+--- /dev/null
++++ b/backend/fix_doctor.py
+@@ -0,0 +1,15 @@
++import asyncio
++from app.database.connection import connect_db, get_db
++
++async def fix():
++    await connect_db()
++    db = get_db()
++    result = await db.doctors.update_one(
++        {"user_id": "6a0306935da7320b66535f0a"},
++        {"$set": {"is_active": True, "is_verified": True, "name": "Dr. Sobha Jain"}}
++    )
++    print("Updated:", result.modified_count)
++    doctor = await db.doctors.find_one({"user_id": "6a0306935da7320b66535f0a"})
++    print("Doctor:", doctor.get("name"), "| active:", doctor.get("is_active"), "| verified:", doctor.get("is_verified"))
++
++asyncio.run(fix())
+diff --git a/backend/fix_doctor2.py b/backend/fix_doctor2.py
+new file mode 100644
+index 0000000..64f2a7d
+--- /dev/null
++++ b/backend/fix_doctor2.py
+@@ -0,0 +1,20 @@
++import asyncio
++from app.database.connection import connect_db, get_db
++from bson import ObjectId
++
++async def fix():
++    await connect_db()
++    db = get_db()
++
++    # Deactivate the seeded Shobha Jain (no user_id)
++    result = await db.doctors.update_one(
++        {"_id": ObjectId("6a02f28c992f9ae8656b2dcf")},
++        {"$set": {"is_active": False}}
++    )
++    print("Deactivated seeded Shobha Jain:", result.modified_count)
++
++    # Confirm registered doctor is active
++    doctor = await db.doctors.find_one({"user_id": "6a0306935da7320b66535f0a"})
++    print("Registered doctor:", doctor.get("name"), "| _id:", doctor["_id"], "| active:", doctor.get("is_active"))
++
++asyncio.run(fix())
+diff --git a/frontend/package-lock.json b/frontend/package-lock.json
+index f70a5fc..bdf5bf4 100644
+--- a/frontend/package-lock.json
++++ b/frontend/package-lock.json
+@@ -8,16 +8,21 @@
+       "name": "ai-healthcare-frontend",
+       "version": "1.0.0",
+       "dependencies": {
++        "@react-google-maps/api": "^2.20.8",
+         "@reduxjs/toolkit": "^2.1.0",
+         "axios": "^1.6.5",
+         "date-fns": "^3.3.1",
+         "framer-motion": "^11.0.3",
++        "leaflet": "^1.9.4",
+         "lucide-react": "^0.323.0",
+         "react": "^18.2.0",
+         "react-dom": "^18.2.0",
+         "react-hot-toast": "^2.4.1",
++        "react-is": "^19.2.6",
++        "react-leaflet": "^5.0.0",
+         "react-redux": "^9.1.0",
+         "react-router-dom": "^6.22.0",
++        "recharts": "^3.8.1",
+         "redux-persist": "^6.0.0"
+       },
+       "devDependencies": {
+@@ -716,6 +721,22 @@
+         "node": ">=12"
+       }
+     },
++    "node_modules/@googlemaps/js-api-loader": {
++      "version": "1.16.8",
++      "resolved": "https://registry.npmjs.org/@googlemaps/js-api-loader/-/js-api-loader-1.16.8.tgz",
++      "integrity": "sha512-CROqqwfKotdO6EBjZO/gQGVTbeDps5V7Mt9+8+5Q+jTg5CRMi3Ii/L9PmV3USROrt2uWxtGzJHORmByxyo9pSQ==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/@googlemaps/markerclusterer": {
++      "version": "2.5.3",
++      "resolved": "https://registry.npmjs.org/@googlemaps/markerclusterer/-/markerclusterer-2.5.3.tgz",
++      "integrity": "sha512-x7lX0R5yYOoiNectr10wLgCBasNcXFHiADIBdmn7jQllF2B5ENQw5XtZK+hIw4xnV0Df0xhN4LN98XqA5jaiOw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "fast-deep-equal": "^3.1.3",
++        "supercluster": "^8.0.1"
++      }
++    },
+     "node_modules/@jridgewell/gen-mapping": {
+       "version": "0.3.13",
+       "resolved": "https://registry.npmjs.org/@jridgewell/gen-mapping/-/gen-mapping-0.3.13.tgz",
+@@ -804,6 +825,47 @@
+         "node": ">= 8"
+       }
+     },
++    "node_modules/@react-google-maps/api": {
++      "version": "2.20.8",
++      "resolved": "https://registry.npmjs.org/@react-google-maps/api/-/api-2.20.8.tgz",
++      "integrity": "sha512-wtLYFtCGXK3qbIz1H5to3JxbosPnKsvjDKhqGylXUb859EskhzR7OpuNt0LqdLarXUtZCJTKzPn3BNaekNIahg==",
++      "license": "MIT",
++      "dependencies": {
++        "@googlemaps/js-api-loader": "1.16.8",
++        "@googlemaps/markerclusterer": "2.5.3",
++        "@react-google-maps/infobox": "2.20.0",
++        "@react-google-maps/marker-clusterer": "2.20.0",
++        "@types/google.maps": "3.58.1",
++        "invariant": "2.2.4"
++      },
++      "peerDependencies": {
++        "react": "^16.8 || ^17 || ^18 || ^19",
++        "react-dom": "^16.8 || ^17 || ^18 || ^19"
++      }
++    },
++    "node_modules/@react-google-maps/infobox": {
++      "version": "2.20.0",
++      "resolved": "https://registry.npmjs.org/@react-google-maps/infobox/-/infobox-2.20.0.tgz",
++      "integrity": "sha512-03PJHjohhaVLkX6+NHhlr8CIlvUxWaXhryqDjyaZ8iIqqix/nV8GFdz9O3m5OsjtxtNho09F/15j14yV0nuyLQ==",
++      "license": "MIT"
++    },
++    "node_modules/@react-google-maps/marker-clusterer": {
++      "version": "2.20.0",
++      "resolved": "https://registry.npmjs.org/@react-google-maps/marker-clusterer/-/marker-clusterer-2.20.0.tgz",
++      "integrity": "sha512-tieX9Va5w1yP88vMgfH1pHTacDQ9TgDTjox3tLlisKDXRQWdjw+QeVVghhf5XqqIxXHgPdcGwBvKY6UP+SIvLw==",
++      "license": "MIT"
++    },
++    "node_modules/@react-leaflet/core": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/@react-leaflet/core/-/core-3.0.0.tgz",
++      "integrity": "sha512-3EWmekh4Nz+pGcr+xjf0KNyYfC3U2JjnkWsh0zcqaexYqmmB5ZhH37kz41JXGmKzpaMZCnPofBBm64i+YrEvGQ==",
++      "license": "Hippocratic-2.1",
++      "peerDependencies": {
++        "leaflet": "^1.9.0",
++        "react": "^19.0.0",
++        "react-dom": "^19.0.0"
++      }
++    },
+     "node_modules/@reduxjs/toolkit": {
+       "version": "2.11.2",
+       "resolved": "https://registry.npmjs.org/@reduxjs/toolkit/-/toolkit-2.11.2.tgz",
+@@ -938,9 +1000,6 @@
+         "arm"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -955,9 +1014,6 @@
+         "arm"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -972,9 +1028,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -989,9 +1042,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1006,9 +1056,6 @@
+         "loong64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1023,9 +1070,6 @@
+         "loong64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1040,9 +1084,6 @@
+         "ppc64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1057,9 +1098,6 @@
+         "ppc64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1074,9 +1112,6 @@
+         "riscv64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1091,9 +1126,6 @@
+         "riscv64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1108,9 +1140,6 @@
+         "s390x"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1125,9 +1154,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1142,9 +1168,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1292,6 +1315,69 @@
+         "@babel/types": "^7.28.2"
+       }
+     },
++    "node_modules/@types/d3-array": {
++      "version": "3.2.2",
++      "resolved": "https://registry.npmjs.org/@types/d3-array/-/d3-array-3.2.2.tgz",
++      "integrity": "sha512-hOLWVbm7uRza0BYXpIIW5pxfrKe0W+D5lrFiAEYR+pb6w3N2SwSMaJbXdUfSEv+dT4MfHBLtn5js0LAWaO6otw==",
++      "license": "MIT"
++    },
++    "node_modules/@types/d3-color": {
++      "version": "3.1.3",
++      "resolved": "https://registry.npmjs.org/@types/d3-color/-/d3-color-3.1.3.tgz",
++      "integrity": "sha512-iO90scth9WAbmgv7ogoq57O9YpKmFBbmoEoCHDB2xMBY0+/KVrqAaCDyCE16dUspeOvIxFFRI+0sEtqDqy2b4A==",
++      "license": "MIT"
++    },
++    "node_modules/@types/d3-ease": {
++      "version": "3.0.2",
++      "resolved": "https://registry.npmjs.org/@types/d3-ease/-/d3-ease-3.0.2.tgz",
++      "integrity": "sha512-NcV1JjO5oDzoK26oMzbILE6HW7uVXOHLQvHshBUW4UMdZGfiY6v5BeQwh9a9tCzv+CeefZQHJt5SRgK154RtiA==",
++      "license": "MIT"
++    },
++    "node_modules/@types/d3-interpolate": {
++      "version": "3.0.4",
++      "resolved": "https://registry.npmjs.org/@types/d3-interpolate/-/d3-interpolate-3.0.4.tgz",
++      "integrity": "sha512-mgLPETlrpVV1YRJIglr4Ez47g7Yxjl1lj7YKsiMCb27VJH9W8NVM6Bb9d8kkpG/uAQS5AmbA48q2IAolKKo1MA==",
++      "license": "MIT",
++      "dependencies": {
++        "@types/d3-color": "*"
++      }
++    },
++    "node_modules/@types/d3-path": {
++      "version": "3.1.1",
++      "resolved": "https://registry.npmjs.org/@types/d3-path/-/d3-path-3.1.1.tgz",
++      "integrity": "sha512-VMZBYyQvbGmWyWVea0EHs/BwLgxc+MKi1zLDCONksozI4YJMcTt8ZEuIR4Sb1MMTE8MMW49v0IwI5+b7RmfWlg==",
++      "license": "MIT"
++    },
++    "node_modules/@types/d3-scale": {
++      "version": "4.0.9",
++      "resolved": "https://registry.npmjs.org/@types/d3-scale/-/d3-scale-4.0.9.tgz",
++      "integrity": "sha512-dLmtwB8zkAeO/juAMfnV+sItKjlsw2lKdZVVy6LRr0cBmegxSABiLEpGVmSJJ8O08i4+sGR6qQtb6WtuwJdvVw==",
++      "license": "MIT",
++      "dependencies": {
++        "@types/d3-time": "*"
++      }
++    },
++    "node_modules/@types/d3-shape": {
++      "version": "3.1.8",
++      "resolved": "https://registry.npmjs.org/@types/d3-shape/-/d3-shape-3.1.8.tgz",
++      "integrity": "sha512-lae0iWfcDeR7qt7rA88BNiqdvPS5pFVPpo5OfjElwNaT2yyekbM0C9vK+yqBqEmHr6lDkRnYNoTBYlAgJa7a4w==",
++      "license": "MIT",
++      "dependencies": {
++        "@types/d3-path": "*"
++      }
++    },
++    "node_modules/@types/d3-time": {
++      "version": "3.0.4",
++      "resolved": "https://registry.npmjs.org/@types/d3-time/-/d3-time-3.0.4.tgz",
++      "integrity": "sha512-yuzZug1nkAAaBlBBikKZTgzCeA+k1uy4ZFwWANOfKw5z5LRhV0gNA7gNkKm7HoK+HRN0wX3EkxGk0fpbWhmB7g==",
++      "license": "MIT"
++    },
++    "node_modules/@types/d3-timer": {
++      "version": "3.0.2",
++      "resolved": "https://registry.npmjs.org/@types/d3-timer/-/d3-timer-3.0.2.tgz",
++      "integrity": "sha512-Ps3T8E8dZDam6fUyNiMkekK3XUsaUEik+idO9/YjPtfj2qruF8tFBXS7XhtE4iIXBLxhmLjP3SXpLhVf21I9Lw==",
++      "license": "MIT"
++    },
+     "node_modules/@types/estree": {
+       "version": "1.0.8",
+       "resolved": "https://registry.npmjs.org/@types/estree/-/estree-1.0.8.tgz",
+@@ -1299,18 +1385,24 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/@types/google.maps": {
++      "version": "3.58.1",
++      "resolved": "https://registry.npmjs.org/@types/google.maps/-/google.maps-3.58.1.tgz",
++      "integrity": "sha512-X9QTSvGJ0nCfMzYOnaVs/k6/4L+7F5uCS+4iUmkLEls6J9S/Phv+m/i3mDeyc49ZBgwab3EFO1HEoBY7k98EGQ==",
++      "license": "MIT"
++    },
+     "node_modules/@types/prop-types": {
+       "version": "15.7.15",
+       "resolved": "https://registry.npmjs.org/@types/prop-types/-/prop-types-15.7.15.tgz",
+       "integrity": "sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/@types/react": {
+       "version": "18.3.28",
+       "resolved": "https://registry.npmjs.org/@types/react/-/react-18.3.28.tgz",
+       "integrity": "sha512-z9VXpC7MWrhfWipitjNdgCauoMLRdIILQsAEV+ZesIzBq/oUlxk0m3ApZuMFCXdnS4U7KrI+l3WRUEGQ8K1QKw==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/prop-types": "*",
+@@ -1591,6 +1683,15 @@
+         "node": ">= 6"
+       }
+     },
++    "node_modules/clsx": {
++      "version": "2.1.1",
++      "resolved": "https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz",
++      "integrity": "sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=6"
++      }
++    },
+     "node_modules/combined-stream": {
+       "version": "1.0.8",
+       "resolved": "https://registry.npmjs.org/combined-stream/-/combined-stream-1.0.8.tgz",
+@@ -1639,6 +1740,127 @@
+       "integrity": "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==",
+       "license": "MIT"
+     },
++    "node_modules/d3-array": {
++      "version": "3.2.4",
++      "resolved": "https://registry.npmjs.org/d3-array/-/d3-array-3.2.4.tgz",
++      "integrity": "sha512-tdQAmyA18i4J7wprpYq8ClcxZy3SC31QMeByyCFyRt7BVHdREQZ5lpzoe5mFEYZUWe+oq8HBvk9JjpibyEV4Jg==",
++      "license": "ISC",
++      "dependencies": {
++        "internmap": "1 - 2"
++      },
++      "engines": {
++        "node": ">=12"
++      }
++    },
++    "node_modules/d3-color": {
++      "version": "3.1.0",
++      "resolved": "https://registry.npmjs.org/d3-color/-/d3-color-3.1.0.tgz",
++      "integrity": "sha512-zg/chbXyeBtMQ1LbD/WSoW2DpC3I0mpmPdW+ynRTj/x2DAWYrIY7qeZIHidozwV24m4iavr15lNwIwLxRmOxhA==",
++      "license": "ISC",
++      "engines": {
++        "node": ">=12"
++      }
++    },
++    "node_modules/d3-ease": {
++      "version": "3.0.1",
++      "resolved": "https://registry.npmjs.org/d3-ease/-/d3-ease-3.0.1.tgz",
++      "integrity": "sha512-wR/XK3D3XcLIZwpbvQwQ5fK+8Ykds1ip7A2Txe0yxncXSdq1L9skcG7blcedkOX+ZcgxGAmLX1FrRGbADwzi0w==",
++      "license": "BSD-3-Clause",
++      "engines": {
++        "node": ">=12"
++      }
++    },
++    "node_modules/d3-format": {
++      "version": "3.1.2",
++      "resolved": "https://registry.npmjs.org/d3-format/-/d3-format-3.1.2.tgz",
++      "integrity": "sha512-AJDdYOdnyRDV5b6ArilzCPPwc1ejkHcoyFarqlPqT7zRYjhavcT3uSrqcMvsgh2CgoPbK3RCwyHaVyxYcP2Arg==",
++      "license": "ISC",
++      "engines": {
++        "node": ">=12"
++      }
++    },
++    "node_modules/d3-interpolate": {
++      "version": "3.0.1",
++      "resolved": "https://registry.npmjs.org/d3-interpolate/-/d3-interpolate-3.0.1.tgz",
++      "integrity": "sha512-3bYs1rOD33uo8aqJfKP3JWPAibgw8Zm2+L9vBKEHJ2Rg+viTR7o5Mmv5mZcieN+FRYaAOWX5SJATX6k1PWz72g==",
++      "license": "ISC",
++      "dependencies": {
++        "d3-color": "1 - 3"
++      },
++      "engines": {
++        "node": ">=12"
++      }
++    },
++    "node_modules/d3-path": {
++      "version": "3.1.0",
++      "resolved": "https://registry.npmjs.org/d3-path/-/d3-path-3.1.0.tgz",
++      "integrity": "sha512-p3KP5HCf/bvjBSSKuXid6Zqijx7wIfNW+J/maPs+iwR35at5JCbLUT0LzF1cnjbCHWhqzQTIN2Jpe8pRebIEFQ==",
++      "license": "ISC",
++      "engines": {
++        "node": ">=12"
++      }
++    },
++    "node_modules/d3-scale": {
++      "version": "4.0.2",
++      "resolved": "https://registry.npmjs.org/d3-scale/-/d3-scale-4.0.2.tgz",
++      "integrity": "sha512-GZW464g1SH7ag3Y7hXjf8RoUuAFIqklOAq3MRl4OaWabTFJY9PN/E1YklhXLh+OQ3fM9yS2nOkCoS+WLZ6kvxQ==",
++      "license": "ISC",
++      "dependencies": {
++        "d3-array": "2.10.0 - 3",
++        "d3-format": "1 - 3",
++        "d3-interpolate": "1.2.0 - 3",
++        "d3-time": "2.1.1 - 3",
++        "d3-time-format": "2 - 4"
++      },
++      "engines": {
++        "node": ">=12"
++      }
++    },
++    "node_modules/d3-shape": {
++      "version": "3.2.0",
++      "resolved": "https://registry.npmjs.org/d3-shape/-/d3-shape-3.2.0.tgz",
++      "integrity": "sha512-SaLBuwGm3MOViRq2ABk3eLoxwZELpH6zhl3FbAoJ7Vm1gofKx6El1Ib5z23NUEhF9AsGl7y+dzLe5Cw2AArGTA==",
++      "license": "ISC",
++      "dependencies": {
++        "d3-path": "^3.1.0"
++      },
++      "engines": {
++        "node": ">=12"
++      }
++    },
++    "node_modules/d3-time": {
++      "version": "3.1.0",
++      "resolved": "https://registry.npmjs.org/d3-time/-/d3-time-3.1.0.tgz",
++      "integrity": "sha512-VqKjzBLejbSMT4IgbmVgDjpkYrNWUYJnbCGo874u7MMKIWsILRX+OpX/gTk8MqjpT1A/c6HY2dCA77ZN0lkQ2Q==",
++      "license": "ISC",
++      "dependencies": {
++        "d3-array": "2 - 3"
++      },
++      "engines": {
++        "node": ">=12"
++      }
++    },
++    "node_modules/d3-time-format": {
++      "version": "4.1.0",
++      "resolved": "https://registry.npmjs.org/d3-time-format/-/d3-time-format-4.1.0.tgz",
++      "integrity": "sha512-dJxPBlzC7NugB2PDLwo9Q8JiTR3M3e4/XANkreKSUxF8vvXKqm1Yfq4Q5dl8budlunRVlUUaDUgFt7eA8D6NLg==",
++      "license": "ISC",
++      "dependencies": {
++        "d3-time": "1 - 3"
++      },
++      "engines": {
++        "node": ">=12"
++      }
++    },
++    "node_modules/d3-timer": {
++      "version": "3.0.1",
++      "resolved": "https://registry.npmjs.org/d3-timer/-/d3-timer-3.0.1.tgz",
++      "integrity": "sha512-ndfJ/JxxMd3nw31uyKoY2naivF+r29V+Lc0svZxe1JvvIRmi8hUsrMvdOwgS1o6uBHmiz91geQ0ylPP0aj1VUA==",
++      "license": "ISC",
++      "engines": {
++        "node": ">=12"
++      }
++    },
+     "node_modules/date-fns": {
+       "version": "3.6.0",
+       "resolved": "https://registry.npmjs.org/date-fns/-/date-fns-3.6.0.tgz",
+@@ -1667,6 +1889,12 @@
+         }
+       }
+     },
++    "node_modules/decimal.js-light": {
++      "version": "2.5.1",
++      "resolved": "https://registry.npmjs.org/decimal.js-light/-/decimal.js-light-2.5.1.tgz",
++      "integrity": "sha512-qIMFpTMZmny+MMIitAB6D7iVPEorVw6YQRWkvarTkT4tBeSLLiHzcwj6q0MmYSFCiVpiqPJTJEYIrpcPzVEIvg==",
++      "license": "MIT"
++    },
+     "node_modules/delayed-stream": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/delayed-stream/-/delayed-stream-1.0.0.tgz",
+@@ -1756,6 +1984,16 @@
+         "node": ">= 0.4"
+       }
+     },
++    "node_modules/es-toolkit": {
++      "version": "1.46.1",
++      "resolved": "https://registry.npmjs.org/es-toolkit/-/es-toolkit-1.46.1.tgz",
++      "integrity": "sha512-5eNtXOs3tbfxXOj04tjjseeWkRWaoCjdEI+96DgwzZoe6c9juL49pXlzAFTI72aWC9Y8p7168g6XIKjh7k6pyQ==",
++      "license": "MIT",
++      "workspaces": [
++        "docs",
++        "benchmarks"
++      ]
++    },
+     "node_modules/esbuild": {
+       "version": "0.21.5",
+       "resolved": "https://registry.npmjs.org/esbuild/-/esbuild-0.21.5.tgz",
+@@ -1805,6 +2043,18 @@
+         "node": ">=6"
+       }
+     },
++    "node_modules/eventemitter3": {
++      "version": "5.0.4",
++      "resolved": "https://registry.npmjs.org/eventemitter3/-/eventemitter3-5.0.4.tgz",
++      "integrity": "sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==",
++      "license": "MIT"
++    },
++    "node_modules/fast-deep-equal": {
++      "version": "3.1.3",
++      "resolved": "https://registry.npmjs.org/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz",
++      "integrity": "sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==",
++      "license": "MIT"
++    },
+     "node_modules/fast-glob": {
+       "version": "3.3.3",
+       "resolved": "https://registry.npmjs.org/fast-glob/-/fast-glob-3.3.3.tgz",
+@@ -2089,6 +2339,24 @@
+         "url": "https://opencollective.com/immer"
+       }
+     },
++    "node_modules/internmap": {
++      "version": "2.0.3",
++      "resolved": "https://registry.npmjs.org/internmap/-/internmap-2.0.3.tgz",
++      "integrity": "sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==",
++      "license": "ISC",
++      "engines": {
++        "node": ">=12"
++      }
++    },
++    "node_modules/invariant": {
++      "version": "2.2.4",
++      "resolved": "https://registry.npmjs.org/invariant/-/invariant-2.2.4.tgz",
++      "integrity": "sha512-phJfQVBuaJM5raOpJjSfkiD6BpbCE4Ns//LaXl6wGYtUBY83nWS6Rf9tXm2e8VaK60JEjYldbPif/A2B1C2gNA==",
++      "license": "MIT",
++      "dependencies": {
++        "loose-envify": "^1.0.0"
++      }
++    },
+     "node_modules/is-binary-path": {
+       "version": "2.1.0",
+       "resolved": "https://registry.npmjs.org/is-binary-path/-/is-binary-path-2.1.0.tgz",
+@@ -2193,6 +2461,18 @@
+         "node": ">=6"
+       }
+     },
++    "node_modules/kdbush": {
++      "version": "4.0.2",
++      "resolved": "https://registry.npmjs.org/kdbush/-/kdbush-4.0.2.tgz",
++      "integrity": "sha512-WbCVYJ27Sz8zi9Q7Q0xHC+05iwkm3Znipc2XTlrnJbsHMYktW4hPhXUE8Ys1engBrvffoSCqbil1JQAa7clRpA==",
++      "license": "ISC"
++    },
++    "node_modules/leaflet": {
++      "version": "1.9.4",
++      "resolved": "https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz",
++      "integrity": "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==",
++      "license": "BSD-2-Clause"
++    },
+     "node_modules/lilconfig": {
+       "version": "3.1.3",
+       "resolved": "https://registry.npmjs.org/lilconfig/-/lilconfig-3.1.3.tgz",
+@@ -2670,6 +2950,26 @@
+         "react-dom": ">=16"
+       }
+     },
++    "node_modules/react-is": {
++      "version": "19.2.6",
++      "resolved": "https://registry.npmjs.org/react-is/-/react-is-19.2.6.tgz",
++      "integrity": "sha512-XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw==",
++      "license": "MIT"
++    },
++    "node_modules/react-leaflet": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/react-leaflet/-/react-leaflet-5.0.0.tgz",
++      "integrity": "sha512-CWbTpr5vcHw5bt9i4zSlPEVQdTVcML390TjeDG0cK59z1ylexpqC6M1PJFjV8jD7CF+ACBFsLIDs6DRMoLEofw==",
++      "license": "Hippocratic-2.1",
++      "dependencies": {
++        "@react-leaflet/core": "^3.0.0"
++      },
++      "peerDependencies": {
++        "leaflet": "^1.9.0",
++        "react": "^19.0.0",
++        "react-dom": "^19.0.0"
++      }
++    },
+     "node_modules/react-redux": {
+       "version": "9.2.0",
+       "resolved": "https://registry.npmjs.org/react-redux/-/react-redux-9.2.0.tgz",
+@@ -2758,6 +3058,46 @@
+         "node": ">=8.10.0"
+       }
+     },
++    "node_modules/recharts": {
++      "version": "3.8.1",
++      "resolved": "https://registry.npmjs.org/recharts/-/recharts-3.8.1.tgz",
++      "integrity": "sha512-mwzmO1s9sFL0TduUpwndxCUNoXsBw3u3E/0+A+cLcrSfQitSG62L32N69GhqUrrT5qKcAE3pCGVINC6pqkBBQg==",
++      "license": "MIT",
++      "workspaces": [
++        "www"
++      ],
++      "dependencies": {
++        "@reduxjs/toolkit": "^1.9.0 || 2.x.x",
++        "clsx": "^2.1.1",
++        "decimal.js-light": "^2.5.1",
++        "es-toolkit": "^1.39.3",
++        "eventemitter3": "^5.0.1",
++        "immer": "^10.1.1",
++        "react-redux": "8.x.x || 9.x.x",
++        "reselect": "5.1.1",
++        "tiny-invariant": "^1.3.3",
++        "use-sync-external-store": "^1.2.2",
++        "victory-vendor": "^37.0.2"
++      },
++      "engines": {
++        "node": ">=18"
++      },
++      "peerDependencies": {
++        "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0",
++        "react-dom": "^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0",
++        "react-is": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0"
++      }
++    },
++    "node_modules/recharts/node_modules/immer": {
++      "version": "10.2.0",
++      "resolved": "https://registry.npmjs.org/immer/-/immer-10.2.0.tgz",
++      "integrity": "sha512-d/+XTN3zfODyjr89gM3mPq1WNX2B8pYsu7eORitdwyA2sBubnTl3laYlBk4sXY5FUa5qTZGBDPJICVbvqzjlbw==",
++      "license": "MIT",
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/immer"
++      }
++    },
+     "node_modules/redux": {
+       "version": "5.0.1",
+       "resolved": "https://registry.npmjs.org/redux/-/redux-5.0.1.tgz",
+@@ -2942,6 +3282,15 @@
+         "node": ">=16 || 14 >=14.17"
+       }
+     },
++    "node_modules/supercluster": {
++      "version": "8.0.1",
++      "resolved": "https://registry.npmjs.org/supercluster/-/supercluster-8.0.1.tgz",
++      "integrity": "sha512-IiOea5kJ9iqzD2t7QJq/cREyLHTtSmUT6gQsweojg9WH2sYJqZK9SswTu6jrscO6D1G5v5vYZ9ru/eq85lXeZQ==",
++      "license": "ISC",
++      "dependencies": {
++        "kdbush": "^4.0.2"
++      }
++    },
+     "node_modules/supports-preserve-symlinks-flag": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/supports-preserve-symlinks-flag/-/supports-preserve-symlinks-flag-1.0.0.tgz",
+@@ -3016,6 +3365,12 @@
+         "node": ">=0.8"
+       }
+     },
++    "node_modules/tiny-invariant": {
++      "version": "1.3.3",
++      "resolved": "https://registry.npmjs.org/tiny-invariant/-/tiny-invariant-1.3.3.tgz",
++      "integrity": "sha512-+FbBPE1o9QAYvviau/qC5SE3caw21q3xkvWKBtja5vgqOWIHHJ3ioaq1VPfn/Szqctz2bU/oYeKd9/z5BL+PVg==",
++      "license": "MIT"
++    },
+     "node_modules/tinyglobby": {
+       "version": "0.2.16",
+       "resolved": "https://registry.npmjs.org/tinyglobby/-/tinyglobby-0.2.16.tgz",
+@@ -3137,6 +3492,28 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/victory-vendor": {
++      "version": "37.3.6",
++      "resolved": "https://registry.npmjs.org/victory-vendor/-/victory-vendor-37.3.6.tgz",
++      "integrity": "sha512-SbPDPdDBYp+5MJHhBCAyI7wKM3d5ivekigc2Dk2s7pgbZ9wIgIBYGVw4zGHBml/qTFbexrofXW6Gu4noGxrOwQ==",
++      "license": "MIT AND ISC",
++      "dependencies": {
++        "@types/d3-array": "^3.0.3",
++        "@types/d3-ease": "^3.0.0",
++        "@types/d3-interpolate": "^3.0.1",
++        "@types/d3-scale": "^4.0.2",
++        "@types/d3-shape": "^3.1.0",
++        "@types/d3-time": "^3.0.0",
++        "@types/d3-timer": "^3.0.0",
++        "d3-array": "^3.1.6",
++        "d3-ease": "^3.0.1",
++        "d3-interpolate": "^3.0.1",
++        "d3-scale": "^4.0.2",
++        "d3-shape": "^3.1.0",
++        "d3-time": "^3.0.0",
++        "d3-timer": "^3.0.1"
++      }
++    },
+     "node_modules/vite": {
+       "version": "5.4.21",
+       "resolved": "https://registry.npmjs.org/vite/-/vite-5.4.21.tgz",
+diff --git a/frontend/package.json b/frontend/package.json
+index f8bd468..d38cdde 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -9,16 +9,21 @@
+     "preview": "vite preview"
+   },
+   "dependencies": {
++    "@react-google-maps/api": "^2.20.8",
+     "@reduxjs/toolkit": "^2.1.0",
+     "axios": "^1.6.5",
+     "date-fns": "^3.3.1",
+     "framer-motion": "^11.0.3",
++    "leaflet": "^1.9.4",
+     "lucide-react": "^0.323.0",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0",
+     "react-hot-toast": "^2.4.1",
++    "react-is": "^19.2.6",
++    "react-leaflet": "^5.0.0",
+     "react-redux": "^9.1.0",
+     "react-router-dom": "^6.22.0",
++    "recharts": "^3.8.1",
+     "redux-persist": "^6.0.0"
+   },
+   "devDependencies": {
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 5f04197..0dd1f76 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -12,6 +12,10 @@ import DoctorListing from './pages/DoctorListing'
+ import AppointmentBooking from './pages/AppointmentBooking'
+ import VideoConsultation from './pages/VideoConsultation'
+ import Profile from './pages/Profile'
++import HealthRecords from './pages/HealthRecords'
++import MedicineReminder from './pages/MedicineReminder'
++import NearbyPlaces from './pages/NearbyPlaces'
++import PrescriptionReader from './pages/PrescriptionReader'
+ import ProtectedRoute from './routes/ProtectedRoute'
+ 
+ function App() {
+@@ -61,6 +65,26 @@ function App() {
+             <Profile />
+           </ProtectedRoute>
+         } />
++        <Route path="/patient/records" element={
++          <ProtectedRoute roles={['patient']}>
++            <HealthRecords />
++          </ProtectedRoute>
++        } />
++        <Route path="/patient/medicines" element={
++          <ProtectedRoute roles={['patient']}>
++            <MedicineReminder />
++          </ProtectedRoute>
++        } />
++        <Route path="/patient/nearby" element={
++          <ProtectedRoute roles={['patient']}>
++            <NearbyPlaces />
++          </ProtectedRoute>
++        } />
++        <Route path="/patient/ai-reader" element={
++          <ProtectedRoute roles={['patient']}>
++            <PrescriptionReader />
++          </ProtectedRoute>
++        } />
+ 
+         <Route path="/doctor/dashboard" element={
+           <ProtectedRoute roles={['doctor']}>
+diff --git a/frontend/src/components/common/BottomNav.jsx b/frontend/src/components/common/BottomNav.jsx
+new file mode 100644
+index 0000000..2b5591a
+--- /dev/null
++++ b/frontend/src/components/common/BottomNav.jsx
+@@ -0,0 +1,55 @@
++import { NavLink } from 'react-router-dom'
++import { LayoutDashboard, Stethoscope, Activity, User, Shield, FolderOpen, Pill } from 'lucide-react'
++import { useSelector } from 'react-redux'
++
++function BottomNav() {
++  const { user } = useSelector(s => s.auth)
++
++  const patientLinks = [
++    { to: '/patient/dashboard', icon: LayoutDashboard, label: 'Home' },
++    { to: '/patient/symptoms', icon: Activity, label: 'Symptoms' },
++    { to: '/patient/doctors', icon: Stethoscope, label: 'Doctors' },
++    { to: '/patient/records', icon: FolderOpen, label: 'Records' },
++    { to: '/patient/medicines', icon: Pill, label: 'Medicines' },
++  ]
++
++  const doctorLinks = [
++    { to: '/doctor/dashboard', icon: LayoutDashboard, label: 'Home' },
++    { to: '/doctor/profile', icon: User, label: 'Profile' },
++  ]
++
++  const adminLinks = [
++    { to: '/admin', icon: Shield, label: 'Admin' },
++  ]
++
++  const links = user?.role === 'doctor' ? doctorLinks : user?.role === 'admin' ? adminLinks : patientLinks
++
++  return (
++    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 lg:hidden">
++      <div className="flex items-center justify-around px-2 py-2">
++        {links.map(({ to, icon: Icon, label }) => (
++          <NavLink
++            key={to}
++            to={to}
++            className={({ isActive }) =>
++              `flex flex-col items-center gap-1 px-4 py-1.5 rounded-xl transition-all ${
++                isActive ? 'text-blue-600' : 'text-gray-400'
++              }`
++            }
++          >
++            {({ isActive }) => (
++              <>
++                <div className={`p-1.5 rounded-xl transition-all ${isActive ? 'bg-blue-50' : ''}`}>
++                  <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
++                </div>
++                <span className="text-xs font-medium">{label}</span>
++              </>
++            )}
++          </NavLink>
++        ))}
++      </div>
++    </nav>
++  )
++}
++
++export default BottomNav
+diff --git a/frontend/src/components/common/Charts.jsx b/frontend/src/components/common/Charts.jsx
+new file mode 100644
+index 0000000..afafdc4
+--- /dev/null
++++ b/frontend/src/components/common/Charts.jsx
+@@ -0,0 +1,158 @@
++import {
++  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
++  PieChart, Pie, Cell, Legend, LineChart, Line, AreaChart, Area
++} from 'recharts'
++
++const COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2']
++
++// Bar Chart — Appointment Status
++export function AppointmentBarChart({ data }) {
++  return (
++    <div className="card">
++      <h3 className="font-semibold text-gray-900 mb-4">Appointments by Status</h3>
++      <ResponsiveContainer width="100%" height={250}>
++        <BarChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
++          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
++          <XAxis dataKey="name" tick={{ fontSize: 12 }} />
++          <YAxis tick={{ fontSize: 12 }} />
++          <Tooltip
++            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
++          />
++          <Bar dataKey="value" radius={[6, 6, 0, 0]}>
++            {data.map((entry, index) => (
++              <Cell key={index} fill={COLORS[index % COLORS.length]} />
++            ))}
++          </Bar>
++        </BarChart>
++      </ResponsiveContainer>
++    </div>
++  )
++}
++
++// Pie Chart — Doctor Specializations
++export function SpecializationPieChart({ data }) {
++  return (
++    <div className="card">
++      <h3 className="font-semibold text-gray-900 mb-4">Doctors by Specialization</h3>
++      <ResponsiveContainer width="100%" height={250}>
++        <PieChart>
++          <Pie
++            data={data}
++            cx="50%"
++            cy="50%"
++            outerRadius={80}
++            dataKey="value"
++            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
++            labelLine={false}
++          >
++            {data.map((entry, index) => (
++              <Cell key={index} fill={COLORS[index % COLORS.length]} />
++            ))}
++          </Pie>
++          <Tooltip
++            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
++          />
++        </PieChart>
++      </ResponsiveContainer>
++    </div>
++  )
++}
++
++// Line Chart — Monthly Appointments Trend
++export function AppointmentTrendChart({ data }) {
++  return (
++    <div className="card">
++      <h3 className="font-semibold text-gray-900 mb-4">Appointment Trends</h3>
++      <ResponsiveContainer width="100%" height={250}>
++        <AreaChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
++          <defs>
++            <linearGradient id="colorAppointments" x1="0" y1="0" x2="0" y2="1">
++              <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
++              <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
++            </linearGradient>
++          </defs>
++          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
++          <XAxis dataKey="month" tick={{ fontSize: 12 }} />
++          <YAxis tick={{ fontSize: 12 }} />
++          <Tooltip
++            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
++          />
++          <Area
++            type="monotone"
++            dataKey="appointments"
++            stroke="#2563eb"
++            strokeWidth={2}
++            fill="url(#colorAppointments)"
++          />
++        </AreaChart>
++      </ResponsiveContainer>
++    </div>
++  )
++}
++
++// Bar Chart — Disease/Symptom Frequency
++export function DiseaseBarChart({ data }) {
++  if (!data || data.length === 0) {
++    return (
++      <div className="card text-center py-10">
++        <p className="text-gray-400 text-sm">No symptom data yet.</p>
++        <p className="text-gray-400 text-xs mt-1">Use the AI Symptom Checker to see your disease history here.</p>
++      </div>
++    )
++  }
++
++  return (
++    <div className="card">
++      <h3 className="font-semibold text-gray-900 mb-1">Your Disease History</h3>
++      <p className="text-xs text-gray-400 mb-4">Based on your AI symptom analysis reports</p>
++      <ResponsiveContainer width="100%" height={280}>
++        <BarChart data={data} layout="vertical" margin={{ top: 5, right: 20, left: 80, bottom: 5 }}>
++          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
++          <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
++          <YAxis type="category" dataKey="disease" tick={{ fontSize: 11 }} width={80} />
++          <Tooltip
++            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
++            formatter={(value) => [value, 'Times reported']}
++          />
++          <Bar dataKey="count" radius={[0, 6, 6, 0]}>
++            {data.map((entry, index) => (
++              <Cell key={index} fill={COLORS[index % COLORS.length]} />
++            ))}
++          </Bar>
++        </BarChart>
++      </ResponsiveContainer>
++    </div>
++  )
++}
++
++// Bar Chart — Platform Stats (Admin)
++export function PlatformStatsChart({ stats }) {
++  const data = [
++    { name: 'Patients', value: stats?.total_patients || 0 },
++    { name: 'Doctors', value: stats?.total_doctors || 0 },
++    { name: 'Appointments', value: stats?.total_appointments || 0 },
++    { name: 'Pending', value: stats?.pending_appointments || 0 },
++    { name: 'Verified Drs', value: stats?.verified_doctors || 0 },
++  ]
++
++  return (
++    <div className="card">
++      <h3 className="font-semibold text-gray-900 mb-4">Platform Overview</h3>
++      <ResponsiveContainer width="100%" height={250}>
++        <BarChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
++          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
++          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
++          <YAxis tick={{ fontSize: 12 }} />
++          <Tooltip
++            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
++          />
++          <Bar dataKey="value" radius={[6, 6, 0, 0]}>
++            {data.map((entry, index) => (
++              <Cell key={index} fill={COLORS[index % COLORS.length]} />
++            ))}
++          </Bar>
++        </BarChart>
++      </ResponsiveContainer>
++    </div>
++  )
++}
+diff --git a/frontend/src/components/common/Chat.jsx b/frontend/src/components/common/Chat.jsx
+new file mode 100644
+index 0000000..4cd4675
+--- /dev/null
++++ b/frontend/src/components/common/Chat.jsx
+@@ -0,0 +1,116 @@
++import { useState, useEffect, useRef } from 'react'
++import { useSelector } from 'react-redux'
++import { Send, X, MessageCircle } from 'lucide-react'
++import api from '../../services/api'
++
++function Chat({ roomId, otherPersonName, onClose }) {
++  const { user, accessToken } = useSelector(s => s.auth)
++  const [messages, setMessages] = useState([])
++  const [input, setInput] = useState('')
++  const [connected, setConnected] = useState(false)
++  const ws = useRef(null)
++  const bottomRef = useRef(null)
++
++  useEffect(() => {
++    // Load chat history
++    api.get(`/chat/history/${roomId}`).then(res => {
++      setMessages(res.data)
++    }).catch(() => {})
++
++    // Connect WebSocket
++    const wsUrl = `ws://localhost:8000/api/chat/ws/${roomId}?token=${accessToken}`
++    ws.current = new WebSocket(wsUrl)
++
++    ws.current.onopen = () => setConnected(true)
++
++    ws.current.onmessage = (event) => {
++      const data = JSON.parse(event.data)
++      setMessages(prev => [...prev, data])
++    }
++
++    ws.current.onclose = () => setConnected(false)
++
++    return () => {
++      ws.current?.close()
++    }
++  }, [roomId, accessToken])
++
++  useEffect(() => {
++    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
++  }, [messages])
++
++  const sendMessage = () => {
++    if (!input.trim() || !connected) return
++    ws.current.send(JSON.stringify({ message: input.trim() }))
++    setInput('')
++  }
++
++  const handleKeyDown = (e) => {
++    if (e.key === 'Enter' && !e.shiftKey) {
++      e.preventDefault()
++      sendMessage()
++    }
++  }
++
++  return (
++    <div className="fixed bottom-4 right-4 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col z-50">
++      {/* Header */}
++      <div className="flex items-center justify-between px-4 py-3 bg-blue-600 rounded-t-2xl">
++        <div className="flex items-center gap-2">
++          <MessageCircle size={18} className="text-white" />
++          <span className="text-white font-semibold text-sm">{otherPersonName || 'Chat'}</span>
++          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-300' : 'bg-gray-300'}`} />
++        </div>
++        <button onClick={onClose} className="text-white hover:text-gray-200">
++          <X size={18} />
++        </button>
++      </div>
++
++      {/* Messages */}
++      <div className="flex-1 overflow-y-auto p-3 space-y-2 h-72">
++        {messages.length === 0 && (
++          <p className="text-center text-gray-400 text-sm mt-8">No messages yet. Say hello!</p>
++        )}
++        {messages.map((msg, i) => {
++          const isMine = msg.sender_id === user?.id
++          return (
++            <div key={i} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
++              <div className={`max-w-[75%] px-3 py-2 rounded-xl text-sm ${
++                isMine
++                  ? 'bg-blue-600 text-white rounded-br-none'
++                  : 'bg-gray-100 text-gray-800 rounded-bl-none'
++              }`}>
++                <p>{msg.message}</p>
++                <p className={`text-xs mt-1 ${isMine ? 'text-blue-200' : 'text-gray-400'}`}>
++                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
++                </p>
++              </div>
++            </div>
++          )
++        })}
++        <div ref={bottomRef} />
++      </div>
++
++      {/* Input */}
++      <div className="flex items-center gap-2 px-3 py-3 border-t border-gray-100">
++        <input
++          type="text"
++          value={input}
++          onChange={e => setInput(e.target.value)}
++          onKeyDown={handleKeyDown}
++          placeholder="Type a message..."
++          className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
++        />
++        <button
++          onClick={sendMessage}
++          disabled={!connected || !input.trim()}
++          className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 disabled:opacity-40"
++        >
++          <Send size={16} />
++        </button>
++      </div>
++    </div>
++  )
++}
++
++export default Chat
+diff --git a/frontend/src/components/common/Sidebar.jsx b/frontend/src/components/common/Sidebar.jsx
+index 56628e2..31a8da9 100644
+--- a/frontend/src/components/common/Sidebar.jsx
++++ b/frontend/src/components/common/Sidebar.jsx
+@@ -1,7 +1,7 @@
+ import { NavLink } from 'react-router-dom'
+ import {
+   LayoutDashboard, Stethoscope, Users, Calendar, Video, User, Settings,
+-  Heart, LogOut, Shield, Activity
++  Heart, LogOut, Shield, Activity, FolderOpen, Pill, MapPin, ScanLine
+ } from 'lucide-react'
+ import { useSelector, useDispatch } from 'react-redux'
+ import { useNavigate } from 'react-router-dom'
+@@ -11,6 +11,10 @@ const patientLinks = [
+   { to: '/patient/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+   { to: '/patient/symptoms', icon: Activity, label: 'Symptom Checker' },
+   { to: '/patient/doctors', icon: Stethoscope, label: 'Find Doctors' },
++  { to: '/patient/records', icon: FolderOpen, label: 'Health Records' },
++  { to: '/patient/medicines', icon: Pill, label: 'Medicine Reminder' },
++  { to: '/patient/nearby', icon: MapPin, label: 'Nearby Places' },
++  { to: '/patient/ai-reader', icon: ScanLine, label: 'AI Reader' },
+   { to: '/patient/profile', icon: User, label: 'Profile' },
+ ]
+ 
+diff --git a/frontend/src/layouts/DashboardLayout.jsx b/frontend/src/layouts/DashboardLayout.jsx
+index 6ee01f6..1491ffb 100644
+--- a/frontend/src/layouts/DashboardLayout.jsx
++++ b/frontend/src/layouts/DashboardLayout.jsx
+@@ -1,6 +1,7 @@
+ import { useState } from 'react'
+ import Navbar from '../components/common/Navbar'
+ import Sidebar from '../components/common/Sidebar'
++import BottomNav from '../components/common/BottomNav'
+ 
+ function DashboardLayout({ children }) {
+   const [sidebarOpen, setSidebarOpen] = useState(false)
+@@ -13,10 +14,11 @@ function DashboardLayout({ children }) {
+           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+           sidebarOpen={sidebarOpen}
+         />
+-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
++        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 lg:pb-6">
+           {children}
+         </main>
+       </div>
++      <BottomNav />
+     </div>
+   )
+ }
+diff --git a/frontend/src/pages/AdminDashboard.jsx b/frontend/src/pages/AdminDashboard.jsx
+index 0e8e6dc..08a7286 100644
+--- a/frontend/src/pages/AdminDashboard.jsx
++++ b/frontend/src/pages/AdminDashboard.jsx
+@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux'
+ import { Users, Stethoscope, Calendar, CheckCircle, Shield, XCircle, ToggleLeft, ToggleRight } from 'lucide-react'
+ import DashboardLayout from '../layouts/DashboardLayout'
+ import LoadingSpinner from '../components/common/LoadingSpinner'
++import { PlatformStatsChart, SpecializationPieChart, AppointmentBarChart } from '../components/common/Charts'
+ import api from '../services/api'
+ import { formatDate } from '../utils/helpers'
+ import toast from 'react-hot-toast'
+@@ -208,6 +209,17 @@ function AdminDashboard() {
+ 
+         {/* Overview Tab */}
+         {tab === 'overview' && (
++          <>
++          {/* Charts */}
++          <div className="grid md:grid-cols-2 gap-4">
++            <PlatformStatsChart stats={stats} />
++            <SpecializationPieChart data={
++              [...new Set(doctors.map(d => d.specialization))].slice(0, 6).map(spec => ({
++                name: spec?.length > 12 ? spec.slice(0, 12) + '...' : spec,
++                value: doctors.filter(d => d.specialization === spec).length
++              }))
++            } />
++          </div>
+           <div className="card">
+             <h2 className="font-semibold text-gray-900 mb-4">Platform Summary</h2>
+             <div className="grid md:grid-cols-2 gap-6">
+@@ -246,6 +258,7 @@ function AdminDashboard() {
+               </div>
+             </div>
+           </div>
++          </>
+         )}
+       </div>
+     </DashboardLayout>
+diff --git a/frontend/src/pages/DoctorDashboard.jsx b/frontend/src/pages/DoctorDashboard.jsx
+index 3080e70..4199d96 100644
+--- a/frontend/src/pages/DoctorDashboard.jsx
++++ b/frontend/src/pages/DoctorDashboard.jsx
+@@ -1,8 +1,9 @@
+ import { useEffect, useState } from 'react'
+ import { useSelector } from 'react-redux'
+-import { Calendar, Clock, CheckCircle, XCircle, User, Video, FileText } from 'lucide-react'
++import { Calendar, Clock, CheckCircle, XCircle, User, Video, FileText, MessageCircle } from 'lucide-react'
+ import DashboardLayout from '../layouts/DashboardLayout'
+ import LoadingSpinner from '../components/common/LoadingSpinner'
++import Chat from '../components/common/Chat'
+ import api from '../services/api'
+ import { formatDate, getStatusColor } from '../utils/helpers'
+ import toast from 'react-hot-toast'
+@@ -14,6 +15,15 @@ function DoctorDashboard() {
+   const [stats, setStats] = useState({ total: 0, pending: 0, confirmed: 0, completed: 0 })
+   const [prescriptionModal, setPrescriptionModal] = useState(null)
+   const [prescription, setPrescription] = useState('')
++  const [chatOpen, setChatOpen] = useState(false)
++  const [chatRoom, setChatRoom] = useState(null)
++  const [chatName, setChatName] = useState('')
++
++  const openChat = (appointment) => {
++    setChatRoom(`appointment_${appointment.id}`)
++    setChatName(appointment.patient_name)
++    setChatOpen(true)
++  }
+ 
+   useEffect(() => {
+     loadAppointments()
+@@ -147,11 +157,17 @@ function DoctorDashboard() {
+                       >
+                         <Video size={14} /> Start Video Call
+                       </a>
++                      <button
++                        onClick={() => openChat(apt)}
++                        className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1"
++                      >
++                        <MessageCircle size={14} /> Chat
++                      </button>
+                       <button
+                         onClick={() => setPrescriptionModal(apt.id)}
+                         className="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1"
+                       >
+-                        <FileText size={14} /> Add Prescription
++                        <FileText size={14} /> Prescription
+                       </button>
+                     </div>
+                   )}
+@@ -169,6 +185,14 @@ function DoctorDashboard() {
+         </div>
+       </div>
+ 
++      {chatOpen && chatRoom && (
++        <Chat
++          roomId={chatRoom}
++          otherPersonName={chatName}
++          onClose={() => setChatOpen(false)}
++        />
++      )}
++
+       {/* Prescription Modal */}
+       {prescriptionModal && (
+         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+diff --git a/frontend/src/pages/DoctorListing.jsx b/frontend/src/pages/DoctorListing.jsx
+index 6dcb8b5..8068ee4 100644
+--- a/frontend/src/pages/DoctorListing.jsx
++++ b/frontend/src/pages/DoctorListing.jsx
+@@ -12,6 +12,7 @@ function DoctorListing() {
+   const [search, setSearch] = useState('')
+   const [selectedSpec, setSelectedSpec] = useState('')
+   const [minRating, setMinRating] = useState('')
++  const [maxFee, setMaxFee] = useState('')
+   const [page, setPage] = useState(1)
+   const [showFilters, setShowFilters] = useState(false)
+   const limit = 12
+@@ -25,8 +26,9 @@ function DoctorListing() {
+     if (search) params.search = search
+     if (selectedSpec) params.specialization = selectedSpec
+     if (minRating) params.min_rating = minRating
++    if (maxFee) params.max_fee = maxFee
+     dispatch(fetchDoctors(params))
+-  }, [dispatch, page, search, selectedSpec, minRating])
++  }, [dispatch, page, search, selectedSpec, minRating, maxFee])
+ 
+   const handleSearch = (e) => {
+     setSearch(e.target.value)
+@@ -37,11 +39,12 @@ function DoctorListing() {
+     setSearch('')
+     setSelectedSpec('')
+     setMinRating('')
++    setMaxFee('')
+     setPage(1)
+   }
+ 
+   const totalPages = Math.ceil(total / limit)
+-  const hasFilters = search || selectedSpec || minRating
++  const hasFilters = search || selectedSpec || minRating || maxFee
+ 
+   return (
+     <DashboardLayout>
+@@ -108,6 +111,20 @@ function DoctorListing() {
+                   <option value="4.9">4.9 Stars</option>
+                 </select>
+               </div>
++              <div>
++                <label className="label">Max Consultation Fee (₹)</label>
++                <select
++                  value={maxFee}
++                  onChange={e => { setMaxFee(e.target.value); setPage(1) }}
++                  className="input-field"
++                >
++                  <option value="">Any Fee</option>
++                  <option value="500">Up to ₹500</option>
++                  <option value="1000">Up to ₹1000</option>
++                  <option value="1500">Up to ₹1500</option>
++                  <option value="2000">Up to ₹2000</option>
++                </select>
++              </div>
+             </div>
+           </div>
+         )}
+diff --git a/frontend/src/pages/HealthRecords.jsx b/frontend/src/pages/HealthRecords.jsx
+new file mode 100644
+index 0000000..17f2769
+--- /dev/null
++++ b/frontend/src/pages/HealthRecords.jsx
+@@ -0,0 +1,216 @@
++import { useState, useEffect, useRef } from 'react'
++import { Plus, FileText, Trash2, Download, X, Upload, Stethoscope, FlaskConical, ClipboardList, FolderOpen } from 'lucide-react'
++import DashboardLayout from '../layouts/DashboardLayout'
++import LoadingSpinner from '../components/common/LoadingSpinner'
++import api from '../services/api'
++import toast from 'react-hot-toast'
++
++const RECORD_TYPES = [
++  { value: 'prescription', label: 'Prescription', icon: '💊', color: 'bg-blue-50 text-blue-700 border-blue-100' },
++  { value: 'lab_report', label: 'Lab Report', icon: '🧪', color: 'bg-green-50 text-green-700 border-green-100' },
++  { value: 'diagnosis', label: 'Diagnosis', icon: '🩺', color: 'bg-purple-50 text-purple-700 border-purple-100' },
++  { value: 'other', label: 'Other', icon: '📁', color: 'bg-gray-50 text-gray-700 border-gray-100' },
++]
++
++function HealthRecords() {
++  const [records, setRecords] = useState([])
++  const [loading, setLoading] = useState(true)
++  const [showModal, setShowModal] = useState(false)
++  const [filter, setFilter] = useState('all')
++  const [form, setForm] = useState({ title: '', record_type: 'prescription', description: '', doctor_name: '', date: '', file_data: '' })
++  const [saving, setSaving] = useState(false)
++  const fileRef = useRef(null)
++
++  useEffect(() => { loadRecords() }, [])
++
++  const loadRecords = async () => {
++    try {
++      const res = await api.get('/health-records/')
++      setRecords(res.data)
++    } catch {
++      toast.error('Failed to load records')
++    } finally {
++      setLoading(false)
++    }
++  }
++
++  const handleFileChange = (e) => {
++    const file = e.target.files[0]
++    if (!file) return
++    if (file.size > 5 * 1024 * 1024) { toast.error('File must be under 5MB'); return }
++    const reader = new FileReader()
++    reader.onload = () => setForm(f => ({ ...f, file_data: reader.result }))
++    reader.readAsDataURL(file)
++  }
++
++  const handleSave = async () => {
++    if (!form.title.trim()) { toast.error('Please enter a title'); return }
++    setSaving(true)
++    try {
++      const res = await api.post('/health-records/', form)
++      setRecords(prev => [res.data, ...prev])
++      setShowModal(false)
++      setForm({ title: '', record_type: 'prescription', description: '', doctor_name: '', date: '', file_data: '' })
++      toast.success('Record saved!')
++    } catch {
++      toast.error('Failed to save record')
++    } finally {
++      setSaving(false)
++    }
++  }
++
++  const handleDelete = async (id) => {
++    try {
++      await api.delete(`/health-records/${id}`)
++      setRecords(prev => prev.filter(r => r.id !== id))
++      toast.success('Record deleted')
++    } catch {
++      toast.error('Failed to delete')
++    }
++  }
++
++  const filtered = filter === 'all' ? records : records.filter(r => r.record_type === filter)
++  const getType = (type) => RECORD_TYPES.find(t => t.value === type) || RECORD_TYPES[3]
++
++  return (
++    <DashboardLayout>
++      <div className="space-y-6 animate-fade-in">
++        {/* Header */}
++        <div className="flex items-center justify-between">
++          <div>
++            <h1 className="text-2xl font-bold text-gray-900">Health Records</h1>
++            <p className="text-gray-500 text-sm mt-1">Store and manage your medical documents</p>
++          </div>
++          <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2 text-sm">
++            <Plus size={16} /> Add Record
++          </button>
++        </div>
++
++        {/* Filter Tabs */}
++        <div className="flex gap-2 flex-wrap">
++          <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${filter === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
++            All ({records.length})
++          </button>
++          {RECORD_TYPES.map(t => (
++            <button key={t.value} onClick={() => setFilter(t.value)} className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${filter === t.value ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
++              {t.icon} {t.label} ({records.filter(r => r.record_type === t.value).length})
++            </button>
++          ))}
++        </div>
++
++        {/* Records */}
++        {loading ? (
++          <div className="py-16 flex justify-center"><LoadingSpinner text="Loading records..." /></div>
++        ) : filtered.length === 0 ? (
++          <div className="card text-center py-16">
++            <FolderOpen size={48} className="mx-auto text-gray-200 mb-3" />
++            <p className="text-gray-500 font-medium">No records found</p>
++            <p className="text-gray-400 text-sm mt-1">Click "Add Record" to store your first health document</p>
++            <button onClick={() => setShowModal(true)} className="mt-4 btn-primary text-sm inline-flex items-center gap-2">
++              <Plus size={14} /> Add Record
++            </button>
++          </div>
++        ) : (
++          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
++            {filtered.map(record => {
++              const type = getType(record.record_type)
++              return (
++                <div key={record.id} className={`border rounded-2xl p-5 hover:shadow-md transition-all ${type.color}`}>
++                  <div className="flex items-start justify-between mb-3">
++                    <div className="flex items-center gap-2">
++                      <span className="text-2xl">{type.icon}</span>
++                      <span className="text-xs font-medium capitalize">{type.label}</span>
++                    </div>
++                    <button onClick={() => handleDelete(record.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-red-400 hover:text-red-600 transition-colors">
++                      <Trash2 size={14} />
++                    </button>
++                  </div>
++                  <h3 className="font-semibold text-gray-900 mb-1">{record.title}</h3>
++                  {record.doctor_name && <p className="text-xs text-gray-500 mb-1">Dr. {record.doctor_name}</p>}
++                  {record.date && <p className="text-xs text-gray-400 mb-2">{record.date}</p>}
++                  {record.description && <p className="text-sm text-gray-600 line-clamp-2">{record.description}</p>}
++                  {record.file_data && (
++                    <a href={record.file_data} download={record.title} className="mt-3 flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline">
++                      <Download size={12} /> Download File
++                    </a>
++                  )}
++                </div>
++              )
++            })}
++          </div>
++        )}
++      </div>
++
++      {/* Add Record Modal */}
++      {showModal && (
++        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
++          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
++            <div className="flex items-center justify-between mb-5">
++              <h3 className="font-bold text-gray-900 text-lg">Add Health Record</h3>
++              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
++                <X size={18} />
++              </button>
++            </div>
++
++            <div className="space-y-4">
++              <div>
++                <label className="label">Record Type</label>
++                <div className="grid grid-cols-2 gap-2">
++                  {RECORD_TYPES.map(t => (
++                    <button
++                      key={t.value}
++                      type="button"
++                      onClick={() => setForm(f => ({ ...f, record_type: t.value }))}
++                      className={`p-3 rounded-xl border text-sm font-medium transition-all text-left flex items-center gap-2 ${form.record_type === t.value ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-blue-300'}`}
++                    >
++                      <span>{t.icon}</span> {t.label}
++                    </button>
++                  ))}
++                </div>
++              </div>
++
++              <div>
++                <label className="label">Title *</label>
++                <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Blood Test Report" className="input-field" />
++              </div>
++
++              <div className="grid grid-cols-2 gap-3">
++                <div>
++                  <label className="label">Doctor Name</label>
++                  <input type="text" value={form.doctor_name} onChange={e => setForm(f => ({ ...f, doctor_name: e.target.value }))} placeholder="Dr. Name" className="input-field" />
++                </div>
++                <div>
++                  <label className="label">Date</label>
++                  <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="input-field" />
++                </div>
++              </div>
++
++              <div>
++                <label className="label">Notes / Description</label>
++                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Any additional notes..." className="input-field h-20 resize-none" />
++              </div>
++
++              <div>
++                <label className="label">Upload File (optional)</label>
++                <button type="button" onClick={() => fileRef.current?.click()} className="w-full border-2 border-dashed border-gray-200 rounded-xl p-4 text-sm text-gray-500 hover:border-blue-300 hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
++                  <Upload size={16} />
++                  {form.file_data ? '✅ File selected' : 'Click to upload (PDF, Image — max 5MB)'}
++                </button>
++                <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleFileChange} className="hidden" />
++              </div>
++            </div>
++
++            <div className="flex gap-3 mt-6">
++              <button onClick={() => setShowModal(false)} className="btn-secondary flex-1">Cancel</button>
++              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2">
++                {saving ? <LoadingSpinner size="sm" /> : <><Plus size={14} /> Save Record</>}
++              </button>
++            </div>
++          </div>
++        </div>
++      )}
++    </DashboardLayout>
++  )
++}
++
++export default HealthRecords
+diff --git a/frontend/src/pages/Landing.jsx b/frontend/src/pages/Landing.jsx
+index b3e72d4..37fa526 100644
+--- a/frontend/src/pages/Landing.jsx
++++ b/frontend/src/pages/Landing.jsx
+@@ -1,26 +1,34 @@
+ import { useNavigate, Link } from 'react-router-dom'
+-import { Heart, Brain, Calendar, Video, Shield, Star, ArrowRight, CheckCircle, Activity } from 'lucide-react'
++import { Heart, Brain, Calendar, Video, Shield, ArrowRight, CheckCircle, Activity, Star, Phone, Clock, Users, Stethoscope, MessageCircle, ChevronRight } from 'lucide-react'
+ 
+-const features = [
+-  { icon: Brain, title: 'AI Symptom Analysis', desc: 'Describe your symptoms and get instant AI-powered health insights with possible conditions and severity assessment.' },
+-  { icon: Heart, title: 'Expert Doctors', desc: 'Connect with 20+ verified specialists across all medical fields for professional consultations.' },
+-  { icon: Calendar, title: 'Easy Scheduling', desc: 'Book appointments at your convenience with real-time availability and instant confirmation.' },
+-  { icon: Video, title: 'Video Consultations', desc: 'Consult from the comfort of your home with secure, HD video calls with your doctor.' },
+-  { icon: Shield, title: 'Secure & Private', desc: 'Your health data is protected with enterprise-grade encryption and strict privacy controls.' },
+-  { icon: Activity, title: 'Health Tracking', desc: 'Track your consultation history, prescriptions, and health reports in one place.' },
++const specializations = [
++  { name: 'Cardiologist', icon: '❤️' },
++  { name: 'Neurologist', icon: '🧠' },
++  { name: 'Dermatologist', icon: '🧴' },
++  { name: 'Orthopedist', icon: '🦴' },
++  { name: 'Gynecologist', icon: '👩‍⚕️' },
++  { name: 'Psychiatrist', icon: '🧘' },
++  { name: 'Gastroenterologist', icon: '🫁' },
++  { name: 'Pulmonologist', icon: '🫀' },
++  { name: 'Pediatrician', icon: '👶' },
++  { name: 'ENT Specialist', icon: '👂' },
++  { name: 'Ophthalmologist', icon: '👁️' },
++  { name: 'Endocrinologist', icon: '💉' },
+ ]
+ 
+-const stats = [
+-  { value: '20+', label: 'Expert Doctors' },
+-  { value: '10K+', label: 'Consultations' },
+-  { value: '4.8★', label: 'Average Rating' },
+-  { value: '15+', label: 'Specializations' },
++const features = [
++  { icon: Brain, title: 'AI Symptom Checker', desc: 'Get instant AI-powered health insights', color: 'bg-blue-50 text-blue-600' },
++  { icon: Video, title: 'Video Consultation', desc: 'Consult doctors from home', color: 'bg-purple-50 text-purple-600' },
++  { icon: Calendar, title: 'Easy Booking', desc: 'Book appointments in seconds', color: 'bg-green-50 text-green-600' },
++  { icon: MessageCircle, title: 'Chat with Doctor', desc: 'Real-time messaging', color: 'bg-orange-50 text-orange-600' },
++  { icon: Shield, title: 'Secure & Private', desc: 'Your data is protected', color: 'bg-red-50 text-red-600' },
++  { icon: Activity, title: 'Health Tracking', desc: 'Track your health history', color: 'bg-teal-50 text-teal-600' },
+ ]
+ 
+-const specializations = [
+-  'Cardiologist', 'Neurologist', 'Dermatologist', 'Orthopedist',
+-  'Gynecologist', 'Psychiatrist', 'Gastroenterologist', 'Pulmonologist',
+-  'Endocrinologist', 'Pediatrician', 'ENT Specialist', 'Ophthalmologist'
++const testimonials = [
++  { name: 'Priya Sharma', role: 'Patient', text: 'The AI symptom checker helped me understand my condition before my appointment. Amazing platform!', rating: 5 },
++  { name: 'Rahul Mehta', role: 'Patient', text: 'Booked an appointment in under 2 minutes. The video call quality was excellent!', rating: 5 },
++  { name: 'Anita Patel', role: 'Patient', text: 'Very easy to use. The doctors are professional and the platform is very smooth.', rating: 5 },
+ ]
+ 
+ function Landing() {
+@@ -29,143 +37,243 @@ function Landing() {
+   return (
+     <div className="min-h-screen bg-white">
+       {/* Navbar */}
+-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
++      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+           <div className="flex items-center gap-2">
+-            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-400 rounded-xl flex items-center justify-center">
+-              <Heart size={16} className="text-white" />
++            <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-blue-400 rounded-xl flex items-center justify-center shadow-md">
++              <Heart size={18} className="text-white" />
+             </div>
+-            <span className="font-bold text-xl text-gray-900">AI Healthcare</span>
++            <span className="font-bold text-xl text-gray-900">AI <span className="text-blue-600">Healthcare</span></span>
++          </div>
++          <div className="hidden md:flex items-center gap-6 text-sm text-gray-600">
++            <a href="#features" className="hover:text-blue-600 transition-colors">Features</a>
++            <a href="#specializations" className="hover:text-blue-600 transition-colors">Specializations</a>
++            <a href="#how-it-works" className="hover:text-blue-600 transition-colors">How It Works</a>
+           </div>
+           <div className="flex items-center gap-3">
+-            <Link to="/login" className="btn-secondary text-sm py-2 px-4">Sign In</Link>
+-            <Link to="/register" className="btn-primary text-sm py-2 px-4">Get Started</Link>
++            <Link to="/login" className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors px-3 py-2">Sign In</Link>
++            <Link to="/register" className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-5 rounded-xl transition-colors shadow-md">Get Started</Link>
+           </div>
+         </div>
+       </nav>
+ 
+       {/* Hero */}
+-      <section className="pt-32 pb-20 bg-gradient-to-br from-blue-50 via-white to-blue-50">
+-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+-          <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 rounded-full px-4 py-2 text-sm font-medium mb-6">
+-            <Brain size={14} />
+-            AI-Powered Healthcare Platform
++      <section className="pt-24 pb-16 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-900 text-white relative overflow-hidden">
++        <div className="absolute inset-0 opacity-10">
++          <div className="absolute top-10 left-10 w-72 h-72 bg-white rounded-full blur-3xl" />
++          <div className="absolute bottom-10 right-10 w-96 h-96 bg-blue-300 rounded-full blur-3xl" />
++        </div>
++        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
++          <div className="max-w-3xl mx-auto text-center">
++            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 text-sm font-medium mb-6">
++              <Brain size={14} />
++              AI-Powered Healthcare Platform
++            </div>
++            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
++              Doctor Consultation
++              <span className="block text-blue-200">At Your Fingertips</span>
++            </h1>
++            <p className="text-lg text-blue-100 mb-8 max-w-2xl mx-auto">
++              Consult top doctors online, get AI-powered health insights, and manage your health — anytime, anywhere.
++            </p>
++            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
++              <button
++                onClick={() => navigate('/register')}
++                className="w-full sm:w-auto bg-white text-blue-700 hover:bg-blue-50 font-bold py-3.5 px-8 rounded-xl transition-colors shadow-lg flex items-center justify-center gap-2 text-base"
++              >
++                Consult a Doctor <ArrowRight size={18} />
++              </button>
++              <button
++                onClick={() => navigate('/login')}
++                className="w-full sm:w-auto bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white font-semibold py-3.5 px-8 rounded-xl transition-colors border border-white/20 text-base"
++              >
++                Sign In
++              </button>
++            </div>
++            <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm text-blue-200">
++              <span className="flex items-center gap-1"><CheckCircle size={14} className="text-green-400" /> Free Registration</span>
++              <span className="flex items-center gap-1"><CheckCircle size={14} className="text-green-400" /> 20+ Specialists</span>
++              <span className="flex items-center gap-1"><CheckCircle size={14} className="text-green-400" /> AI Health Analysis</span>
++            </div>
+           </div>
+-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+-            Your Health, Our
+-            <span className="text-gradient block">Priority</span>
+-          </h1>
+-          <p className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed">
+-            Describe your symptoms, get AI-powered health insights, and consult with expert doctors — all from the comfort of your home.
+-          </p>
+-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+-            <button
+-              onClick={() => navigate('/register')}
+-              className="btn-primary flex items-center gap-2 text-base py-3 px-8"
+-            >
+-              Start Free Consultation <ArrowRight size={16} />
+-            </button>
+-            <button
+-              onClick={() => navigate('/login')}
+-              className="btn-secondary flex items-center gap-2 text-base py-3 px-8"
+-            >
+-              Sign In
+-            </button>
++        </div>
++
++        {/* Stats Bar */}
++        <div className="max-w-4xl mx-auto px-4 mt-14">
++          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 grid grid-cols-2 md:grid-cols-4 gap-6 border border-white/20">
++            {[
++              { value: '20+', label: 'Expert Doctors', icon: Stethoscope },
++              { value: '10K+', label: 'Consultations', icon: Calendar },
++              { value: '4.8★', label: 'Average Rating', icon: Star },
++              { value: '15+', label: 'Specializations', icon: Activity },
++            ].map(({ value, label, icon: Icon }) => (
++              <div key={label} className="text-center">
++                <p className="text-2xl font-bold text-white mb-1">{value}</p>
++                <p className="text-blue-200 text-xs">{label}</p>
++              </div>
++            ))}
+           </div>
++        </div>
++      </section>
+ 
+-          <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">
+-            <CheckCircle size={14} className="text-green-500" />
+-            <span>No subscription required • Pay per consultation</span>
++      {/* Quick Actions — like MFine */}
++      <section className="py-12 bg-gray-50">
++        <div className="max-w-5xl mx-auto px-4">
++          <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">What do you need?</h2>
++          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
++            {[
++              { icon: '🩺', title: 'Consult a Doctor', desc: 'Online consultation', color: 'bg-blue-50 border-blue-100' },
++              { icon: '🧠', title: 'AI Symptom Check', desc: 'Get health insights', color: 'bg-purple-50 border-purple-100' },
++              { icon: '💊', title: 'Medicine Reminder', desc: 'Never miss a dose', color: 'bg-green-50 border-green-100' },
++              { icon: '📋', title: 'Health Records', desc: 'View your reports', color: 'bg-orange-50 border-orange-100' },
++            ].map(({ icon, title, desc, color }) => (
++              <button
++                key={title}
++                onClick={() => navigate('/register')}
++                className={`${color} border rounded-2xl p-5 text-left hover:shadow-md transition-all group`}
++              >
++                <div className="text-3xl mb-3">{icon}</div>
++                <p className="font-semibold text-gray-900 text-sm">{title}</p>
++                <p className="text-gray-400 text-xs mt-1">{desc}</p>
++                <ChevronRight size={14} className="text-gray-400 mt-2 group-hover:translate-x-1 transition-transform" />
++              </button>
++            ))}
+           </div>
+         </div>
+       </section>
+ 
+-      {/* Stats */}
+-      <section className="py-12 bg-white border-y border-gray-100">
+-        <div className="max-w-5xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8">
+-          {stats.map((s) => (
+-            <div key={s.label} className="text-center">
+-              <p className="text-3xl font-bold text-blue-600 mb-1">{s.value}</p>
+-              <p className="text-gray-500 text-sm">{s.label}</p>
+-            </div>
+-          ))}
++      {/* Specializations */}
++      <section id="specializations" className="py-14 bg-white">
++        <div className="max-w-5xl mx-auto px-4">
++          <div className="text-center mb-8">
++            <h2 className="text-2xl font-bold text-gray-900">Browse by Specialization</h2>
++            <p className="text-gray-500 text-sm mt-2">Find the right specialist for every health concern</p>
++          </div>
++          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
++            {specializations.map(({ name, icon }) => (
++              <button
++                key={name}
++                onClick={() => navigate('/register')}
++                className="flex flex-col items-center gap-2 p-4 rounded-2xl border border-gray-100 hover:border-blue-200 hover:bg-blue-50 transition-all group"
++              >
++                <span className="text-2xl">{icon}</span>
++                <span className="text-xs font-medium text-gray-700 text-center leading-tight group-hover:text-blue-700">{name}</span>
++              </button>
++            ))}
++          </div>
+         </div>
+       </section>
+ 
+       {/* Features */}
+-      <section className="py-20 bg-gray-50">
+-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+-          <div className="text-center mb-12">
+-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Everything You Need</h2>
+-            <p className="text-gray-600 max-w-xl mx-auto">A complete healthcare platform powered by AI for smarter, faster, and more accessible medical care.</p>
++      <section id="features" className="py-14 bg-gray-50">
++        <div className="max-w-5xl mx-auto px-4">
++          <div className="text-center mb-10">
++            <h2 className="text-2xl font-bold text-gray-900">Everything in One App</h2>
++            <p className="text-gray-500 text-sm mt-2">A complete healthcare platform for all your needs</p>
+           </div>
+-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+-            {features.map(({ icon: Icon, title, desc }) => (
+-              <div key={title} className="card hover:shadow-md transition-shadow">
+-                <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
+-                  <Icon size={22} className="text-blue-600" />
++          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
++            {features.map(({ icon: Icon, title, desc, color }) => (
++              <div key={title} className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow border border-gray-100">
++                <div className={`w-12 h-12 ${color} rounded-2xl flex items-center justify-center mb-4`}>
++                  <Icon size={22} />
+                 </div>
+-                <h3 className="font-semibold text-gray-900 mb-2">{title}</h3>
+-                <p className="text-gray-500 text-sm leading-relaxed">{desc}</p>
++                <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
++                <p className="text-gray-500 text-sm">{desc}</p>
+               </div>
+             ))}
+           </div>
+         </div>
+       </section>
+ 
+-      {/* Specializations */}
+-      <section className="py-20 bg-white">
+-        <div className="max-w-5xl mx-auto px-4 text-center">
+-          <h2 className="text-3xl font-bold text-gray-900 mb-4">All Specializations</h2>
+-          <p className="text-gray-600 mb-10">Find the right specialist for every health concern</p>
+-          <div className="flex flex-wrap justify-center gap-3">
+-            {specializations.map((spec) => (
+-              <span key={spec} className="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-medium">
+-                {spec}
+-              </span>
++      {/* How It Works */}
++      <section id="how-it-works" className="py-14 bg-white">
++        <div className="max-w-4xl mx-auto px-4 text-center">
++          <h2 className="text-2xl font-bold text-gray-900 mb-2">How It Works</h2>
++          <p className="text-gray-500 text-sm mb-10">Get a consultation in 3 simple steps</p>
++          <div className="grid md:grid-cols-3 gap-6">
++            {[
++              { step: '1', icon: '📝', title: 'Describe Symptoms', desc: 'Enter your symptoms. Our AI analyzes them instantly and suggests possible conditions.' },
++              { step: '2', icon: '🔍', title: 'Get AI Analysis', desc: 'Receive possible conditions, severity assessment, and specialist recommendations.' },
++              { step: '3', icon: '👨‍⚕️', title: 'Consult Doctor', desc: 'Book an appointment and connect with your doctor via video call or chat.' },
++            ].map(({ step, icon, title, desc }) => (
++              <div key={step} className="relative">
++                <div className="bg-blue-50 rounded-2xl p-6 text-left">
++                  <div className="text-3xl mb-3">{icon}</div>
++                  <div className="text-xs font-bold text-blue-600 mb-1">STEP {step}</div>
++                  <h3 className="font-bold text-gray-900 mb-2">{title}</h3>
++                  <p className="text-gray-500 text-sm">{desc}</p>
++                </div>
++              </div>
+             ))}
+           </div>
+         </div>
+       </section>
+ 
+-      {/* How It Works */}
+-      <section className="py-20 bg-gradient-to-br from-blue-600 to-blue-800 text-white">
+-        <div className="max-w-5xl mx-auto px-4 text-center">
+-          <h2 className="text-3xl font-bold mb-4">How It Works</h2>
+-          <p className="text-blue-200 mb-12 max-w-xl mx-auto">Get a consultation in 3 simple steps</p>
+-          <div className="grid md:grid-cols-3 gap-8">
+-            {[
+-              { step: '1', title: 'Describe Symptoms', desc: 'Enter your symptoms in natural language. Our AI analyzes them instantly.' },
+-              { step: '2', title: 'Get AI Analysis', desc: 'Receive possible conditions, severity assessment, and specialist recommendations.' },
+-              { step: '3', title: 'Consult Doctor', desc: 'Book an appointment and connect with your doctor via video call.' }
+-            ].map(({ step, title, desc }) => (
+-              <div key={step} className="text-center">
+-                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-4">
+-                  {step}
++      {/* Testimonials */}
++      <section className="py-14 bg-gray-50">
++        <div className="max-w-4xl mx-auto px-4">
++          <div className="text-center mb-10">
++            <h2 className="text-2xl font-bold text-gray-900">What Patients Say</h2>
++          </div>
++          <div className="grid md:grid-cols-3 gap-4">
++            {testimonials.map(({ name, role, text, rating }) => (
++              <div key={name} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
++                <div className="flex gap-1 mb-3">
++                  {Array.from({ length: rating }).map((_, i) => (
++                    <Star key={i} size={14} className="text-yellow-400 fill-yellow-400" />
++                  ))}
++                </div>
++                <p className="text-gray-600 text-sm mb-4">"{text}"</p>
++                <div className="flex items-center gap-3">
++                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm">
++                    {name.charAt(0)}
++                  </div>
++                  <div>
++                    <p className="font-semibold text-gray-900 text-sm">{name}</p>
++                    <p className="text-gray-400 text-xs">{role}</p>
++                  </div>
+                 </div>
+-                <h3 className="font-semibold text-lg mb-2">{title}</h3>
+-                <p className="text-blue-200 text-sm">{desc}</p>
+               </div>
+             ))}
+           </div>
++        </div>
++      </section>
++
++      {/* CTA */}
++      <section className="py-14 bg-gradient-to-br from-blue-600 to-blue-800 text-white">
++        <div className="max-w-2xl mx-auto px-4 text-center">
++          <h2 className="text-3xl font-bold mb-4">Start Your Health Journey Today</h2>
++          <p className="text-blue-200 mb-8">Join thousands of patients getting better healthcare with AI</p>
+           <button
+             onClick={() => navigate('/register')}
+-            className="mt-12 bg-white text-blue-700 hover:bg-blue-50 font-semibold py-3 px-8 rounded-xl transition-colors inline-flex items-center gap-2"
++            className="bg-white text-blue-700 hover:bg-blue-50 font-bold py-3.5 px-10 rounded-xl transition-colors shadow-lg inline-flex items-center gap-2 text-base"
+           >
+-            Get Started Free <ArrowRight size={16} />
++            Get Started Free <ArrowRight size={18} />
+           </button>
+         </div>
+       </section>
+ 
+       {/* Footer */}
+-      <footer className="bg-gray-900 text-gray-400 py-8">
+-        <div className="max-w-7xl mx-auto px-4 text-center">
+-          <div className="flex items-center justify-center gap-2 mb-3">
+-            <Heart size={16} className="text-blue-400" />
+-            <span className="text-white font-semibold">AI Healthcare</span>
++      <footer className="bg-gray-900 text-gray-400 py-10">
++        <div className="max-w-7xl mx-auto px-4">
++          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
++            <div className="flex items-center gap-2">
++              <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center">
++                <Heart size={16} className="text-white" />
++              </div>
++              <span className="text-white font-bold">AI Healthcare</span>
++            </div>
++            <div className="flex gap-6 text-sm">
++              <a href="#features" className="hover:text-white transition-colors">Features</a>
++              <a href="#specializations" className="hover:text-white transition-colors">Specializations</a>
++              <Link to="/login" className="hover:text-white transition-colors">Sign In</Link>
++              <Link to="/register" className="hover:text-white transition-colors">Register</Link>
++            </div>
++          </div>
++          <div className="border-t border-gray-800 mt-6 pt-6 text-center text-sm">
++            <p>© 2026 AI Healthcare Platform. All rights reserved.</p>
++            <p className="text-xs mt-1 text-gray-600">Not a substitute for professional medical advice.</p>
+           </div>
+-          <p className="text-sm">© 2026 AI Healthcare Platform. All rights reserved.</p>
+-          <p className="text-xs mt-2 text-gray-500">This platform is not a substitute for professional medical advice, diagnosis, or treatment.</p>
+         </div>
+       </footer>
+     </div>
+diff --git a/frontend/src/pages/MedicineReminder.jsx b/frontend/src/pages/MedicineReminder.jsx
+new file mode 100644
+index 0000000..72a471a
+--- /dev/null
++++ b/frontend/src/pages/MedicineReminder.jsx
+@@ -0,0 +1,208 @@
++import { useState, useEffect } from 'react'
++import { Plus, Bell, Trash2, X, Pill, Clock, Check } from 'lucide-react'
++import DashboardLayout from '../layouts/DashboardLayout'
++import toast from 'react-hot-toast'
++
++const FREQUENCIES = ['Once daily', 'Twice daily', 'Three times daily', 'Every 6 hours', 'Every 8 hours', 'Weekly']
++const MEAL_TIMES = ['Before meal', 'After meal', 'With meal', 'Empty stomach']
++
++function MedicineReminder() {
++  const [reminders, setReminders] = useState(() => {
++    try { return JSON.parse(localStorage.getItem('medicine_reminders') || '[]') } catch { return [] }
++  })
++  const [showModal, setShowModal] = useState(false)
++  const [form, setForm] = useState({ name: '', dosage: '', frequency: 'Once daily', time: '08:00', meal: 'After meal', notes: '', active: true })
++
++  useEffect(() => {
++    localStorage.setItem('medicine_reminders', JSON.stringify(reminders))
++  }, [reminders])
++
++  // Check reminders every minute
++  useEffect(() => {
++    const check = () => {
++      const now = new Date()
++      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
++      reminders.filter(r => r.active && r.time === currentTime).forEach(r => {
++        toast(`💊 Time to take ${r.name} - ${r.dosage}`, { duration: 10000, icon: '⏰' })
++        if ('Notification' in window && Notification.permission === 'granted') {
++          new Notification(`Medicine Reminder`, { body: `Time to take ${r.name} - ${r.dosage}` })
++        }
++      })
++    }
++    const interval = setInterval(check, 60000)
++    return () => clearInterval(interval)
++  }, [reminders])
++
++  const requestNotificationPermission = () => {
++    if ('Notification' in window) {
++      Notification.requestPermission().then(perm => {
++        if (perm === 'granted') toast.success('Notifications enabled!')
++        else toast.error('Please allow notifications for reminders')
++      })
++    }
++  }
++
++  const handleSave = () => {
++    if (!form.name.trim()) { toast.error('Please enter medicine name'); return }
++    const newReminder = { ...form, id: Date.now().toString() }
++    setReminders(prev => [...prev, newReminder])
++    setShowModal(false)
++    setForm({ name: '', dosage: '', frequency: 'Once daily', time: '08:00', meal: 'After meal', notes: '', active: true })
++    toast.success('Reminder added!')
++  }
++
++  const toggleActive = (id) => {
++    setReminders(prev => prev.map(r => r.id === id ? { ...r, active: !r.active } : r))
++  }
++
++  const deleteReminder = (id) => {
++    setReminders(prev => prev.filter(r => r.id !== id))
++    toast.success('Reminder deleted')
++  }
++
++  const active = reminders.filter(r => r.active)
++  const inactive = reminders.filter(r => !r.active)
++
++  return (
++    <DashboardLayout>
++      <div className="space-y-6 animate-fade-in">
++        {/* Header */}
++        <div className="flex items-center justify-between">
++          <div>
++            <h1 className="text-2xl font-bold text-gray-900">Medicine Reminder</h1>
++            <p className="text-gray-500 text-sm mt-1">Never miss your medications</p>
++          </div>
++          <div className="flex gap-2">
++            <button onClick={requestNotificationPermission} className="btn-secondary text-sm flex items-center gap-2">
++              <Bell size={14} /> Enable Alerts
++            </button>
++            <button onClick={() => setShowModal(true)} className="btn-primary text-sm flex items-center gap-2">
++              <Plus size={14} /> Add Medicine
++            </button>
++          </div>
++        </div>
++
++        {/* Stats */}
++        <div className="grid grid-cols-3 gap-4">
++          <div className="card text-center">
++            <p className="text-2xl font-bold text-blue-600">{reminders.length}</p>
++            <p className="text-xs text-gray-500 mt-1">Total Medicines</p>
++          </div>
++          <div className="card text-center">
++            <p className="text-2xl font-bold text-green-600">{active.length}</p>
++            <p className="text-xs text-gray-500 mt-1">Active</p>
++          </div>
++          <div className="card text-center">
++            <p className="text-2xl font-bold text-gray-400">{inactive.length}</p>
++            <p className="text-xs text-gray-500 mt-1">Inactive</p>
++          </div>
++        </div>
++
++        {/* Active Reminders */}
++        {reminders.length === 0 ? (
++          <div className="card text-center py-16">
++            <Pill size={48} className="mx-auto text-gray-200 mb-3" />
++            <p className="text-gray-500 font-medium">No medicine reminders</p>
++            <p className="text-gray-400 text-sm mt-1">Add your first medicine to get reminders</p>
++            <button onClick={() => setShowModal(true)} className="mt-4 btn-primary text-sm inline-flex items-center gap-2">
++              <Plus size={14} /> Add Medicine
++            </button>
++          </div>
++        ) : (
++          <div className="space-y-3">
++            <h2 className="font-semibold text-gray-900">Your Medicines</h2>
++            {reminders.map(reminder => (
++              <div key={reminder.id} className={`rounded-2xl p-4 border transition-all ${reminder.active ? 'bg-white border-gray-100 shadow-sm' : 'bg-gray-50 border-gray-100 opacity-60'}`}>
++                <div className="flex items-center justify-between">
++                  <div className="flex items-center gap-4">
++                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${reminder.active ? 'bg-blue-50' : 'bg-gray-100'}`}>
++                      <Pill size={22} className={reminder.active ? 'text-blue-600' : 'text-gray-400'} />
++                    </div>
++                    <div>
++                      <p className="font-semibold text-gray-900">{reminder.name}</p>
++                      <div className="flex flex-wrap gap-2 mt-1">
++                        {reminder.dosage && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{reminder.dosage}</span>}
++                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full flex items-center gap-1"><Clock size={10} /> {reminder.time}</span>
++                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{reminder.frequency}</span>
++                        <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">{reminder.meal}</span>
++                      </div>
++                      {reminder.notes && <p className="text-xs text-gray-400 mt-1">{reminder.notes}</p>}
++                    </div>
++                  </div>
++                  <div className="flex items-center gap-2 flex-shrink-0">
++                    <button
++                      onClick={() => toggleActive(reminder.id)}
++                      className={`p-2 rounded-xl transition-colors ${reminder.active ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
++                      title={reminder.active ? 'Deactivate' : 'Activate'}
++                    >
++                      <Check size={16} />
++                    </button>
++                    <button onClick={() => deleteReminder(reminder.id)} className="p-2 bg-red-50 text-red-400 hover:bg-red-100 rounded-xl transition-colors">
++                      <Trash2 size={16} />
++                    </button>
++                  </div>
++                </div>
++              </div>
++            ))}
++          </div>
++        )}
++      </div>
++
++      {/* Add Medicine Modal */}
++      {showModal && (
++        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
++          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
++            <div className="flex items-center justify-between mb-5">
++              <h3 className="font-bold text-gray-900 text-lg">Add Medicine</h3>
++              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
++                <X size={18} />
++              </button>
++            </div>
++
++            <div className="space-y-4">
++              <div>
++                <label className="label">Medicine Name *</label>
++                <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Paracetamol 500mg" className="input-field" />
++              </div>
++              <div className="grid grid-cols-2 gap-3">
++                <div>
++                  <label className="label">Dosage</label>
++                  <input type="text" value={form.dosage} onChange={e => setForm(f => ({ ...f, dosage: e.target.value }))} placeholder="e.g. 1 tablet" className="input-field" />
++                </div>
++                <div>
++                  <label className="label">Reminder Time</label>
++                  <input type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} className="input-field" />
++                </div>
++              </div>
++              <div>
++                <label className="label">Frequency</label>
++                <select value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value }))} className="input-field">
++                  {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
++                </select>
++              </div>
++              <div>
++                <label className="label">When to take</label>
++                <select value={form.meal} onChange={e => setForm(f => ({ ...f, meal: e.target.value }))} className="input-field">
++                  {MEAL_TIMES.map(m => <option key={m} value={m}>{m}</option>)}
++                </select>
++              </div>
++              <div>
++                <label className="label">Notes (optional)</label>
++                <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any special instructions..." className="input-field" />
++              </div>
++            </div>
++
++            <div className="flex gap-3 mt-6">
++              <button onClick={() => setShowModal(false)} className="btn-secondary flex-1">Cancel</button>
++              <button onClick={handleSave} className="btn-primary flex-1 flex items-center justify-center gap-2">
++                <Plus size={14} /> Add Reminder
++              </button>
++            </div>
++          </div>
++        </div>
++      )}
++    </DashboardLayout>
++  )
++}
++
++export default MedicineReminder
+diff --git a/frontend/src/pages/NearbyPlaces.jsx b/frontend/src/pages/NearbyPlaces.jsx
+new file mode 100644
+index 0000000..ef4eabe
+--- /dev/null
++++ b/frontend/src/pages/NearbyPlaces.jsx
+@@ -0,0 +1,210 @@
++import { useState, useEffect } from 'react'
++import { MapPin, Navigation, Loader, RefreshCw, Phone } from 'lucide-react'
++import DashboardLayout from '../layouts/DashboardLayout'
++import toast from 'react-hot-toast'
++
++const PLACE_TYPES = [
++  { value: 'pharmacy', label: 'Medical Stores', icon: '💊', query: 'medical+store+pharmacy+chemist' },
++  { value: 'hospital', label: 'Hospitals', icon: '🏥', query: 'hospital' },
++  { value: 'clinic', label: 'Clinics', icon: '🩺', query: 'clinic+doctor' },
++]
++
++function NearbyPlaces() {
++  const [userLocation, setUserLocation] = useState(null)
++  const [places, setPlaces] = useState([])
++  const [activeType, setActiveType] = useState('pharmacy')
++  const [loading, setLoading] = useState(false)
++  const [locationError, setLocationError] = useState(false)
++  const [mapUrl, setMapUrl] = useState('')
++
++  const getUserLocation = () => {
++    setLocationError(false)
++    if (!navigator.geolocation) {
++      toast.error('Geolocation not supported')
++      return
++    }
++    toast('Getting your location...', { icon: '📍' })
++    navigator.geolocation.getCurrentPosition(
++      (pos) => {
++        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
++        setUserLocation(loc)
++        updateMap(loc, activeType)
++        searchNearby(loc, activeType)
++      },
++      () => {
++        setLocationError(true)
++        toast.error('Please allow location access')
++      },
++      { enableHighAccuracy: true, timeout: 10000 }
++    )
++  }
++
++  const updateMap = (loc, type) => {
++    const typeData = PLACE_TYPES.find(t => t.value === type)
++    const query = typeData?.query || 'pharmacy'
++    setMapUrl(`https://www.google.com/maps/embed/v1/search?key=AIzaSyDbJYEZtAxICSETR249CQVF0s-0HcCtriQ&q=${query}+near+${loc.lat},${loc.lng}&zoom=14`)
++  }
++
++  const searchNearby = async (location, type) => {
++    setLoading(true)
++    setPlaces([])
++    try {
++      const amenityMap = { pharmacy: 'pharmacy', hospital: 'hospital', clinic: 'clinic|doctors' }
++      const amenity = amenityMap[type] || 'pharmacy'
++      const url = `https://overpass-api.de/api/interpreter?data=[out:json][timeout:15];(node["amenity"~"${amenity}"](around:5000,${location.lat},${location.lng}););out 15;`
++      const res = await fetch(url)
++      const data = await res.json()
++      if (data.elements?.length > 0) {
++        const results = data.elements.map(el => ({
++          id: el.id,
++          name: el.tags?.name || 'Medical Facility',
++          address: [el.tags?.['addr:street'], el.tags?.['addr:city']].filter(Boolean).join(', ') || 'Nearby',
++          phone: el.tags?.phone || el.tags?.['contact:phone'] || null,
++          lat: el.lat,
++          lng: el.lon,
++        })).filter(p => p.lat && p.lng)
++        setPlaces(results)
++        toast.success(`Found ${results.length} places!`)
++      } else {
++        toast('No places found in 5km', { icon: '📍' })
++      }
++    } catch {
++      toast.error('Failed to load places')
++    } finally {
++      setLoading(false)
++    }
++  }
++
++  useEffect(() => { getUserLocation() }, [])
++
++  useEffect(() => {
++    if (userLocation) {
++      updateMap(userLocation, activeType)
++      searchNearby(userLocation, activeType)
++    }
++  }, [activeType])
++
++  const getDistance = (lat, lng) => {
++    if (!userLocation) return null
++    const R = 6371
++    const dLat = (lat - userLocation.lat) * Math.PI / 180
++    const dLng = (lng - userLocation.lng) * Math.PI / 180
++    const a = Math.sin(dLat / 2) ** 2 + Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2
++    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
++    return dist < 1 ? `${(dist * 1000).toFixed(0)}m` : `${dist.toFixed(1)}km`
++  }
++
++  const openDirections = (lat, lng) => {
++    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank')
++  }
++
++  const activeTypeData = PLACE_TYPES.find(t => t.value === activeType)
++
++  return (
++    <DashboardLayout>
++      <div className="space-y-5 animate-fade-in">
++        {/* Header */}
++        <div className="flex items-center justify-between">
++          <div>
++            <h1 className="text-2xl font-bold text-gray-900">Nearby Places</h1>
++            <p className="text-gray-500 text-sm mt-1">Find medical stores, hospitals and clinics near you</p>
++          </div>
++          <button onClick={getUserLocation} className="btn-primary flex items-center gap-2 text-sm">
++            <RefreshCw size={14} /> Refresh
++          </button>
++        </div>
++
++        {/* Type Selector */}
++        <div className="flex gap-3 flex-wrap">
++          {PLACE_TYPES.map(type => (
++            <button
++              key={type.value}
++              onClick={() => setActiveType(type.value)}
++              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border font-medium text-sm transition-all ${
++                activeType === type.value
++                  ? 'bg-blue-600 text-white border-blue-600 shadow-md'
++                  : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
++              }`}
++            >
++              <span>{type.icon}</span> {type.label}
++            </button>
++          ))}
++        </div>
++
++        {/* Location Error */}
++        {locationError && (
++          <div className="card py-12 text-center">
++            <MapPin size={48} className="mx-auto text-gray-200 mb-3" />
++            <p className="text-gray-700 font-semibold">Location Access Required</p>
++            <p className="text-gray-400 text-sm mt-1 mb-4">Please allow location access to find nearby places</p>
++            <button onClick={getUserLocation} className="btn-primary text-sm inline-flex items-center gap-2">
++              <Navigation size={14} /> Allow Location
++            </button>
++          </div>
++        )}
++
++        {/* Google Maps Embed */}
++        {mapUrl && (
++          <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
++            <iframe
++              src={mapUrl}
++              width="100%"
++              height="400"
++              style={{ border: 0 }}
++              allowFullScreen
++              loading="lazy"
++              referrerPolicy="no-referrer-when-downgrade"
++              title="Nearby Places Map"
++            />
++          </div>
++        )}
++
++        {/* Loading */}
++        {loading && (
++          <div className="py-8 flex flex-col items-center gap-3">
++            <Loader size={28} className="text-blue-600 animate-spin" />
++            <p className="text-gray-500 text-sm">Finding nearby {activeTypeData?.label}...</p>
++          </div>
++        )}
++
++        {/* Places List */}
++        {!loading && places.length > 0 && (
++          <div>
++            <h2 className="font-semibold text-gray-900 mb-3">
++              {places.length} {activeTypeData?.label} found nearby
++            </h2>
++            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
++              {places.map(place => (
++                <div key={place.id} className="bg-white border border-gray-100 rounded-2xl p-4 hover:shadow-md hover:border-blue-200 transition-all">
++                  <div className="flex items-start justify-between gap-2 mb-3">
++                    <div className="flex-1 min-w-0">
++                      <p className="font-semibold text-gray-900 text-sm">{place.name}</p>
++                      <p className="text-gray-400 text-xs mt-1">{place.address}</p>
++                      {place.phone && (
++                        <p className="text-blue-600 text-xs mt-1 flex items-center gap-1">
++                          <Phone size={10} /> {place.phone}
++                        </p>
++                      )}
++                    </div>
++                    <span className="text-2xl">{activeTypeData?.icon}</span>
++                  </div>
++                  <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full inline-flex items-center gap-1 mb-3">
++                    <MapPin size={10} /> {getDistance(place.lat, place.lng)}
++                  </span>
++                  <button
++                    onClick={() => openDirections(place.lat, place.lng)}
++                    className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium py-2 rounded-xl transition-colors"
++                  >
++                    <Navigation size={12} /> Get Directions
++                  </button>
++                </div>
++              ))}
++            </div>
++          </div>
++        )}
++      </div>
++    </DashboardLayout>
++  )
++}
++
++export default NearbyPlaces
+diff --git a/frontend/src/pages/PatientDashboard.jsx b/frontend/src/pages/PatientDashboard.jsx
+index 140c202..62f8714 100644
+--- a/frontend/src/pages/PatientDashboard.jsx
++++ b/frontend/src/pages/PatientDashboard.jsx
+@@ -1,10 +1,13 @@
+-import { useEffect } from 'react'
++import { useEffect, useState } from 'react'
+ import { useDispatch, useSelector } from 'react-redux'
+ import { useNavigate } from 'react-router-dom'
+-import { Activity, Calendar, Clock, Stethoscope, Brain, ChevronRight, AlertCircle } from 'lucide-react'
++import { Activity, Calendar, Clock, Stethoscope, Brain, ChevronRight, AlertCircle, MessageCircle } from 'lucide-react'
+ import DashboardLayout from '../layouts/DashboardLayout'
+ import DoctorCard from '../components/common/DoctorCard'
+ import LoadingSpinner from '../components/common/LoadingSpinner'
++import Chat from '../components/common/Chat'
++import api from '../services/api'
++import { DiseaseBarChart } from '../components/common/Charts'
+ import { fetchMyAppointments } from '../redux/slices/appointmentSlice'
+ import { fetchDoctors } from '../redux/slices/doctorSlice'
+ import { formatDate, getStatusColor } from '../utils/helpers'
+@@ -34,10 +37,21 @@ function PatientDashboard() {
+   const { user } = useSelector(s => s.auth)
+   const { list: appointments, loading: aptLoading } = useSelector(s => s.appointments)
+   const { list: doctors, loading: docLoading } = useSelector(s => s.doctors)
++  const [chatOpen, setChatOpen] = useState(false)
++  const [chatRoom, setChatRoom] = useState(null)
++  const [chatName, setChatName] = useState('')
++  const [diseaseData, setDiseaseData] = useState([])
++
++  const openChat = (appointment) => {
++    setChatRoom(`appointment_${appointment.id}`)
++    setChatName(appointment.doctor_name)
++    setChatOpen(true)
++  }
+ 
+   useEffect(() => {
+     dispatch(fetchMyAppointments())
+     dispatch(fetchDoctors({ limit: 4 }))
++    api.get('/ai/disease-stats').then(res => setDiseaseData(res.data.data)).catch(() => {})
+   }, [dispatch])
+ 
+   const pending = appointments.filter(a => a.status === 'pending').length
+@@ -94,9 +108,18 @@ function PatientDashboard() {
+                       <p className="font-medium text-sm text-gray-900 truncate">{apt.doctor_name}</p>
+                       <p className="text-xs text-gray-400">{formatDate(apt.appointment_date)} · {apt.appointment_time}</p>
+                     </div>
+-                    <span className={getStatusColor(apt.status) + ' capitalize'}>
+-                      {apt.status}
+-                    </span>
++                    <div className="flex items-center gap-2">
++                      <span className={getStatusColor(apt.status) + ' capitalize'}>
++                        {apt.status}
++                      </span>
++                      <button
++                        onClick={() => openChat(apt)}
++                        className="p-1.5 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
++                        title="Chat with doctor"
++                      >
++                        <MessageCircle size={14} />
++                      </button>
++                    </div>
+                   </div>
+                 ))}
+               </div>
+@@ -136,6 +159,9 @@ function PatientDashboard() {
+           </div>
+         </div>
+ 
++        {/* Disease History Chart */}
++        <DiseaseBarChart data={diseaseData} />
++
+         {/* Featured Doctors */}
+         <div>
+           <div className="flex items-center justify-between mb-4">
+@@ -155,6 +181,13 @@ function PatientDashboard() {
+           )}
+         </div>
+       </div>
++      {chatOpen && chatRoom && (
++        <Chat
++          roomId={chatRoom}
++          otherPersonName={chatName}
++          onClose={() => setChatOpen(false)}
++        />
++      )}
+     </DashboardLayout>
+   )
+ }
+diff --git a/frontend/src/pages/PrescriptionReader.jsx b/frontend/src/pages/PrescriptionReader.jsx
+new file mode 100644
+index 0000000..f347407
+--- /dev/null
++++ b/frontend/src/pages/PrescriptionReader.jsx
+@@ -0,0 +1,298 @@
++import { useState, useRef } from 'react'
++import { Upload, Scan, FileText, Pill, User, Calendar, AlertCircle, CheckCircle, X, Loader, ClipboardList } from 'lucide-react'
++import DashboardLayout from '../layouts/DashboardLayout'
++import api from '../services/api'
++import toast from 'react-hot-toast'
++
++const TABS = [
++  { value: 'prescription', label: 'Prescription Reader', icon: '💊' },
++  { value: 'report', label: 'Health Report Analyzer', icon: '🧪' },
++]
++
++function PrescriptionReader() {
++  const [activeTab, setActiveTab] = useState('prescription')
++  const [image, setImage] = useState(null)
++  const [imagePreview, setImagePreview] = useState(null)
++  const [result, setResult] = useState(null)
++  const [loading, setLoading] = useState(false)
++  const fileRef = useRef(null)
++
++  const handleImageUpload = (e) => {
++    const file = e.target.files[0]
++    if (!file) return
++    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return }
++    const reader = new FileReader()
++    reader.onload = () => {
++      setImage(reader.result)
++      setImagePreview(reader.result)
++      setResult(null)
++    }
++    reader.readAsDataURL(file)
++  }
++
++  const handleAnalyze = async () => {
++    if (!image) { toast.error('Please upload an image first'); return }
++    setLoading(true)
++    setResult(null)
++    try {
++      const endpoint = activeTab === 'prescription' ? '/ai/read-prescription' : '/ai/analyze-report'
++      const res = await api.post(endpoint, { image_base64: image })
++      if (res.data.success) {
++        setResult(res.data.data)
++        toast.success('Analysis complete!')
++      } else {
++        toast.error(res.data.error || 'Analysis failed')
++      }
++    } catch {
++      toast.error('Failed to analyze. Please try again.')
++    } finally {
++      setLoading(false)
++    }
++  }
++
++  const clearAll = () => {
++    setImage(null)
++    setImagePreview(null)
++    setResult(null)
++  }
++
++  return (
++    <DashboardLayout>
++      <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
++        {/* Header */}
++        <div>
++          <h1 className="text-2xl font-bold text-gray-900">AI Medical Reader</h1>
++          <p className="text-gray-500 text-sm mt-1">Upload prescription or health report — AI will extract all information instantly</p>
++        </div>
++
++        {/* Tabs */}
++        <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
++          {TABS.map(tab => (
++            <button
++              key={tab.value}
++              onClick={() => { setActiveTab(tab.value); clearAll() }}
++              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.value ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
++            >
++              <span>{tab.icon}</span> {tab.label}
++            </button>
++          ))}
++        </div>
++
++        <div className="grid lg:grid-cols-2 gap-6">
++          {/* Upload Section */}
++          <div className="space-y-4">
++            <div className="card">
++              <h3 className="font-semibold text-gray-900 mb-4">
++                {activeTab === 'prescription' ? '📋 Upload Prescription' : '🧪 Upload Health Report'}
++              </h3>
++
++              {!imagePreview ? (
++                <button
++                  onClick={() => fileRef.current?.click()}
++                  className="w-full border-2 border-dashed border-gray-200 rounded-2xl p-10 text-center hover:border-blue-300 hover:bg-blue-50 transition-all group"
++                >
++                  <Upload size={40} className="mx-auto text-gray-300 group-hover:text-blue-400 mb-3 transition-colors" />
++                  <p className="text-gray-500 font-medium">Click to upload image</p>
++                  <p className="text-gray-400 text-sm mt-1">JPG, PNG — max 5MB</p>
++                  <p className="text-blue-500 text-xs mt-3">📸 Take a clear photo of the document</p>
++                </button>
++              ) : (
++                <div className="relative">
++                  <img src={imagePreview} alt="Uploaded" className="w-full rounded-xl object-contain max-h-64 bg-gray-50" />
++                  <button
++                    onClick={clearAll}
++                    className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-lg hover:bg-red-600"
++                  >
++                    <X size={14} />
++                  </button>
++                </div>
++              )}
++
++              <input ref={fileRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
++
++              {imagePreview && (
++                <button
++                  onClick={handleAnalyze}
++                  disabled={loading}
++                  className="btn-primary w-full flex items-center justify-center gap-2 mt-4"
++                >
++                  {loading ? (
++                    <><Loader size={16} className="animate-spin" /> Analyzing with AI...</>
++                  ) : (
++                    <><Scan size={16} /> Analyze with AI</>
++                  )}
++                </button>
++              )}
++            </div>
++
++            {/* Tips */}
++            <div className="card bg-blue-50 border-blue-100">
++              <h4 className="font-semibold text-blue-900 text-sm mb-2">📸 Tips for best results</h4>
++              <ul className="space-y-1 text-xs text-blue-700">
++                <li>• Take photo in good lighting</li>
++                <li>• Make sure text is clearly visible</li>
++                <li>• Avoid blurry or tilted images</li>
++                <li>• Include the full document in frame</li>
++              </ul>
++            </div>
++          </div>
++
++          {/* Results Section */}
++          <div>
++            {!result && !loading && (
++              <div className="card text-center py-16 h-full flex flex-col items-center justify-center">
++                <Scan size={48} className="text-gray-200 mb-3" />
++                <p className="text-gray-400 font-medium">AI results will appear here</p>
++                <p className="text-gray-300 text-sm mt-1">Upload an image and click Analyze</p>
++              </div>
++            )}
++
++            {loading && (
++              <div className="card text-center py-16 h-full flex flex-col items-center justify-center">
++                <Loader size={48} className="text-blue-400 animate-spin mb-3" />
++                <p className="text-gray-600 font-medium">AI is reading your document...</p>
++                <p className="text-gray-400 text-sm mt-1">This may take 10-15 seconds</p>
++              </div>
++            )}
++
++            {/* Prescription Results */}
++            {result && activeTab === 'prescription' && (
++              <div className="space-y-4">
++                {/* Doctor Info */}
++                <div className="card">
++                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
++                    <User size={16} className="text-blue-600" /> Doctor Information
++                  </h3>
++                  <div className="space-y-2 text-sm">
++                    {result.doctor_name && <p><span className="text-gray-400">Doctor:</span> <span className="font-medium">{result.doctor_name}</span></p>}
++                    {result.hospital && <p><span className="text-gray-400">Hospital:</span> <span className="font-medium">{result.hospital}</span></p>}
++                    {result.patient_name && <p><span className="text-gray-400">Patient:</span> <span className="font-medium">{result.patient_name}</span></p>}
++                    {result.date && <p><span className="text-gray-400">Date:</span> <span className="font-medium">{result.date}</span></p>}
++                    {result.diagnosis && <p><span className="text-gray-400">Diagnosis:</span> <span className="font-medium text-red-600">{result.diagnosis}</span></p>}
++                  </div>
++                </div>
++
++                {/* Medicines */}
++                {result.medicines?.length > 0 && (
++                  <div className="card">
++                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
++                      <Pill size={16} className="text-green-600" /> Medicines ({result.medicines.length})
++                    </h3>
++                    <div className="space-y-3">
++                      {result.medicines.map((med, i) => (
++                        <div key={i} className="bg-green-50 rounded-xl p-3 border border-green-100">
++                          <p className="font-semibold text-gray-900 text-sm">{med.name}</p>
++                          <div className="flex flex-wrap gap-2 mt-2">
++                            {med.dosage && <span className="text-xs bg-white text-green-700 px-2 py-0.5 rounded-full border border-green-200">{med.dosage}</span>}
++                            {med.frequency && <span className="text-xs bg-white text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">{med.frequency}</span>}
++                            {med.duration && <span className="text-xs bg-white text-purple-700 px-2 py-0.5 rounded-full border border-purple-200">{med.duration}</span>}
++                          </div>
++                          {med.instructions && <p className="text-xs text-gray-500 mt-1">⚠️ {med.instructions}</p>}
++                        </div>
++                      ))}
++                    </div>
++                  </div>
++                )}
++
++                {/* Notes */}
++                {(result.notes || result.follow_up) && (
++                  <div className="card">
++                    <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
++                      <ClipboardList size={16} className="text-purple-600" /> Notes
++                    </h3>
++                    {result.notes && <p className="text-sm text-gray-600">{result.notes}</p>}
++                    {result.follow_up && <p className="text-sm text-blue-600 mt-1">📅 Follow-up: {result.follow_up}</p>}
++                  </div>
++                )}
++              </div>
++            )}
++
++            {/* Health Report Results */}
++            {result && activeTab === 'report' && (
++              <div className="space-y-4">
++                {/* Summary */}
++                <div className="card bg-blue-50 border-blue-100">
++                  <h3 className="font-semibold text-blue-900 mb-2">📊 {result.report_type}</h3>
++                  {result.date && <p className="text-xs text-blue-600 mb-2">Date: {result.date}</p>}
++                  <p className="text-sm text-blue-800">{result.overall_summary}</p>
++                </div>
++
++                {/* Parameters */}
++                {result.parameters?.length > 0 && (
++                  <div className="card">
++                    <h3 className="font-semibold text-gray-900 mb-3">Test Results</h3>
++                    <div className="space-y-2">
++                      {result.parameters.map((param, i) => (
++                        <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-xl">
++                          <div className="flex-1">
++                            <p className="text-sm font-medium text-gray-900">{param.name}</p>
++                            <p className="text-xs text-gray-400">{param.normal_range && `Normal: ${param.normal_range}`}</p>
++                          </div>
++                          <div className="text-right">
++                            <p className="text-sm font-bold text-gray-900">{param.value} {param.unit}</p>
++                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
++                              param.status === 'normal' ? 'bg-green-100 text-green-700' :
++                              param.status === 'high' ? 'bg-red-100 text-red-700' :
++                              'bg-yellow-100 text-yellow-700'
++                            }`}>
++                              {param.status === 'normal' ? '✅ Normal' : param.status === 'high' ? '⬆️ High' : '⬇️ Low'}
++                            </span>
++                          </div>
++                        </div>
++                      ))}
++                    </div>
++                  </div>
++                )}
++
++                {/* Concerns */}
++                {result.concerns?.length > 0 && (
++                  <div className="card border-red-100">
++                    <h3 className="font-semibold text-red-700 mb-2 flex items-center gap-2">
++                      <AlertCircle size={16} /> Concerns
++                    </h3>
++                    <ul className="space-y-1">
++                      {result.concerns.map((c, i) => (
++                        <li key={i} className="text-sm text-red-600 flex items-start gap-2">
++                          <span>⚠️</span> {c}
++                        </li>
++                      ))}
++                    </ul>
++                  </div>
++                )}
++
++                {/* Recommendations */}
++                {result.recommendations?.length > 0 && (
++                  <div className="card border-green-100">
++                    <h3 className="font-semibold text-green-700 mb-2 flex items-center gap-2">
++                      <CheckCircle size={16} /> Recommendations
++                    </h3>
++                    <ul className="space-y-1">
++                      {result.recommendations.map((r, i) => (
++                        <li key={i} className="text-sm text-green-700 flex items-start gap-2">
++                          <span>✅</span> {r}
++                        </li>
++                      ))}
++                    </ul>
++                    {result.doctor_to_consult && (
++                      <p className="text-sm text-blue-600 mt-2">👨‍⚕️ Consult: {result.doctor_to_consult}</p>
++                    )}
++                  </div>
++                )}
++              </div>
++            )}
++          </div>
++        </div>
++
++        {/* Disclaimer */}
++        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3">
++          <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
++          <p className="text-xs text-amber-700">
++            This AI analysis is for informational purposes only and is not a substitute for professional medical advice. Always consult a qualified doctor for proper diagnosis and treatment.
++          </p>
++        </div>
++      </div>
++    </DashboardLayout>
++  )
++}
++
++export default PrescriptionReader
+diff --git a/frontend/src/pages/Profile.jsx b/frontend/src/pages/Profile.jsx
+index 8f884c1..e9f1734 100644
+--- a/frontend/src/pages/Profile.jsx
++++ b/frontend/src/pages/Profile.jsx
+@@ -1,15 +1,41 @@
+-import { useState } from 'react'
++import { useState, useRef } from 'react'
+ import { useSelector, useDispatch } from 'react-redux'
+-import { User, Mail, Phone, MapPin, Calendar, Shield, Edit3, Save, X } from 'lucide-react'
++import { User, Mail, Phone, MapPin, Calendar, Shield, Edit3, Save, X, Camera } from 'lucide-react'
+ import DashboardLayout from '../layouts/DashboardLayout'
+ import LoadingSpinner from '../components/common/LoadingSpinner'
+ import { updateProfile } from '../redux/slices/authSlice'
+ import { getInitials } from '../utils/helpers'
++import api from '../services/api'
++import toast from 'react-hot-toast'
+ 
+ function Profile() {
+   const { user, loading } = useSelector(s => s.auth)
+   const dispatch = useDispatch()
+   const [editing, setEditing] = useState(false)
++  const [photoUploading, setPhotoUploading] = useState(false)
++  const fileInputRef = useRef(null)
++
++  const handlePhotoUpload = async (e) => {
++    const file = e.target.files[0]
++    if (!file) return
++    if (file.size > 2 * 1024 * 1024) {
++      toast.error('Image must be under 2MB')
++      return
++    }
++    const reader = new FileReader()
++    reader.onload = async () => {
++      setPhotoUploading(true)
++      try {
++        await dispatch(updateProfile({ profile_image: reader.result }))
++        toast.success('Profile photo updated!')
++      } catch {
++        toast.error('Failed to upload photo')
++      } finally {
++        setPhotoUploading(false)
++      }
++    }
++    reader.readAsDataURL(file)
++  }
+   const [form, setForm] = useState({
+     full_name: user?.full_name || '',
+     phone: user?.phone || '',
+@@ -59,12 +85,22 @@ function Profile() {
+ 
+         {/* Avatar Section */}
+         <div className="card text-center">
+-          <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4">
+-            {user?.profile_image ? (
+-              <img src={user.profile_image} alt="" className="w-full h-full rounded-3xl object-cover" />
+-            ) : (
+-              getInitials(user?.full_name)
+-            )}
++          <div className="relative w-24 h-24 mx-auto mb-4">
++            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-3xl font-bold overflow-hidden">
++              {user?.profile_image ? (
++                <img src={user.profile_image} alt="" className="w-full h-full object-cover" />
++              ) : (
++                getInitials(user?.full_name)
++              )}
++            </div>
++            <button
++              onClick={() => fileInputRef.current?.click()}
++              disabled={photoUploading}
++              className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center shadow-md transition-colors"
++            >
++              {photoUploading ? <LoadingSpinner size="sm" /> : <Camera size={14} />}
++            </button>
++            <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+           </div>
+           <h2 className="font-bold text-xl text-gray-900">{user?.full_name}</h2>
+           <p className="text-gray-500 text-sm capitalize">{user?.role} Account</p>

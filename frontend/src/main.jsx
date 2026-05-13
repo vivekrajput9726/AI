@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import { store, persistor } from './redux/store'
 import { injectStore } from './services/api'
+import { ThemeProvider } from './context/ThemeContext'
 import './styles/index.css'
 
 injectStore(store)
@@ -14,7 +15,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        <App />
+        <ThemeProvider>
+          <App />
         <Toaster
           position="top-right"
           toastOptions={{
@@ -24,6 +26,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
           }}
         />
+        </ThemeProvider>
       </PersistGate>
     </Provider>
   </React.StrictMode>
