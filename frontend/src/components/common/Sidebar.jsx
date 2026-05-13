@@ -2,9 +2,11 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Stethoscope, Calendar, User,
   Heart, LogOut, Shield, Activity, FolderOpen, Pill,
-  MapPin, FlaskConical, MessageCircle,
-  FileText, Settings, Plus, ChevronRight, ClipboardList, Microscope
+  MapPin, FlaskConical, MessageCircle, AlertTriangle,
+  FileText, Settings, Plus, ChevronRight, ClipboardList,
+  Microscope, Users, Brain, Zap
 } from 'lucide-react'
+// Shield and Activity already imported above
 import { useSelector, useDispatch } from 'react-redux'
 import { logout } from '../../redux/slices/authSlice'
 
@@ -17,6 +19,13 @@ const patientLinks = [
   { to: '/patient/laboratory', icon: FlaskConical, label: 'Laboratory' },
   { to: '/patient/ai-analyzer', icon: Microscope, label: 'AI Health Analyzer' },
   { to: '/patient/nearby', icon: MapPin, label: 'Nearby Hospitals' },
+  { to: '/patient/wellness', icon: Heart, label: 'Wellness Hub' },
+  { to: '/patient/drug-checker', icon: Pill, label: 'Drug Checker' },
+  { to: '/patient/emergency', icon: AlertTriangle, label: 'Emergency SOS' },
+  { to: '/patient/prescription-pdf', icon: FileText, label: 'Prescription PDF' },
+  { to: '/patient/bmi', icon: Activity, label: 'BMI Calculator' },
+  { to: '/patient/diary', icon: ClipboardList, label: 'Symptom Diary' },
+  { to: '/patient/vaccines', icon: Shield, label: 'Vaccination Tracker' },
   { to: '/patient/profile', icon: User, label: 'Profile' },
 ]
 

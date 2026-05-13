@@ -7,7 +7,7 @@ import {
   FileText, Clock, CheckCircle, AlertTriangle,
   Stethoscope, ChevronRight, Eye, Star,
   Video, Phone, MapPin, Mail, BarChart2, Shield,
-  TrendingUp, Heart, Droplets, Weight, Zap
+  TrendingUp, Heart, Droplets, Weight, Zap, Printer
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -175,6 +175,9 @@ export default function MyRecords() {
                 <p className="text-blue-200 text-xs mt-0.5">Health Records · Medical History · AI Insights · Tracking</p>
               </div>
             </div>
+            <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-3 py-2 rounded-xl transition-colors">
+              <Printer size={15}/> Export PDF
+            </button>
             <div className="hidden sm:flex gap-3">
               {[
                 { label: 'Records', value: records.length },

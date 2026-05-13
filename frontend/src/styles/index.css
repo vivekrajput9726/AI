@@ -10,6 +10,24 @@
     @apply bg-gray-50 text-gray-900;
     font-family: 'Inter', system-ui, sans-serif;
   }
+  .dark body {
+    @apply bg-gray-950 text-gray-100;
+  }
+  .dark .card {
+    @apply bg-gray-900 border-gray-800 text-gray-100;
+  }
+  .dark .input-field {
+    @apply bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-400;
+  }
+  .dark header {
+    @apply bg-gray-900 border-gray-800;
+  }
+  .dark aside {
+    @apply bg-gray-900 border-gray-800;
+  }
+  .dark main {
+    @apply bg-gray-950;
+  }
   ::-webkit-scrollbar {
     width: 6px;
   }

@@ -98,6 +98,7 @@ function PatientDashboard() {
   const [chatName, setChatName] = useState('')
   const [activeMeeting, setActiveMeeting] = useState(null)
   const [ratingApt, setRatingApt] = useState(null)
+  const [healthTips, setHealthTips] = useState([])
   const pollRef = useRef(null)
 
   const submitRating = async (appointmentId, rating, review) => {
@@ -125,6 +126,7 @@ function PatientDashboard() {
   useEffect(() => {
     dispatch(fetchMyAppointments())
     dispatch(fetchDoctors({ limit: 4 }))
+    api.get('/extras/health-tips').then(r => setHealthTips(r.data.tips || [])).catch(() => {})
 
     const poll = async () => {
       try {
@@ -361,6 +363,26 @@ function PatientDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Health Tips */}
+      {healthTips.length > 0 && (
+        <div className="bg-gradient-to-r from-teal-50 to-blue-50 rounded-2xl p-5 border border-teal-100">
+          <h2 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <span className="text-lg">💡</span> Today's Health Tips
+          </h2>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {healthTips.slice(0,4).map((tip, i) => (
+              <div key={i} className="bg-white rounded-xl p-3 flex gap-3 shadow-sm">
+                <span className="text-xl flex-shrink-0">{tip.icon}</span>
+                <div>
+                  <p className="text-xs font-bold text-teal-600">{tip.category}</p>
+                  <p className="text-xs text-gray-700 mt-0.5">{tip.tip}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {chatOpen && chatRoom && <Chat roomId={chatRoom} otherPersonName={chatName} onClose={() => setChatOpen(false)} />}
       {ratingApt && <RatingModal appointment={ratingApt} onClose={() => setRatingApt(null)} onSubmit={submitRating} />}

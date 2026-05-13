@@ -2,11 +2,59 @@ import { useState, useRef } from 'react'
 import {
   Camera, RefreshCw, Scan, AlertCircle, CheckCircle, Bot, X,
   Upload, FileText, Pill, ClipboardList, Loader, RotateCcw,
-  Send, User, ChevronDown, ChevronUp, Microscope, FlaskConical
+  Send, User, ChevronDown, ChevronUp, Microscope, FlaskConical,
+  Save, BookOpen, FlipHorizontal
 } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import api from '../services/api'
 import toast from 'react-hot-toast'
+
+function compressImage(base64, maxWidth = 1600, quality = 0.92) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      let { width, height } = img
+      // Keep high resolution so AI can read text clearly
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width)
+        width = maxWidth
+      }
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      // White background for better text contrast
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, width, height)
+      ctx.drawImage(img, 0, 0, width, height)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.src = base64
+  })
+}
+
+async function saveToHealthRecords(result, imageBase64, toolId) {
+  try {
+    const title = result.report_type || (toolId === 'prescription' ? 'Prescription' : 'Lab Report')
+    const description = [
+      result.overall_summary || '',
+      result.concerns?.length ? `Concerns: ${result.concerns.join(', ')}` : '',
+      result.recommendations?.length ? `Recommendations: ${result.recommendations.join(', ')}` : '',
+      result.doctor_to_consult ? `See: ${result.doctor_to_consult}` : '',
+    ].filter(Boolean).join('\n')
+
+    await api.post('/health-records/', {
+      title,
+      record_type: toolId === 'prescription' ? 'prescription' : 'lab_report',
+      description,
+      file_data: imageBase64 || null,
+      date: new Date().toISOString().split('T')[0],
+    })
+    toast.success('Saved to Health Records!')
+  } catch {
+    toast.error('Could not save to Health Records')
+  }
+}
 
 const TOOLS = [
   {
@@ -172,63 +220,154 @@ function ResultPanel({ result, toolId }) {
 
 // ── Camera Scanner Tool ───────────────────────────────────────────────────────
 function CameraScannerTool() {
-  const videoRef = useRef(null)
+  const videoRef  = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
-  const [cameraActive, setCameraActive] = useState(false)
-  const [captured, setCaptured] = useState(null)
-  const [scanning, setScanning] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [result, setResult] = useState(null)
+  const photoRef  = useRef(null)   // native camera input
 
-  const startCamera = async () => {
+  const [mode, setCaptureMode]  = useState('choose')  // 'choose' | 'live' | 'photo'
+  const [cameraActive, setCameraActive] = useState(false)
+  const [facingMode, setFacingMode]     = useState('environment')
+  const [captured,  setCaptured]  = useState(null)
+  const [scanning,  setScanning]  = useState(false)
+  const [progress,  setProgress]  = useState(0)
+  const [result,    setResult]    = useState(null)
+  const [saved,     setSaved]     = useState(false)
+
+  /* ── Live camera (desktop) ── */
+  const startLive = async (fm = facingMode) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } })
+      streamRef.current?.getTracks().forEach(t => t.stop())
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: fm }, width: 1280, height: 720 }
+      })
       streamRef.current = stream
       if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play() }
       setCameraActive(true); setCaptured(null); setResult(null)
     } catch { toast.error('Camera access denied. Please allow camera permission.') }
   }
 
-  const stopCamera = () => {
+  const stopLive = () => {
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null; setCameraActive(false)
   }
 
-  const capture = () => {
-    if (!videoRef.current || !canvasRef.current) return
-    const canvas = canvasRef.current
-    canvas.width = videoRef.current.videoWidth
-    canvas.height = videoRef.current.videoHeight
-    canvas.getContext('2d').drawImage(videoRef.current, 0, 0)
-    setCaptured(canvas.toDataURL('image/jpeg', 0.85))
-    stopCamera()
+  const flip = () => {
+    const nm = facingMode === 'environment' ? 'user' : 'environment'
+    setFacingMode(nm); startLive(nm)
   }
 
+  const capture = () => {
+    if (!videoRef.current || !canvasRef.current) return
+    const c = canvasRef.current
+    c.width  = videoRef.current.videoWidth
+    c.height = videoRef.current.videoHeight
+    c.getContext('2d').drawImage(videoRef.current, 0, 0)
+    setCaptured(c.toDataURL('image/jpeg', 0.9))
+    stopLive()
+  }
+
+  /* ── Native phone camera (no permissions needed) ── */
+  const handlePhotoFile = (e) => {
+    const file = e.target.files[0]; if (!file) return
+    if (file.size > 8 * 1024 * 1024) { toast.error('Image must be under 8MB'); return }
+    const reader = new FileReader()
+    reader.onload = ev => { setCaptured(ev.target.result); setResult(null); setSaved(false) }
+    reader.readAsDataURL(file)
+  }
+
+  /* ── AI analyze ── */
   const analyze = async () => {
     if (!captured) return
     setScanning(true); setResult(null); setProgress(0)
-    const iv = setInterval(() => setProgress(p => p >= 90 ? (clearInterval(iv), 90) : p + 10), 200)
+    const iv = setInterval(() => setProgress(p => p >= 90 ? (clearInterval(iv), 90) : p + 10), 300)
     try {
-      const res = await api.post('/ai/analyze-report', { image_base64: captured })
+      toast('Compressing image...', { icon: '🖼️', duration: 1500 })
+      const compressed = await compressImage(captured, 1200, 0.82)
+      const res = await api.post('/ai/analyze-report', { image_base64: compressed }, { timeout: 60000 })
       clearInterval(iv); setProgress(100)
       if (res.data.success) setResult(res.data.data)
       else toast.error(res.data.error || 'Scan failed')
-    } catch { toast.error('Failed to analyze') }
+    } catch (e) {
+      toast.error(e?.response?.status === 413 ? 'Image too large, try again' : 'Analysis failed — check your connection')
+    }
     finally { setScanning(false) }
   }
 
-  const reset = () => { setCaptured(null); setResult(null); setProgress(0); stopCamera() }
+  const reset = () => {
+    setCaptured(null); setResult(null); setProgress(0); setSaved(false)
+    stopLive(); setCaptureMode('choose')
+  }
+
+  const handleSave = async () => {
+    await saveToHealthRecords(result, captured, 'scanner')
+    setSaved(true)
+  }
+
+  /* ── Choose mode screen ── */
+  if (mode === 'choose' && !captured) return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500 text-center">Choose how to scan your report</p>
+      <div className="grid grid-cols-2 gap-3">
+
+        {/* Phone — label directly wraps input so tap always works */}
+        <label className="flex flex-col items-center gap-3 p-5 bg-blue-50 border-2 border-blue-200 rounded-2xl hover:bg-blue-100 transition-all cursor-pointer">
+          <span className="text-4xl">📱</span>
+          <div className="text-center">
+            <p className="font-bold text-blue-800 text-sm">Take Photo</p>
+            <p className="text-xs text-blue-500 mt-0.5">Use phone camera</p>
+            <p className="text-xs text-green-600 font-semibold mt-1">✓ Works on phone</p>
+          </div>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handlePhotoFile}
+          />
+        </label>
+
+        {/* Desktop — live webcam */}
+        <button
+          onClick={() => { setCaptureMode('live'); startLive() }}
+          className="flex flex-col items-center gap-3 p-5 bg-purple-50 border-2 border-purple-200 rounded-2xl hover:bg-purple-100 transition-all"
+        >
+          <span className="text-4xl">💻</span>
+          <div className="text-center">
+            <p className="font-bold text-purple-800 text-sm">Live Camera</p>
+            <p className="text-xs text-purple-500 mt-0.5">Use webcam</p>
+            <p className="text-xs text-blue-600 font-semibold mt-1">✓ Works on PC</p>
+          </div>
+        </button>
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700 space-y-1">
+        <p>💡 <strong>For best results:</strong></p>
+        <p>• Place report flat on table in good light</p>
+        <p>• Hold phone directly above — no angle</p>
+        <p>• Make sure all text is sharp and readable</p>
+      </div>
+
+      <div className="text-center">
+        <p className="text-xs text-gray-400">Photo quality not good? Use <strong>🔬 Full Report Analyzer</strong> to type values manually</p>
+      </div>
+    </div>
+  )
 
   return (
     <div className="space-y-4">
-      {/* Camera/Preview */}
-      <div className="relative bg-gray-900 rounded-2xl overflow-hidden" style={{ minHeight: 260 }}>
+      {/* Hidden native camera input always present */}
+      <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoFile} />
+
+      {/* Preview area */}
+      <div className="relative bg-gray-900 rounded-2xl overflow-hidden" style={{ minHeight: 240 }}>
         <video ref={videoRef} className={`w-full rounded-2xl object-cover ${cameraActive ? 'block' : 'hidden'}`} style={{ maxHeight: 320 }} muted playsInline />
         <canvas ref={canvasRef} className="hidden" />
-        {captured && !cameraActive && (
-          <img src={captured} alt="Captured" className="w-full rounded-2xl object-cover" style={{ maxHeight: 320 }} />
+
+        {captured && (
+          <img src={captured} alt="Captured" className="w-full rounded-2xl object-contain bg-black" style={{ maxHeight: 320 }} />
         )}
+
         {scanning && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-2xl">
             <div className="relative w-20 h-20 mb-3">
@@ -237,53 +376,72 @@ function CameraScannerTool() {
                 <Bot size={32} className="text-blue-400 animate-pulse" />
               </div>
             </div>
-            <p className="text-white font-bold">AI Scanning... {Math.round(progress)}%</p>
+            <p className="text-white font-bold text-sm">AI Analyzing... {Math.round(progress)}%</p>
             <div className="w-40 bg-gray-700 rounded-full h-2 mt-2">
               <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
             </div>
           </div>
         )}
+
         {!cameraActive && !captured && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
             <Camera size={40} className="mb-2 opacity-30" />
-            <p className="text-sm">Camera preview here</p>
+            <p className="text-sm">Opening camera...</p>
           </div>
         )}
+
         {cameraActive && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-48 h-48 border-2 border-blue-400/60 rounded-2xl" />
-          </div>
+          <>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-56 h-56 border-2 border-blue-400/70 rounded-2xl" />
+            </div>
+            <button onClick={flip} className="absolute top-3 right-3 bg-black/50 hover:bg-black/70 text-white rounded-full p-2">
+              <FlipHorizontal size={18} />
+            </button>
+            <div className="absolute bottom-3 left-3 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
+              {facingMode === 'environment' ? '📷 Back' : '🤳 Front'}
+            </div>
+          </>
         )}
       </div>
 
       {/* Controls */}
-      <div className="flex gap-2">
-        {!cameraActive && !captured && (
-          <button onClick={startCamera} className="btn-primary flex-1 flex items-center justify-center gap-2">
-            <Camera size={16} /> Start Camera
-          </button>
-        )}
+      <div className="flex gap-2 flex-wrap">
         {cameraActive && (
           <>
-            <button onClick={stopCamera} className="btn-secondary flex-1 flex items-center justify-center gap-2"><X size={15} /> Cancel</button>
-            <button onClick={capture} className="btn-primary flex-1 flex items-center justify-center gap-2"><Scan size={15} /> Capture</button>
+            <button onClick={stopLive} className="btn-secondary flex items-center gap-1.5 px-4"><X size={14}/> Cancel</button>
+            <button onClick={flip} className="bg-gray-700 text-white px-3 rounded-xl flex items-center gap-1.5 text-sm"><FlipHorizontal size={14}/> Flip</button>
+            <button onClick={capture} className="btn-primary flex-1 flex items-center justify-center gap-2"><Scan size={14}/> Capture</button>
           </>
         )}
         {captured && !scanning && !result && (
           <>
-            <button onClick={reset} className="btn-secondary flex items-center gap-1.5 px-4"><RefreshCw size={14} /> Retake</button>
-            <button onClick={analyze} className="btn-primary flex-1 flex items-center justify-center gap-2"><Bot size={15} /> Analyze with AI</button>
+            <label className="btn-secondary flex items-center gap-1.5 px-4 cursor-pointer">
+              <RefreshCw size={14}/> Retake
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoFile}/>
+            </label>
+            <button onClick={analyze} className="btn-primary flex-1 flex items-center justify-center gap-2"><Bot size={15}/> Analyze with AI</button>
           </>
         )}
         {result && (
-          <button onClick={reset} className="btn-secondary flex-1 flex items-center justify-center gap-2"><RefreshCw size={14} /> New Scan</button>
+          <button onClick={reset} className="btn-secondary flex-1 flex items-center justify-center gap-2"><RefreshCw size={14}/> New Scan</button>
         )}
       </div>
 
-      {result && <ResultPanel result={result} toolId="scanner" />}
+      {result && (
+        <>
+          <ResultPanel result={result} toolId="scanner" />
+          <button onClick={handleSave} disabled={saved}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+              saved ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}>
+            {saved ? <><CheckCircle size={15}/> Saved to Health Records</> : <><Save size={15}/> Save to Health Records</>}
+          </button>
+        </>
+      )}
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
-        <AlertCircle size={13} className="text-amber-600 mt-0.5 flex-shrink-0" />
+        <AlertCircle size={13} className="text-amber-600 mt-0.5 flex-shrink-0"/>
         <p className="text-xs text-amber-700">AI scan is for educational awareness only. Always consult a doctor.</p>
       </div>
     </div>
@@ -296,6 +454,7 @@ function UploadTool({ toolId }) {
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [saved, setSaved] = useState(false)
   const fileRef = useRef(null)
 
   const handleFile = (e) => {
@@ -311,15 +470,21 @@ function UploadTool({ toolId }) {
     if (!image) { toast.error('Please upload an image first'); return }
     setLoading(true); setResult(null)
     try {
+      const compressed = await compressImage(image, 1200, 0.82)
       const endpoint = toolId === 'prescription' ? '/ai/read-prescription' : '/ai/analyze-report'
-      const res = await api.post(endpoint, { image_base64: image })
+      const res = await api.post(endpoint, { image_base64: compressed }, { timeout: 60000 })
       if (res.data.success) setResult(res.data.data)
       else toast.error(res.data.error || 'Analysis failed')
-    } catch { toast.error('Failed to analyze') }
+    } catch { toast.error('Failed to analyze — check connection') }
     finally { setLoading(false) }
   }
 
-  const reset = () => { setImage(null); setPreview(null); setResult(null) }
+  const reset = () => { setImage(null); setPreview(null); setResult(null); setSaved(false) }
+
+  const handleSave = async () => {
+    await saveToHealthRecords(result, image, toolId)
+    setSaved(true)
+  }
 
   return (
     <div className="space-y-4">
@@ -363,7 +528,22 @@ function UploadTool({ toolId }) {
         )}
       </div>
 
-      {result && <ResultPanel result={result} toolId={toolId} />}
+      {result && (
+        <>
+          <ResultPanel result={result} toolId={toolId} />
+          <button
+            onClick={handleSave}
+            disabled={saved}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+              saved
+                ? 'bg-green-100 text-green-700 border border-green-300'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
+          >
+            {saved ? <><CheckCircle size={15}/> Saved to Health Records</> : <><Save size={15}/> Save to Health Records</>}
+          </button>
+        </>
+      )}
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
         <AlertCircle size={13} className="text-amber-600 mt-0.5 flex-shrink-0" />
@@ -619,7 +799,7 @@ export default function AIHealthAnalyzer() {
         {/* Tool Selector */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {TOOLS.map(({ id, label, emoji, desc, color, light }) => (
-            <button key={id} onClick={() => setActiveTool(id)}
+            <button key={id} onClick={() => setActiveTool(id)} data-tool={id}
               className={`p-4 rounded-2xl border-2 text-left transition-all ${
                 activeTool === id
                   ? `${light} border-current shadow-sm`

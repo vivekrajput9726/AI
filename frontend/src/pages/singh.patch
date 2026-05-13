@@ -1,0 +1,530 @@
+diff --git a/backend/app/main.py b/backend/app/main.py
+index 92b00fc..fc69cdd 100644
+--- a/backend/app/main.py
++++ b/backend/app/main.py
+@@ -5,7 +5,7 @@ from loguru import logger
+ 
+ from app.config.settings import settings
+ from app.database.connection import connect_db, disconnect_db
+-from app.routes import auth, users, doctors, appointments, ai_routes, admin, video, chat, health_records, prescription_ai, meetings, whatsapp
++from app.routes import auth, users, doctors, appointments, ai_routes, admin, video, chat, health_records, prescription_ai, meetings, whatsapp, emergency, family, wellness, extras
+ 
+ 
+ @asynccontextmanager
+@@ -46,6 +46,10 @@ app.include_router(health_records.router, prefix="/api/health-records", tags=["H
+ app.include_router(prescription_ai.router, prefix="/api/ai", tags=["AI Services"])
+ app.include_router(meetings.router, prefix="/api/meetings", tags=["Instant Meetings"])
+ app.include_router(whatsapp.router, prefix="/api/whatsapp", tags=["WhatsApp Bot"])
++app.include_router(emergency.router, prefix="/api/emergency", tags=["Emergency SOS"])
++app.include_router(family.router, prefix="/api/family", tags=["Family Health"])
++app.include_router(wellness.router, prefix="/api/wellness", tags=["Wellness"])
++app.include_router(extras.router, prefix="/api/extras", tags=["Extras"])
+ 
+ 
+ @app.get("/health", tags=["Health"])
+diff --git a/backend/app/routes/emergency.py b/backend/app/routes/emergency.py
+new file mode 100644
+index 0000000..110bcd4
+--- /dev/null
++++ b/backend/app/routes/emergency.py
+@@ -0,0 +1,76 @@
++from fastapi import APIRouter, Depends, HTTPException
++from app.middleware.auth_middleware import get_current_user, require_patient
++from app.database.connection import get_db
++from app.utils.helpers import serialize_doc, str_to_objectid
++from app.utils.sms_utils import send_sms
++from app.utils.email_utils import send_email
++from pydantic import BaseModel
++from typing import Optional, List
++from datetime import datetime
++
++router = APIRouter()
++
++
++class EmergencyContact(BaseModel):
++    name: str
++    phone: str
++    relation: str
++
++
++class SOSRequest(BaseModel):
++    latitude: Optional[float] = None
++    longitude: Optional[float] = None
++    address: Optional[str] = None
++    message: Optional[str] = "I need emergency help!"
++
++
++@router.get("/contacts", summary="Get emergency contacts")
++async def get_contacts(current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    doc = await db.emergency_contacts.find_one({"patient_id": current_user["id"]})
++    return doc.get("contacts", []) if doc else []
++
++
++@router.post("/contacts", summary="Save emergency contacts")
++async def save_contacts(contacts: List[EmergencyContact], current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    await db.emergency_contacts.update_one(
++        {"patient_id": current_user["id"]},
++        {"$set": {"patient_id": current_user["id"], "contacts": [c.dict() for c in contacts], "updated_at": datetime.utcnow()}},
++        upsert=True
++    )
++    return {"message": "Contacts saved"}
++
++
++@router.post("/sos", summary="Trigger SOS alert")
++async def trigger_sos(data: SOSRequest, current_user: dict = Depends(require_patient)):
++    db = get_db()
++    doc = await db.emergency_contacts.find_one({"patient_id": current_user["id"]})
++    contacts = doc.get("contacts", []) if doc else []
++
++    location_text = ""
++    if data.latitude and data.longitude:
++        location_text = f"\n📍 Location: https://maps.google.com/?q={data.latitude},{data.longitude}"
++    elif data.address:
++        location_text = f"\n📍 Address: {data.address}"
++
++    msg = f"🚨 EMERGENCY ALERT!\n{current_user['full_name']} needs help!\n{data.message}{location_text}\n\nPlease contact them immediately or call emergency services."
++
++    sent = 0
++    for contact in contacts:
++        if contact.get("phone"):
++            send_sms(to_phone=contact["phone"], message=msg)
++            sent += 1
++
++    # Log SOS event
++    await db.sos_events.insert_one({
++        "patient_id": current_user["id"],
++        "patient_name": current_user["full_name"],
++        "latitude": data.latitude,
++        "longitude": data.longitude,
++        "address": data.address,
++        "contacts_notified": sent,
++        "created_at": datetime.utcnow()
++    })
++
++    return {"message": f"SOS sent to {sent} contact(s)", "contacts_notified": sent}
+diff --git a/backend/app/routes/extras.py b/backend/app/routes/extras.py
+new file mode 100644
+index 0000000..cdf4409
+--- /dev/null
++++ b/backend/app/routes/extras.py
+@@ -0,0 +1,131 @@
++from fastapi import APIRouter, Depends
++from app.middleware.auth_middleware import get_current_user, require_patient
++from app.database.connection import get_db
++from app.utils.helpers import serialize_doc, str_to_objectid
++from app.config.settings import settings
++from pydantic import BaseModel
++from typing import Optional, List
++from datetime import datetime
++
++router = APIRouter()
++
++# ── Symptom Diary ─────────────────────────────────────────────────────────────
++class DiaryEntry(BaseModel):
++    date: str
++    symptoms: str
++    mood: int          # 1-5
++    pain_level: int    # 0-10
++    energy_level: int  # 1-5
++    notes: Optional[str] = ""
++    temperature: Optional[float] = None
++    weight: Optional[float] = None
++
++@router.post("/diary", summary="Add diary entry")
++async def add_diary(data: DiaryEntry, current_user: dict = Depends(require_patient)):
++    db = get_db()
++    doc = {**data.dict(), "patient_id": current_user["id"], "created_at": datetime.utcnow()}
++    result = await db.symptom_diary.insert_one(doc)
++    doc["_id"] = result.inserted_id
++    return serialize_doc(doc)
++
++@router.get("/diary", summary="Get diary entries")
++async def get_diary(current_user: dict = Depends(require_patient)):
++    db = get_db()
++    cursor = db.symptom_diary.find({"patient_id": current_user["id"]}).sort("date", -1).limit(30)
++    return [serialize_doc(d) async for d in cursor]
++
++@router.delete("/diary/{entry_id}", summary="Delete diary entry")
++async def delete_diary(entry_id: str, current_user: dict = Depends(require_patient)):
++    db = get_db()
++    await db.symptom_diary.delete_one({"_id": str_to_objectid(entry_id), "patient_id": current_user["id"]})
++    return {"message": "Deleted"}
++
++# ── Vaccination Tracker ───────────────────────────────────────────────────────
++class Vaccine(BaseModel):
++    name: str
++    date_taken: Optional[str] = ""
++    next_due: Optional[str] = ""
++    provider: Optional[str] = ""
++    notes: Optional[str] = ""
++    status: str = "taken"  # taken | due | upcoming
++
++@router.get("/vaccines", summary="Get vaccinations")
++async def get_vaccines(current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    cursor = db.vaccinations.find({"patient_id": current_user["id"]}).sort("date_taken", -1)
++    return [serialize_doc(v) async for v in cursor]
++
++@router.post("/vaccines", summary="Add vaccination")
++async def add_vaccine(data: Vaccine, current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    doc = {**data.dict(), "patient_id": current_user["id"], "created_at": datetime.utcnow()}
++    result = await db.vaccinations.insert_one(doc)
++    doc["_id"] = result.inserted_id
++    return serialize_doc(doc)
++
++@router.delete("/vaccines/{vaccine_id}", summary="Delete vaccination")
++async def delete_vaccine(vaccine_id: str, current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    await db.vaccinations.delete_one({"_id": str_to_objectid(vaccine_id), "patient_id": current_user["id"]})
++    return {"message": "Deleted"}
++
++# ── Health Tips ───────────────────────────────────────────────────────────────
++@router.get("/health-tips", summary="Get AI health tips")
++async def get_health_tips(current_user: dict = Depends(get_current_user)):
++    import random
++    tips = [
++        {"tip": "Drink at least 8 glasses of water daily to stay hydrated.", "category": "Hydration", "icon": "💧"},
++        {"tip": "Walk for at least 30 minutes every day to improve heart health.", "category": "Fitness", "icon": "🚶"},
++        {"tip": "Eat 5 portions of fruits and vegetables every day for essential vitamins.", "category": "Nutrition", "icon": "🥗"},
++        {"tip": "Sleep 7-9 hours per night. Quality sleep repairs your body and mind.", "category": "Sleep", "icon": "😴"},
++        {"tip": "Practice 5 minutes of deep breathing to reduce stress and anxiety.", "category": "Mental Health", "icon": "🧘"},
++        {"tip": "Wash hands frequently — it prevents 80% of common infections.", "category": "Hygiene", "icon": "🧼"},
++        {"tip": "Limit screen time before bed. Blue light disrupts melatonin production.", "category": "Sleep", "icon": "📱"},
++        {"tip": "Eat breakfast every day. It boosts metabolism and improves concentration.", "category": "Nutrition", "icon": "🍳"},
++        {"tip": "Take a 5-minute break every hour if you sit at a desk.", "category": "Fitness", "icon": "⏰"},
++        {"tip": "Include protein in every meal — eggs, dal, paneer, or nuts.", "category": "Nutrition", "icon": "💪"},
++        {"tip": "Regular health check-ups can detect problems before they become serious.", "category": "Prevention", "icon": "🏥"},
++        {"tip": "Avoid smoking. It's the leading cause of preventable death worldwide.", "category": "Prevention", "icon": "🚭"},
++        {"tip": "Laughing reduces stress hormones and boosts your immune system.", "category": "Mental Health", "icon": "😄"},
++        {"tip": "Sunlight in the morning helps regulate your body clock and mood.", "category": "Wellness", "icon": "☀️"},
++        {"tip": "Maintain a healthy weight — even a 5% reduction improves many conditions.", "category": "Fitness", "icon": "⚖️"},
++    ]
++    selected = random.sample(tips, min(5, len(tips)))
++    return {"tips": selected, "date": datetime.utcnow().strftime("%Y-%m-%d")}
++
++# ── Doctor Revenue ────────────────────────────────────────────────────────────
++@router.get("/doctor-revenue", summary="Doctor revenue stats")
++async def doctor_revenue(current_user: dict = Depends(get_current_user)):
++    if current_user["role"] not in ["doctor", "admin"]:
++        from fastapi import HTTPException, status
++        raise HTTPException(status_code=403, detail="Doctors only")
++    db = get_db()
++    doctor = await db.doctors.find_one({"user_id": current_user["id"]})
++    if not doctor:
++        return {"total": 0, "monthly": [], "by_type": [], "completed": 0, "pending": 0}
++
++    doctor_id = str(doctor["_id"])
++    cursor = db.appointments.find({"doctor_id": doctor_id})
++    apts = [serialize_doc(a) async for a in cursor]
++
++    total_revenue = sum(a.get("consultation_fee", 0) for a in apts if a.get("status") == "completed")
++    completed = len([a for a in apts if a.get("status") == "completed"])
++    pending = len([a for a in apts if a.get("status") == "pending"])
++
++    # Monthly revenue
++    from collections import defaultdict
++    monthly = defaultdict(float)
++    for a in apts:
++        if a.get("status") == "completed":
++            m = a.get("appointment_date", "")[:7]
++            monthly[m] += a.get("consultation_fee", 0)
++    monthly_list = [{"month": k, "revenue": v} for k, v in sorted(monthly.items())[-6:]]
++
++    # By type
++    type_rev = defaultdict(float)
++    for a in apts:
++        if a.get("status") == "completed":
++            type_rev[a.get("appointment_type", "video")] += a.get("consultation_fee", 0)
++    by_type = [{"type": k, "revenue": v} for k, v in type_rev.items()]
++
++    return {"total_revenue": total_revenue, "completed": completed, "pending": pending, "monthly": monthly_list, "by_type": by_type, "total_appointments": len(apts)}
+diff --git a/backend/app/routes/family.py b/backend/app/routes/family.py
+new file mode 100644
+index 0000000..fa9367a
+--- /dev/null
++++ b/backend/app/routes/family.py
+@@ -0,0 +1,56 @@
++from fastapi import APIRouter, Depends, HTTPException
++from app.middleware.auth_middleware import get_current_user
++from app.database.connection import get_db
++from app.utils.helpers import serialize_doc, str_to_objectid
++from pydantic import BaseModel
++from typing import Optional
++from datetime import datetime
++
++router = APIRouter()
++
++
++class FamilyMember(BaseModel):
++    name: str
++    relation: str
++    date_of_birth: Optional[str] = None
++    blood_group: Optional[str] = None
++    gender: Optional[str] = None
++    allergies: Optional[str] = None
++    medical_conditions: Optional[str] = None
++    emergency_contact: Optional[str] = None
++
++
++@router.get("/", summary="Get family members")
++async def get_family(current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    cursor = db.family_members.find({"owner_id": current_user["id"]}).sort("created_at", -1)
++    return [serialize_doc(m) async for m in cursor]
++
++
++@router.post("/", summary="Add family member")
++async def add_member(data: FamilyMember, current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    doc = {**data.dict(), "owner_id": current_user["id"], "created_at": datetime.utcnow()}
++    result = await db.family_members.insert_one(doc)
++    doc["_id"] = result.inserted_id
++    return serialize_doc(doc)
++
++
++@router.put("/{member_id}", summary="Update family member")
++async def update_member(member_id: str, data: FamilyMember, current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    result = await db.family_members.find_one_and_update(
++        {"_id": str_to_objectid(member_id), "owner_id": current_user["id"]},
++        {"$set": {**data.dict(), "updated_at": datetime.utcnow()}},
++        return_document=True
++    )
++    if not result:
++        raise HTTPException(status_code=404, detail="Member not found")
++    return serialize_doc(result)
++
++
++@router.delete("/{member_id}", summary="Delete family member")
++async def delete_member(member_id: str, current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    await db.family_members.delete_one({"_id": str_to_objectid(member_id), "owner_id": current_user["id"]})
++    return {"message": "Deleted"}
+diff --git a/backend/app/routes/prescription_ai.py b/backend/app/routes/prescription_ai.py
+index 654bff6..0b78ef0 100644
+--- a/backend/app/routes/prescription_ai.py
++++ b/backend/app/routes/prescription_ai.py
+@@ -85,39 +85,90 @@ Return ONLY a valid JSON object in this exact format (no extra text):
+         return {"success": False, "error": str(e)}
+ 
+ 
+-@router.post("/analyze-report", summary="AI analyzes health report")
+-async def analyze_report(data: PrescriptionRequest, current_user: dict = Depends(get_current_user)):
+-    if not settings.GEMINI_API_KEY:
+-        return {"success": False, "error": "Gemini API key not configured"}
++REPORT_PROMPT = """You are an expert medical report analyzer with OCR capability.
++CAREFULLY read ALL text visible in this image. Extract EVERY number, value, and parameter you can see.
+ 
+-    try:
+-        prompt = """You are a medical report analyzer. Analyze this health/lab report image carefully.
++This image may be a lab report, blood test, X-ray, MRI, ECG, prescription, or medical document.
+ 
+-Return ONLY a valid JSON object in this exact format (no extra text):
++IMPORTANT RULES:
++- Read the ACTUAL values shown in the image, do not guess or make up values
++- If you can see text/numbers, extract them exactly as written
++- If the image is blurry or unreadable, set overall_summary to explain this
++
++Return ONLY a valid JSON object (no extra text, no markdown):
+ {
+-  "report_type": "Type of report",
+-  "date": "Date if visible or empty string",
+-  "lab_name": "Laboratory name if visible or empty string",
++  "report_type": "Exact type detected (Blood Test / X-Ray / Prescription / ECG / MRI / Urine Test / etc.)",
++  "severity": "Normal or Mild Concern or Moderate Concern or Urgent",
++  "overall_summary": "2-3 sentence plain-language summary of what you found in this report",
+   "parameters": [
+     {
+-      "name": "Parameter name",
+-      "value": "Measured value",
+-      "unit": "Unit of measurement",
+-      "normal_range": "Normal range if shown",
+-      "status": "normal or high or low",
+-      "interpretation": "Brief explanation"
++      "name": "Exact parameter name from the report",
++      "value": "Exact value shown in report",
++      "unit": "Unit shown (g/dL, mg/dL, cells/mcL, etc.)",
++      "normal_range": "Normal range if shown in report",
++      "status": "normal or high or low or unknown",
++      "interpretation": "What this value means for the patient in simple words"
+     }
+   ],
+-  "overall_summary": "Overall health summary in simple language",
+-  "concerns": ["List of concerning values if any"],
+-  "recommendations": ["List of recommendations"],
+-  "doctor_to_consult": "Type of specialist to consult if needed"
++  "concerns": ["List specific abnormal values or findings with their actual numbers"],
++  "recommendations": ["Specific actionable recommendations based on these results"],
++  "doctor_to_consult": "Specific specialist type based on findings"
+ }"""
+ 
+-        result = call_gemini(data.image_base64, prompt)
++
++async def analyze_with_openai(image_base64: str) -> dict:
++    """Use OpenAI GPT-4o-mini vision to analyze an image."""
++    from openai import AsyncOpenAI
++    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
++
++    # Ensure proper data URL format
++    if not image_base64.startswith("data:"):
++        image_base64 = f"data:image/jpeg;base64,{image_base64}"
++
++    response = await client.chat.completions.create(
++        model="gpt-4o-mini",
++        messages=[
++            {
++                "role": "user",
++                "content": [
++                    {"type": "text", "text": REPORT_PROMPT},
++                    {"type": "image_url", "image_url": {"url": image_base64, "detail": "high"}}
++                ]
++            }
++        ],
++        max_tokens=1200,
++        temperature=0.2
++    )
++    content = response.choices[0].message.content.strip()
++    json_match = re.search(r'\{.*\}', content, re.DOTALL)
++    if json_match:
++        return json.loads(json_match.group())
++    return None
++
++
++@router.post("/analyze-report", summary="AI analyzes health report or camera image")
++async def analyze_report(data: PrescriptionRequest, current_user: dict = Depends(get_current_user)):
++    try:
++        result = None
++
++        # Try OpenAI Vision first (fast, reliable)
++        if settings.OPENAI_API_KEY:
++            try:
++                result = await analyze_with_openai(data.image_base64)
++            except Exception as e:
++                logger.warning(f"OpenAI vision failed, trying Gemini: {e}")
++
++        # Fallback to Gemini
++        if not result and settings.GEMINI_API_KEY:
++            try:
++                result = call_gemini(data.image_base64, REPORT_PROMPT)
++            except Exception as e:
++                logger.warning(f"Gemini also failed: {e}")
++
+         if result:
+             return {"success": True, "data": result}
+-        return {"success": False, "error": "Could not analyze report"}
++
++        return {"success": False, "error": "AI analysis failed. Please ensure image is clear and try again."}
+ 
+     except Exception as e:
+         logger.error(f"Report AI error: {e}")
+diff --git a/backend/app/routes/wellness.py b/backend/app/routes/wellness.py
+new file mode 100644
+index 0000000..c062243
+--- /dev/null
++++ b/backend/app/routes/wellness.py
+@@ -0,0 +1,89 @@
++from fastapi import APIRouter, Depends
++from app.middleware.auth_middleware import get_current_user
++from app.database.connection import get_db
++from app.utils.helpers import serialize_doc
++from app.config.settings import settings
++from pydantic import BaseModel
++from typing import List, Optional
++from datetime import datetime
++
++router = APIRouter()
++
++
++class DrugCheckRequest(BaseModel):
++    medicines: List[str]
++
++
++class AssessmentResult(BaseModel):
++    assessment_type: str
++    score: int
++    level: str
++    answers: List[dict]
++
++
++@router.post("/drug-interaction", summary="Check drug interactions")
++async def check_drug_interaction(data: DrugCheckRequest, current_user: dict = Depends(get_current_user)):
++    if len(data.medicines) < 2:
++        return {"result": "Please enter at least 2 medicines to check interactions.", "safe": True, "interactions": []}
++
++    medicines_list = ", ".join(data.medicines)
++
++    if settings.OPENAI_API_KEY:
++        try:
++            from openai import AsyncOpenAI
++            client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
++            response = await client.chat.completions.create(
++                model="gpt-4o-mini",
++                messages=[
++                    {"role": "system", "content": """You are a clinical pharmacist AI. Analyze drug interactions.
++Respond ONLY with a valid JSON object:
++{
++  "safe": true/false,
++  "severity": "None/Minor/Moderate/Major/Contraindicated",
++  "interactions": [{"drugs": ["drug1","drug2"], "effect": "description", "severity": "Minor/Moderate/Major"}],
++  "recommendation": "brief clinical recommendation",
++  "disclaimer": "Always consult a pharmacist or doctor"
++}"""},
++                    {"role": "user", "content": f"Check interactions between: {medicines_list}"}
++                ],
++                temperature=0.2,
++                max_tokens=600
++            )
++            import json, re
++            content = response.choices[0].message.content.strip()
++            match = re.search(r'\{.*\}', content, re.DOTALL)
++            if match:
++                return json.loads(match.group())
++        except Exception:
++            pass
++
++    return {
++        "safe": None,
++        "severity": "Unknown",
++        "interactions": [],
++        "recommendation": "Could not analyze. Please consult your pharmacist.",
++        "disclaimer": "Always consult a qualified pharmacist or doctor before taking multiple medications."
++    }
++
++
++@router.post("/mental-assessment", summary="Save mental health assessment")
++async def save_assessment(data: AssessmentResult, current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    doc = {
++        "patient_id": current_user["id"],
++        "assessment_type": data.assessment_type,
++        "score": data.score,
++        "level": data.level,
++        "answers": data.answers,
++        "created_at": datetime.utcnow()
++    }
++    result = await db.mental_assessments.insert_one(doc)
++    doc["_id"] = result.inserted_id
++    return serialize_doc(doc)
++
++
++@router.get("/mental-assessment/history", summary="Get assessment history")
++async def get_assessment_history(current_user: dict = Depends(get_current_user)):
++    db = get_db()
++    cursor = db.mental_assessments.find({"patient_id": current_user["id"]}).sort("created_at", -1).limit(10)
++    return [serialize_doc(d) async for d in cursor]
+diff --git a/backend/requirements.txt b/backend/requirements.txt
+index 760c400..99fec36 100644
+--- a/backend/requirements.txt
++++ b/backend/requirements.txt
+@@ -7,7 +7,7 @@ pydantic-settings==2.1.0
+ python-jose[cryptography]==3.3.0
+ passlib[bcrypt]==1.7.4
+ python-multipart==0.0.6
+-openai==1.3.7
++openai==1.56.0
+ python-dotenv==1.0.0
+ httpx==0.25.2
+ email-validator==2.1.0

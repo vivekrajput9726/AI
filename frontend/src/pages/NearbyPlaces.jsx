@@ -42,37 +42,111 @@ function NearbyPlaces() {
   const updateMap = (loc, type) => {
     const typeData = PLACE_TYPES.find(t => t.value === type)
     const query = typeData?.query || 'pharmacy'
-    setMapUrl(`https://www.google.com/maps/embed/v1/search?key=AIzaSyDbJYEZtAxICSETR249CQVF0s-0HcCtriQ&q=${query}+near+${loc.lat},${loc.lng}&zoom=14`)
+    setMapUrl(`https://www.google.com/maps/embed/v1/search?key=AIzaSyDbJYEZtAxICSETR249CQVF0s-0HcCtriQ&q=${query}+near+${loc.lat},${loc.lng}&zoom=13`)
   }
 
   const searchNearby = async (location, type) => {
     setLoading(true)
     setPlaces([])
-    try {
-      const amenityMap = { pharmacy: 'pharmacy', hospital: 'hospital', clinic: 'clinic|doctors' }
-      const amenity = amenityMap[type] || 'pharmacy'
-      const url = `https://overpass-api.de/api/interpreter?data=[out:json][timeout:15];(node["amenity"~"${amenity}"](around:5000,${location.lat},${location.lng}););out 15;`
-      const res = await fetch(url)
-      const data = await res.json()
-      if (data.elements?.length > 0) {
-        const results = data.elements.map(el => ({
-          id: el.id,
-          name: el.tags?.name || 'Medical Facility',
-          address: [el.tags?.['addr:street'], el.tags?.['addr:city']].filter(Boolean).join(', ') || 'Nearby',
-          phone: el.tags?.phone || el.tags?.['contact:phone'] || null,
-          lat: el.lat,
-          lng: el.lon,
-        })).filter(p => p.lat && p.lng)
-        setPlaces(results)
-        toast.success(`Found ${results.length} places!`)
-      } else {
-        toast('No places found in 5km', { icon: '📍' })
-      }
-    } catch {
-      toast.error('Failed to load places')
-    } finally {
-      setLoading(false)
+
+    const amenityMap = {
+      pharmacy: 'pharmacy',
+      hospital: 'hospital',
+      clinic:   'clinic'
     }
+    const amenity = amenityMap[type] || 'pharmacy'
+
+    // Try multiple Overpass API mirrors
+    const MIRRORS = [
+      'https://overpass-api.de/api/interpreter',
+      'https://overpass.kumi.systems/api/interpreter',
+      'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+    ]
+
+    // Build a clean query
+    const query = `[out:json][timeout:20];(node["amenity"="${amenity}"](around:5000,${location.lat},${location.lng});way["amenity"="${amenity}"](around:5000,${location.lat},${location.lng}););out center 20;`
+
+    let success = false
+
+    for (const mirror of MIRRORS) {
+      try {
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 15000)
+
+        const res = await fetch(`${mirror}?data=${encodeURIComponent(query)}`, {
+          signal: controller.signal
+        })
+        clearTimeout(timer)
+
+        if (!res.ok) continue
+
+        const data = await res.json()
+        const elements = data.elements || []
+
+        if (elements.length > 0) {
+          const results = elements.map(el => {
+            const lat = el.lat || el.center?.lat
+            const lng = el.lon || el.center?.lon
+            if (!lat || !lng) return null
+            return {
+              id: el.id,
+              name: el.tags?.name || el.tags?.['name:en'] || 'Medical Facility',
+              address: [
+                el.tags?.['addr:full'],
+                el.tags?.['addr:street'],
+                el.tags?.['addr:suburb'],
+                el.tags?.['addr:city']
+              ].filter(Boolean).join(', ') || 'Nearby location',
+              phone: el.tags?.phone || el.tags?.['contact:phone'] || el.tags?.['contact:mobile'] || null,
+              website: el.tags?.website || el.tags?.['contact:website'] || null,
+              lat,
+              lng,
+            }
+          }).filter(Boolean)
+
+          setPlaces(results)
+          toast.success(`Found ${results.length} ${PLACE_TYPES.find(t=>t.value===type)?.label || 'places'} nearby`)
+          success = true
+          break
+        } else {
+          // No results — try increasing radius to 10km
+          const query2 = `[out:json][timeout:20];(node["amenity"="${amenity}"](around:10000,${location.lat},${location.lng});way["amenity"="${amenity}"](around:10000,${location.lat},${location.lng}););out center 15;`
+          const res2 = await fetch(`${mirror}?data=${encodeURIComponent(query2)}`)
+          const data2 = await res2.json()
+          const elements2 = data2.elements || []
+
+          if (elements2.length > 0) {
+            const results2 = elements2.map(el => {
+              const lat = el.lat || el.center?.lat
+              const lng = el.lon || el.center?.lon
+              if (!lat || !lng) return null
+              return {
+                id: el.id,
+                name: el.tags?.name || 'Medical Facility',
+                address: [el.tags?.['addr:street'], el.tags?.['addr:city']].filter(Boolean).join(', ') || 'Nearby',
+                phone: el.tags?.phone || null,
+                lat, lng,
+              }
+            }).filter(Boolean)
+            setPlaces(results2)
+            toast.success(`Found ${results2.length} places within 10km`)
+            success = true
+          } else {
+            toast('No places found nearby. Try the map view.', { icon: '🗺️' })
+          }
+          break
+        }
+      } catch (err) {
+        // Try next mirror
+        continue
+      }
+    }
+
+    if (!success && !places.length) {
+      toast('Could not load list. Use the map above to find places.', { icon: '🗺️' })
+    }
+
+    setLoading(false)
   }
 
   useEffect(() => { getUserLocation() }, [])
@@ -163,7 +237,8 @@ function NearbyPlaces() {
         {loading && (
           <div className="py-8 flex flex-col items-center gap-3">
             <Loader size={28} className="text-blue-600 animate-spin" />
-            <p className="text-gray-500 text-sm">Finding nearby {activeTypeData?.label}...</p>
+            <p className="text-gray-500 text-sm">Searching nearby {activeTypeData?.label}... (up to 10km)</p>
+            <p className="text-xs text-gray-400">Using OpenStreetMap data</p>
           </div>
         )}
 
