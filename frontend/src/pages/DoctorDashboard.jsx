@@ -17,6 +17,76 @@ import toast from 'react-hot-toast'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const EMPTY_SLOT = { day: 'Monday', start_time: '09:00', end_time: '17:00', is_available: true }
 
+// ─── Revenue Tab ──────────────────────────────────────────────────────────────
+function RevenueTab() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.get('/extras/doctor-revenue').then(r => setData(r.data)).catch(() => toast.error('Failed to load revenue')).finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div className="py-10 flex justify-center"><LoadingSpinner text="Loading revenue..." /></div>
+  if (!data) return null
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Revenue', value: `₹${(data.total_revenue||0).toLocaleString('en-IN')}`, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Completed', value: data.completed, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Pending', value: data.pending, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+          { label: 'Total Appointments', value: data.total_appointments, color: 'text-purple-600', bg: 'bg-purple-50' },
+        ].map(({ label, value, color, bg }) => (
+          <div key={label} className={`card ${bg}`}>
+            <p className="text-xs text-gray-500">{label}</p>
+            <p className={`text-2xl font-extrabold ${color} mt-0.5`}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {data.monthly?.length > 0 && (
+        <div className="card">
+          <h3 className="font-bold text-gray-900 mb-1">Monthly Revenue</h3>
+          <p className="text-xs text-gray-400 mb-4">Last 6 months earnings (₹)</p>
+          <div className="space-y-2">
+            {data.monthly.map(({ month, revenue }) => (
+              <div key={month} className="flex items-center gap-3">
+                <span className="text-xs text-gray-500 w-14">{month}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-3">
+                  <div className="h-3 rounded-full bg-green-500 transition-all"
+                    style={{ width: `${Math.min(100, (revenue / Math.max(...data.monthly.map(m=>m.revenue))) * 100)}%` }} />
+                </div>
+                <span className="text-xs font-bold text-gray-700 w-16 text-right">₹{revenue.toLocaleString('en-IN')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.by_type?.length > 0 && (
+        <div className="card">
+          <h3 className="font-bold text-gray-900 mb-3">Revenue by Consultation Type</h3>
+          <div className="space-y-2">
+            {data.by_type.map(({ type, revenue }) => (
+              <div key={type} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl">
+                <span className="text-sm text-gray-700 capitalize font-medium">{type}</span>
+                <span className="text-sm font-bold text-green-600">₹{revenue.toLocaleString('en-IN')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.total_revenue === 0 && (
+        <div className="card text-center py-10">
+          <p className="text-gray-400 text-sm">No revenue yet. Complete appointments to see earnings.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Availability Section ──────────────────────────────────────────────────
 
 function AvailabilitySection() {
@@ -760,6 +830,7 @@ function DoctorDashboard() {
     { key: 'appointments', label: 'Appointments', icon: Calendar },
     { key: 'patients', label: 'My Patients', icon: Users },
     { key: 'availability', label: 'Availability', icon: Clock },
+    { key: 'revenue', label: 'Revenue', icon: Activity },
   ]
 
   return (
@@ -858,6 +929,8 @@ function DoctorDashboard() {
         )}
 
         {activeTab === 'availability' && <AvailabilitySection />}
+
+        {activeTab === 'revenue' && <RevenueTab />}
       </div>
 
       {/* Chat overlay */}

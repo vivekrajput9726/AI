@@ -73,9 +73,25 @@ async def update_doctor_profile(user_id: str, update_data: dict) -> dict:
 
 async def get_doctor_appointments(doctor_id: str, status_filter: Optional[str] = None) -> list:
     db = get_db()
+
+    # Step 1: Find doctor profile by user_id
     doctor = await db.doctors.find_one({"user_id": doctor_id})
+
+    # Step 2: If not found by user_id, find by email of the user account
     if not doctor:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
+        user = await db.users.find_one({"_id": str_to_objectid(doctor_id)})
+        if user and user.get("email"):
+            doctor = await db.doctors.find_one({"email": user["email"]})
+            # Link this doctor to the user_id so future lookups work
+            if doctor:
+                await db.doctors.update_one(
+                    {"_id": doctor["_id"]},
+                    {"$set": {"user_id": doctor_id}}
+                )
+
+    # Step 3: If still not found, return empty list (don't throw 404)
+    if not doctor:
+        return []
 
     query = {"doctor_id": str(doctor["_id"])}
     if status_filter:

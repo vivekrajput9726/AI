@@ -179,11 +179,45 @@ async def analyze_symptoms(
     if report_context:
         patient_context += f"\n\nPatient has also uploaded a medical report. Use this data to refine your analysis:\n{report_context}"
 
+    # Try Groq first (free, fast)
+    if settings.GROQ_API_KEY:
+        try:
+            from groq import Groq
+            client = Groq(api_key=settings.GROQ_API_KEY)
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": patient_context}
+                ],
+                temperature=0.3, max_tokens=1000
+            )
+            content = response.choices[0].message.content.strip()
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+        except Exception as e:
+            logger.warning(f"Groq analysis failed: {e}")
+
+    # Try Gemini
+    if settings.GEMINI_API_KEY:
+        try:
+            from google import genai as gai
+            client = gai.Client(api_key=settings.GEMINI_API_KEY)
+            prompt = SYSTEM_PROMPT + "\n\nPatient information:\n" + patient_context
+            response = client.models.generate_content(model="gemini-2.0-flash-lite", contents=prompt)
+            content = response.text.strip()
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+        except Exception as e:
+            logger.warning(f"Gemini symptom analysis failed: {e}")
+
+    # Fallback to OpenAI
     if settings.OPENAI_API_KEY:
         try:
             from openai import AsyncOpenAI
             client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-
             response = await client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -193,14 +227,12 @@ async def analyze_symptoms(
                 temperature=0.3,
                 max_tokens=1000
             )
-
             content = response.choices[0].message.content.strip()
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
-                result = json.loads(json_match.group())
-                return result
+                return json.loads(json_match.group())
         except Exception as e:
-            logger.warning(f"OpenAI analysis failed, using rule-based fallback: {e}")
+            logger.warning(f"OpenAI analysis failed: {e}")
 
     return rule_based_analysis(symptoms)
 
@@ -234,6 +266,22 @@ When answering, reference the specific values from the report where relevant. If
         messages.append({"role": h["role"], "content": h["content"]})
     messages.append({"role": "user", "content": message})
 
+    # Try Groq first (free, fast)
+    if settings.GROQ_API_KEY:
+        try:
+            from groq import Groq
+            client = Groq(api_key=settings.GROQ_API_KEY)
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+                temperature=0.5,
+                max_tokens=600
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.warning(f"Groq chat failed: {e}")
+
+    # Fallback to OpenAI
     if settings.OPENAI_API_KEY:
         try:
             from openai import AsyncOpenAI
@@ -249,10 +297,7 @@ When answering, reference the specific values from the report where relevant. If
             logger.warning(f"OpenAI chat failed: {e}")
 
     return (
-        "I understand you're experiencing some health concerns. Based on what you've described, "
-        "I recommend consulting with a healthcare professional who can properly evaluate your symptoms. "
-        "In the meantime, make sure to rest, stay hydrated, and monitor your symptoms. "
-        "If symptoms worsen or you experience chest pain, difficulty breathing, or other severe symptoms, "
-        "please seek emergency care immediately.\n\n"
+        "I understand your health concern. Please consult a qualified doctor for proper evaluation. "
+        "If you experience chest pain, difficulty breathing, or severe symptoms, seek emergency care immediately.\n\n"
         "⚠️ This is not a medical diagnosis. Please consult a qualified doctor."
     )

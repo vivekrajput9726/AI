@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, Link } from 'react-router-dom'
-import { LogOut, Menu, X, Plus, Bell, MessageCircle, Search, Settings, User } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { LogOut, Menu, X, Plus, Bell, MessageCircle, Search, Settings, User, Moon, Sun, Languages } from 'lucide-react'
+import { useTheme } from '../../context/ThemeContext'
+
+const LANG_KEY = 'synora_lang'
 import { logout } from '../../redux/slices/authSlice'
 import { getInitials } from '../../utils/helpers'
 
@@ -10,6 +14,28 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
   const navigate = useNavigate()
   const { user } = useSelector((state) => state.auth)
   const [showDropdown, setShowDropdown] = useState(false)
+
+  const { dark, toggle } = useTheme()
+  const [lang, setLang] = useState(() => localStorage.getItem(LANG_KEY) || 'en')
+
+  const toggleLang = () => {
+    const next = lang === 'en' ? 'hi' : 'en'
+    setLang(next)
+    localStorage.setItem(LANG_KEY, next)
+    window.dispatchEvent(new Event('langchange'))
+    toast.success(next === 'hi' ? 'हिंदी भाषा चुनी गई' : 'English selected')
+  }
+
+  const requestNotifications = async () => {
+    if (!('Notification' in window)) { toast.error('Notifications not supported'); return }
+    const perm = await Notification.requestPermission()
+    if (perm === 'granted') {
+      toast.success('Notifications enabled!')
+      new Notification('Synora Health', { body: 'You will now receive health reminders!', icon: '/favicon.ico' })
+    } else {
+      toast.error('Notification permission denied')
+    }
+  }
 
   const handleLogout = () => {
     dispatch(logout())
@@ -49,6 +75,21 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
 
         {/* Right — Actions + Profile */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {/* Hindi/English toggle */}
+          <button onClick={toggleLang} className="hidden sm:flex items-center gap-1 p-2.5 rounded-xl hover:bg-gray-100 transition-colors text-xs font-bold text-gray-500" title="Toggle language">
+            <Languages size={16}/> {lang === 'en' ? 'हिं' : 'EN'}
+          </button>
+
+          {/* Push Notifications */}
+          <button onClick={requestNotifications} className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors" title="Enable notifications">
+            <Bell size={18} className="text-gray-500" />
+          </button>
+
+          {/* Dark Mode */}
+          <button onClick={toggle} className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors" title={dark ? 'Light mode' : 'Dark mode'}>
+            {dark ? <Sun size={18} className="text-yellow-500" /> : <Moon size={18} className="text-gray-500" />}
+          </button>
+
           {/* Bell */}
           <button className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors">
             <Bell size={18} className="text-gray-500" />
