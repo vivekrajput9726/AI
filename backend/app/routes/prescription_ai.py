@@ -121,6 +121,7 @@ async def analyze_with_openai(image_base64: str) -> dict:
     from openai import AsyncOpenAI
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
+    # Ensure proper data URL format
     if not image_base64.startswith("data:"):
         image_base64 = f"data:image/jpeg;base64,{image_base64}"
 
@@ -145,24 +146,58 @@ async def analyze_with_openai(image_base64: str) -> dict:
     return None
 
 
+async def analyze_with_groq(image_base64: str) -> dict:
+    """Use Groq vision to analyze an image (free tier)."""
+    from groq import Groq
+    client = Groq(api_key=settings.GROQ_API_KEY)
+    if not image_base64.startswith("data:"):
+        image_base64 = f"data:image/jpeg;base64,{image_base64}"
+    response = client.chat.completions.create(
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": REPORT_PROMPT},
+                {"type": "image_url", "image_url": {"url": image_base64}}
+            ]
+        }],
+        max_tokens=1200, temperature=0.2
+    )
+    content = response.choices[0].message.content.strip()
+    json_match = re.search(r'\{.*\}', content, re.DOTALL)
+    if json_match:
+        return json.loads(json_match.group())
+    return None
+
+
 @router.post("/analyze-report", summary="AI analyzes health report or camera image")
 async def analyze_report(data: PrescriptionRequest, current_user: dict = Depends(get_current_user)):
     try:
         result = None
 
-        # Try OpenAI Vision first (fast, reliable)
-        if settings.OPENAI_API_KEY:
+        # Try Groq first (free, vision capable)
+        if settings.GROQ_API_KEY:
             try:
-                result = await analyze_with_openai(data.image_base64)
+                result = await analyze_with_groq(data.image_base64)
+                if result: logger.info("Report analyzed via Groq")
             except Exception as e:
-                logger.warning(f"OpenAI vision failed, trying Gemini: {e}")
+                logger.warning(f"Groq vision failed: {e}")
 
-        # Fallback to Gemini
+        # Try Gemini
         if not result and settings.GEMINI_API_KEY:
             try:
                 result = call_gemini(data.image_base64, REPORT_PROMPT)
+                if result: logger.info("Report analyzed via Gemini")
             except Exception as e:
-                logger.warning(f"Gemini also failed: {e}")
+                logger.warning(f"Gemini failed: {e}")
+
+        # Fallback to OpenAI
+        if not result and settings.OPENAI_API_KEY:
+            try:
+                result = await analyze_with_openai(data.image_base64)
+                if result: logger.info("Report analyzed via OpenAI")
+            except Exception as e:
+                logger.warning(f"OpenAI also failed: {e}")
 
         if result:
             return {"success": True, "data": result}

@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { Activity, TrendingUp, Heart, Zap, Target, Info } from 'lucide-react'
+import { Activity, TrendingUp, Heart, Zap, Target, Info, Bot, Loader, ChevronDown, ChevronUp } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
+import api from '../services/api'
+import toast from 'react-hot-toast'
 
 const BMI_RANGES = [
   { max: 18.5, label: 'Underweight',    color: 'text-blue-600',   bg: 'bg-blue-50 border-blue-200',   advice: 'You may need to gain weight. Consult a dietitian for a healthy meal plan.' },
@@ -30,6 +32,9 @@ export default function BMICalculator() {
   const [gender, setGender] = useState('male')
   const [unit, setUnit]     = useState('metric')
   const [result, setResult] = useState(null)
+  const [aiAdvice, setAiAdvice]   = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [showAdvice, setShowAdvice] = useState(true)
 
   const calculate = () => {
     if (!weight || !height) return
@@ -50,6 +55,28 @@ export default function BMICalculator() {
     const whr    = Math.round(ibw * 0.95) + '–' + Math.round(ibw * 1.05)
 
     setResult({ bmi: bmi.toFixed(1), range, ibw: ibw.toFixed(1), bmr: Math.round(bmr), maxHR, fatBurn, cardio, whr })
+    setAiAdvice(null)
+    getAIAdvice(bmi.toFixed(1), range.label, Math.round(bmr), parseInt(age) || 25, gender, w.toFixed(1), (h * 100).toFixed(0))
+  }
+
+  const getAIAdvice = async (bmi, category, bmr, ageVal, genderVal, weightKg, heightCm) => {
+    setAiLoading(true)
+    try {
+      const res = await api.post('/extras/bmi-advice', {
+        bmi: parseFloat(bmi),
+        category,
+        bmr,
+        age: ageVal,
+        gender: genderVal,
+        weight_kg: parseFloat(weightKg),
+        height_cm: parseFloat(heightCm)
+      })
+      if (res.data.success) setAiAdvice(res.data.data)
+    } catch {
+      toast.error('Could not load AI advice')
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   const bmiPercent = result ? Math.min(100, Math.max(0, ((parseFloat(result.bmi) - 10) / (40 - 10)) * 100)) : 0
@@ -168,6 +195,105 @@ export default function BMICalculator() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* ── AI Health Advice ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <button onClick={() => setShowAdvice(s => !s)}
+                className="w-full flex items-center justify-between px-5 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
+                <div className="flex items-center gap-2">
+                  <Bot size={18}/>
+                  <span className="font-bold text-sm">AI Personalized Health Advice</span>
+                  {aiLoading && <Loader size={14} className="animate-spin"/>}
+                  {aiAdvice && !aiLoading && <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Ready</span>}
+                </div>
+                {showAdvice ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+              </button>
+
+              {showAdvice && (
+                <div className="p-5">
+                  {aiLoading && (
+                    <div className="flex flex-col items-center py-8 gap-3">
+                      <div className="relative w-14 h-14">
+                        <div className="absolute inset-0 border-4 border-purple-200 rounded-full animate-ping opacity-40"/>
+                        <div className="w-full h-full bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center">
+                          <Bot size={22} className="text-white animate-pulse"/>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-500 font-medium">AI generating your personalized plan...</p>
+                    </div>
+                  )}
+
+                  {aiAdvice && !aiLoading && (
+                    <div className="space-y-4">
+                      {/* Goal */}
+                      {aiAdvice.goal && (
+                        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4">
+                          <p className="text-xs font-bold text-purple-600 mb-1">🎯 Your Health Goal</p>
+                          <p className="text-sm text-purple-900 font-semibold">{aiAdvice.goal}</p>
+                        </div>
+                      )}
+
+                      {/* Diet + Exercise */}
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        {aiAdvice.diet?.length > 0 && (
+                          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                            <p className="text-xs font-bold text-green-700 mb-2">🥗 Diet Tips</p>
+                            <ul className="space-y-1.5">
+                              {aiAdvice.diet.map((t,i) => (
+                                <li key={i} className="text-xs text-green-700 flex gap-1.5"><span>•</span>{t}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {aiAdvice.exercise?.length > 0 && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                            <p className="text-xs font-bold text-blue-700 mb-2">🏃 Exercise Plan</p>
+                            <ul className="space-y-1.5">
+                              {aiAdvice.exercise.map((t,i) => (
+                                <li key={i} className="text-xs text-blue-700 flex gap-1.5"><span>•</span>{t}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Lifestyle */}
+                      {aiAdvice.lifestyle?.length > 0 && (
+                        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                          <p className="text-xs font-bold text-orange-700 mb-2">✨ Lifestyle Changes</p>
+                          <div className="flex flex-wrap gap-2">
+                            {aiAdvice.lifestyle.map((t,i) => (
+                              <span key={i} className="text-xs bg-orange-100 text-orange-700 border border-orange-200 px-2.5 py-1 rounded-full">{t}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Risk + Motivation */}
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        {aiAdvice.risk && (
+                          <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                            <p className="text-xs font-bold text-red-600 mb-1">⚠️ Watch Out For</p>
+                            <p className="text-xs text-red-700">{aiAdvice.risk}</p>
+                          </div>
+                        )}
+                        {aiAdvice.motivational && (
+                          <div className="bg-teal-50 border border-teal-200 rounded-xl p-3">
+                            <p className="text-xs font-bold text-teal-600 mb-1">💪 Motivation</p>
+                            <p className="text-xs text-teal-700 italic">"{aiAdvice.motivational}"</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <button onClick={() => getAIAdvice(result.bmi, result.range.label, result.bmr, parseInt(age)||25, gender, unit==='metric'?parseFloat(weight):parseFloat(weight)*0.453592, unit==='metric'?parseFloat(height):parseFloat(height)*2.54)}
+                        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-purple-200 text-purple-600 text-xs font-medium hover:bg-purple-50 transition-colors">
+                        <Bot size={13}/> Regenerate Advice
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">

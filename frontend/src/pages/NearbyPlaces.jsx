@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { MapPin, Navigation, Loader, RefreshCw, Phone } from 'lucide-react'
+import { MapPin, Navigation, Loader, RefreshCw, Phone, Star } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import toast from 'react-hot-toast'
 
@@ -178,13 +178,18 @@ function NearbyPlaces() {
     <DashboardLayout>
       <div className="space-y-5 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Nearby Places</h1>
-            <p className="text-gray-500 text-sm mt-1">Find medical stores, hospitals and clinics near you</p>
+        <div className="bg-gradient-to-r from-blue-600 to-teal-500 rounded-2xl p-5 text-white flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <MapPin size={20} className="text-white"/>
+            </div>
+            <div>
+              <h1 className="text-lg font-extrabold">Nearby Hospitals</h1>
+              <p className="text-blue-100 text-xs">Hospitals, Clinics & Pharmacies near you</p>
+            </div>
           </div>
-          <button onClick={getUserLocation} className="btn-primary flex items-center gap-2 text-sm">
-            <RefreshCw size={14} /> Refresh
+          <button onClick={getUserLocation} className="bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
+            <RefreshCw size={14}/> Refresh
           </button>
         </div>
 

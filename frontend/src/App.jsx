@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 
 import Landing from './pages/Landing'
+import SplashScreen from './pages/SplashScreen'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import PatientDashboard from './pages/PatientDashboard'
@@ -15,22 +16,17 @@ import Profile from './pages/Profile'
 import HealthRecords from './pages/HealthRecords'
 import MedicineReminder from './pages/MedicineReminder'
 import NearbyPlaces from './pages/NearbyPlaces'
-import PrescriptionReader from './pages/PrescriptionReader'
-import ReportAnalyzer from './pages/ReportAnalyzer'
 import Laboratory from './pages/Laboratory'
-import HealthScanner from './pages/HealthScanner'
-import MedicalHistory from './pages/MedicalHistory'
-import AIHealthAnalyzer from './pages/AIHealthAnalyzer'
+import AIHealthCopilot from './pages/AIHealthCopilot'
+import AIFollowUp from './pages/AIFollowUp'
 import MyRecords from './pages/MyRecords'
 import EmergencySOS from './pages/EmergencySOS'
-import PrescriptionPDF from './pages/PrescriptionPDF'
-import DrugChecker from './pages/DrugChecker'
-import FamilyHealth from './pages/FamilyHealth'
-import MentalHealth from './pages/MentalHealth'
-import WellnessHub from './pages/WellnessHub'
-import BMICalculator from './pages/BMICalculator'
 import SymptomDiary from './pages/SymptomDiary'
 import VaccinationTracker from './pages/VaccinationTracker'
+import HealthGoals from './pages/HealthGoals'
+import FamilyHealth from './pages/FamilyHealth'
+import PatientJourney from './pages/PatientJourney'
+import SmartReport from './pages/SmartReport'
 import AIChatbot from './components/common/AIChatbot'
 import ProtectedRoute from './routes/ProtectedRoute'
 
@@ -48,156 +44,36 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/splash" element={<SplashScreen />} />
         <Route path="/login" element={user ? <Navigate to={getDashboardPath()} /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to={getDashboardPath()} /> : <Register />} />
 
-        <Route path="/patient/dashboard" element={
-          <ProtectedRoute roles={['patient']}>
-            <PatientDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/symptoms" element={
-          <ProtectedRoute roles={['patient']}>
-            <SymptomChecker />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/doctors" element={
-          <ProtectedRoute roles={['patient']}>
-            <DoctorListing />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/book/:doctorId" element={
-          <ProtectedRoute roles={['patient']}>
-            <AppointmentBooking />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/video/:appointmentId" element={
-          <ProtectedRoute roles={['patient', 'doctor']}>
-            <VideoConsultation />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/profile" element={
-          <ProtectedRoute roles={['patient']}>
-            <Profile />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/records" element={
-          <ProtectedRoute roles={['patient']}>
-            <HealthRecords />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/medicines" element={
-          <ProtectedRoute roles={['patient']}>
-            <MedicineReminder />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/nearby" element={
-          <ProtectedRoute roles={['patient']}>
-            <NearbyPlaces />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/ai-reader" element={
-          <ProtectedRoute roles={['patient']}>
-            <PrescriptionReader />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/report-analyzer" element={
-          <ProtectedRoute roles={['patient']}>
-            <ReportAnalyzer />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/laboratory" element={
-          <ProtectedRoute roles={['patient']}>
-            <Laboratory />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/health-scanner" element={
-          <ProtectedRoute roles={['patient']}>
-            <HealthScanner />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/ai-analyzer" element={
-          <ProtectedRoute roles={['patient']}>
-            <AIHealthAnalyzer />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/medical-history" element={
-          <ProtectedRoute roles={['patient']}>
-            <MedicalHistory />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/my-records" element={
-          <ProtectedRoute roles={['patient']}>
-            <MyRecords />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/emergency" element={
-          <ProtectedRoute roles={['patient']}>
-            <EmergencySOS />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/prescription-pdf" element={
-          <ProtectedRoute roles={['patient', 'doctor']}>
-            <PrescriptionPDF />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/drug-checker" element={
-          <ProtectedRoute roles={['patient']}>
-            <DrugChecker />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/family" element={
-          <ProtectedRoute roles={['patient']}>
-            <FamilyHealth />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/mental-health" element={
-          <ProtectedRoute roles={['patient']}>
-            <MentalHealth />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/wellness" element={
-          <ProtectedRoute roles={['patient']}>
-            <WellnessHub />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/bmi" element={
-          <ProtectedRoute roles={['patient']}>
-            <BMICalculator />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/diary" element={
-          <ProtectedRoute roles={['patient']}>
-            <SymptomDiary />
-          </ProtectedRoute>
-        } />
-        <Route path="/patient/vaccines" element={
-          <ProtectedRoute roles={['patient']}>
-            <VaccinationTracker />
-          </ProtectedRoute>
-        } />
+        <Route path="/patient/dashboard" element={<ProtectedRoute roles={['patient']}><PatientDashboard /></ProtectedRoute>} />
+        <Route path="/patient/symptoms"  element={<ProtectedRoute roles={['patient']}><SymptomChecker /></ProtectedRoute>} />
+        <Route path="/patient/doctors"   element={<ProtectedRoute roles={['patient']}><DoctorListing /></ProtectedRoute>} />
+        <Route path="/patient/book/:doctorId" element={<ProtectedRoute roles={['patient']}><AppointmentBooking /></ProtectedRoute>} />
+        <Route path="/patient/video/:appointmentId" element={<ProtectedRoute roles={['patient','doctor']}><VideoConsultation /></ProtectedRoute>} />
+        <Route path="/patient/profile"   element={<ProtectedRoute roles={['patient']}><Profile /></ProtectedRoute>} />
+        <Route path="/patient/records"   element={<ProtectedRoute roles={['patient']}><HealthRecords /></ProtectedRoute>} />
+        <Route path="/patient/my-records"element={<ProtectedRoute roles={['patient']}><MyRecords /></ProtectedRoute>} />
+        <Route path="/patient/medicines" element={<ProtectedRoute roles={['patient']}><MedicineReminder /></ProtectedRoute>} />
+        <Route path="/patient/nearby"    element={<ProtectedRoute roles={['patient']}><NearbyPlaces /></ProtectedRoute>} />
+        <Route path="/patient/laboratory"element={<ProtectedRoute roles={['patient']}><Laboratory /></ProtectedRoute>} />
+        <Route path="/patient/copilot"    element={<ProtectedRoute roles={['patient']}><AIHealthCopilot /></ProtectedRoute>} />
+        <Route path="/patient/follow-up"  element={<ProtectedRoute roles={['patient']}><AIFollowUp /></ProtectedRoute>} />
+        <Route path="/patient/emergency" element={<ProtectedRoute roles={['patient']}><EmergencySOS /></ProtectedRoute>} />
+        <Route path="/patient/diary"     element={<ProtectedRoute roles={['patient']}><SymptomDiary /></ProtectedRoute>} />
+        <Route path="/patient/vaccines"  element={<ProtectedRoute roles={['patient']}><VaccinationTracker /></ProtectedRoute>} />
+        <Route path="/patient/goals"      element={<ProtectedRoute roles={['patient']}><HealthGoals /></ProtectedRoute>} />
+        <Route path="/patient/family"    element={<ProtectedRoute roles={['patient']}><FamilyHealth /></ProtectedRoute>} />
+        <Route path="/patient/journey"      element={<ProtectedRoute roles={['patient']}><PatientJourney /></ProtectedRoute>} />
+        <Route path="/patient/smart-report" element={<ProtectedRoute roles={['patient']}><SmartReport /></ProtectedRoute>} />
 
-        <Route path="/doctor/dashboard" element={
-          <ProtectedRoute roles={['doctor']}>
-            <DoctorDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/doctor/profile" element={
-          <ProtectedRoute roles={['doctor']}>
-            <Profile />
-          </ProtectedRoute>
-        } />
-        <Route path="/doctor/video/:appointmentId" element={
-          <ProtectedRoute roles={['doctor']}>
-            <VideoConsultation />
-          </ProtectedRoute>
-        } />
+        <Route path="/doctor/dashboard"  element={<ProtectedRoute roles={['doctor']}><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/doctor/profile"    element={<ProtectedRoute roles={['doctor']}><Profile /></ProtectedRoute>} />
+        <Route path="/doctor/video/:appointmentId" element={<ProtectedRoute roles={['doctor']}><VideoConsultation /></ProtectedRoute>} />
 
-        <Route path="/admin" element={
-          <ProtectedRoute roles={['admin']}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        } />
+        <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
