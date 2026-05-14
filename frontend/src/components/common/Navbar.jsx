@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, Link } from 'react-router-dom'
-import { LogOut, Menu, X, Plus, Bell, MessageCircle, Search, Settings, User } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { LogOut, Menu, X, Plus, Bell, MessageCircle, Search, Settings, User, Moon, Sun, Languages, AlertTriangle, CheckCircle, FileText, Pill } from 'lucide-react'
+import { useTheme } from '../../context/ThemeContext'
+
+const LANG_KEY = 'synora_lang'
 import { logout } from '../../redux/slices/authSlice'
 import { getInitials } from '../../utils/helpers'
 
@@ -9,7 +13,43 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const { user } = useSelector((state) => state.auth)
+  const { list: appointments } = useSelector(s => s.appointments || { list: [] })
   const [showDropdown, setShowDropdown] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
+
+  const notifications = [
+    ...(appointments?.filter(a => a.status === 'confirmed').slice(0,1).map(a => ({
+      icon: <CheckCircle size={14} className="text-green-500"/>,
+      bg: 'bg-green-50',
+      title: 'Appointment Confirmed',
+      sub: `Dr. ${a.doctor_name} · ${a.appointment_time || 'Today'}`,
+      time: a.appointment_date || 'Today'
+    })) || []),
+    { icon: <FileText size={14} className="text-blue-500"/>, bg:'bg-blue-50', title:'Report Analysis Ready', sub:'Tap to view your AI analysis', time:'Just now' },
+    { icon: <Pill size={14} className="text-orange-500"/>, bg:'bg-orange-50', title:'Medicine Reminder', sub:'Paracetamol — 6:00 PM', time:'Today' },
+  ]
+
+  const { dark, toggle } = useTheme()
+  const [lang, setLang] = useState(() => localStorage.getItem(LANG_KEY) || 'en')
+
+  const toggleLang = () => {
+    const next = lang === 'en' ? 'hi' : 'en'
+    setLang(next)
+    localStorage.setItem(LANG_KEY, next)
+    window.dispatchEvent(new Event('langchange'))
+    toast.success(next === 'hi' ? 'हिंदी भाषा चुनी गई' : 'English selected')
+  }
+
+  const requestNotifications = async () => {
+    if (!('Notification' in window)) { toast.error('Notifications not supported'); return }
+    const perm = await Notification.requestPermission()
+    if (perm === 'granted') {
+      toast.success('Notifications enabled!')
+      new Notification('Synora Health', { body: 'You will now receive health reminders!', icon: '/favicon.ico' })
+    } else {
+      toast.error('Notification permission denied')
+    }
+  }
 
   const handleLogout = () => {
     dispatch(logout())
@@ -49,16 +89,53 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
 
         {/* Right — Actions + Profile */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* Bell */}
-          <button className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors">
-            <Bell size={18} className="text-gray-500" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+          {/* Hindi/English toggle */}
+          <button onClick={toggleLang} className="hidden sm:flex items-center gap-1 p-2.5 rounded-xl hover:bg-gray-100 transition-colors text-xs font-bold text-gray-500" title="Toggle language">
+            <Languages size={16}/> {lang === 'en' ? 'हिं' : 'EN'}
           </button>
 
-          {/* Message */}
-          <button className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors">
-            <MessageCircle size={18} className="text-gray-500" />
+          {/* Push Notifications */}
+          <button onClick={requestNotifications} className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors" title="Enable notifications">
+            <Bell size={18} className="text-gray-500" />
           </button>
+
+          {/* Dark Mode */}
+          <button onClick={toggle} className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors" title={dark ? 'Light mode' : 'Dark mode'}>
+            {dark ? <Sun size={18} className="text-yellow-500" /> : <Moon size={18} className="text-gray-500" />}
+          </button>
+
+          {/* Notifications Bell */}
+          <div className="relative">
+            <button onClick={() => { setShowNotifications(n => !n); setShowDropdown(false) }}
+              className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors">
+              <Bell size={18} className="text-gray-500" />
+              <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] font-bold flex items-center justify-center">{notifications.length}</span>
+            </button>
+            {showNotifications && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <p className="font-bold text-gray-900 text-sm">Notifications</p>
+                  <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold">{notifications.length} new</span>
+                </div>
+                <div className="max-h-72 overflow-y-auto">
+                  {notifications.map((n, i) => (
+                    <button key={i} onClick={() => { setShowNotifications(false); navigate('/patient/dashboard') }}
+                      className="w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 text-left">
+                      <div className={`w-8 h-8 ${n.bg} rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5`}>{n.icon}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">{n.title}</p>
+                        <p className="text-xs text-gray-500 truncate">{n.sub}</p>
+                      </div>
+                      <span className="text-xs text-gray-400 flex-shrink-0">{n.time}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="px-4 py-2 border-t border-gray-100">
+                  <button className="w-full text-xs text-blue-600 font-medium hover:underline">Mark all as read</button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Profile */}
           <div className="relative ml-1">
@@ -79,20 +156,57 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
             </button>
 
             {showDropdown && (
-              <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
+                {/* User Info */}
                 <div className="px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-semibold text-gray-900">{user?.full_name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{user?.email}</p>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-teal-400 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                      {getInitials(user?.full_name)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900 leading-tight">{user?.full_name}</p>
+                      <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
+                    </div>
+                  </div>
                 </div>
-                <Link to={profilePath} onClick={() => setShowDropdown(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                  <User size={15} className="text-gray-400" /> Profile Settings
+
+                {/* Profile */}
+                <Link to={profilePath} onClick={() => setShowDropdown(false)}
+                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                  <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center">
+                    <User size={14} className="text-blue-600"/>
+                  </div>
+                  Profile
                 </Link>
-                <Link to="/patient/profile" onClick={() => setShowDropdown(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                  <Settings size={15} className="text-gray-400" /> Settings
+
+                {/* Settings */}
+                <Link to={profilePath} onClick={() => setShowDropdown(false)}
+                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                  <div className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center">
+                    <Settings size={14} className="text-gray-500"/>
+                  </div>
+                  Settings
                 </Link>
+
+                {/* Emergency SOS */}
+                {user?.role === 'patient' && (
+                  <Link to="/patient/emergency" onClick={() => setShowDropdown(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                    <div className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center">
+                      <AlertTriangle size={14} className="text-red-600"/>
+                    </div>
+                    Emergency SOS
+                  </Link>
+                )}
+
+                {/* Sign Out */}
                 <div className="border-t border-gray-100 mt-1 pt-1">
-                  <button onClick={handleLogout} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full text-left transition-colors">
-                    <LogOut size={15} /> Sign Out
+                  <button onClick={handleLogout}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 w-full text-left transition-colors">
+                    <div className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center">
+                      <LogOut size={14} className="text-red-500"/>
+                    </div>
+                    Sign Out
                   </button>
                 </div>
               </div>

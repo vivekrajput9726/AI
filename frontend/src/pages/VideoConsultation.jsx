@@ -223,12 +223,17 @@ export default function VideoConsultation() {
                       </button>
                     </div>
 
-                    {/* Main join button */}
+                    {/* Main join button — type-aware */}
                     <button onClick={() => setInRoom(true)}
-                      className="w-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 text-base transition-all shadow-lg">
-                      <Video size={22} />
-                      {isDoctor ? 'Start Video Call' : 'Join Video Call'}
+                      className={`w-full active:scale-95 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 text-base transition-all shadow-lg ${aptType === 'voice' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                      {aptType === 'voice' ? <Phone size={22}/> : <Video size={22}/>}
+                      {aptType === 'voice'
+                        ? (isDoctor ? 'Start Voice Call' : 'Join Voice Call')
+                        : (isDoctor ? 'Start Video Call' : 'Join Video Call')}
                     </button>
+                    <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+                      <span>{aptType === 'voice' ? '🎙️ Voice Only — Camera will be OFF' : '📹 Video + Audio — Camera will be ON'}</span>
+                    </div>
 
                     {/* Open in new tab fallback */}
                     <a href={appointment.meeting_link} target="_blank" rel="noopener noreferrer"
@@ -271,13 +276,13 @@ export default function VideoConsultation() {
                   </div>
                 </div>
 
-                {/* Jitsi iframe */}
+                {/* Jitsi iframe — video ON for video calls, OFF for voice */}
                 <iframe
-                  src={`${appointment.meeting_link}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.toolbarButtons=["microphone","camera","chat","fullscreen","hangup"]&userInfo.displayName=${encodeURIComponent(user?.full_name || 'User')}`}
+                  src={`${appointment.meeting_link}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=${aptType === 'voice' ? 'true' : 'false'}&config.toolbarButtons=["microphone","camera","chat","fullscreen","hangup"]&userInfo.displayName=${encodeURIComponent(user?.full_name || 'User')}`}
                   allow="camera; microphone; fullscreen; display-capture; autoplay"
                   className={`w-full border-0 ${fullscreen ? 'h-screen' : 'rounded-b-2xl'}`}
                   style={{ height: fullscreen ? '100vh' : '580px' }}
-                  title="Video Consultation"
+                  title={aptType === 'voice' ? 'Voice Consultation' : 'Video Consultation'}
                 />
 
                 {!fullscreen && (

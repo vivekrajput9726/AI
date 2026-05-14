@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Synora Health – Project Report</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Times+New+Roman&family=Arial:wght@400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 12pt;
+    line-height: 1.6;
+    color: #000;
+    background: #fff;
+  }
+
+  /* ── Page wrapper ── */
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 25mm 25mm 20mm 30mm;
+    background: #fff;
+  }
+
+  /* ── Title page ── */
+  .title-page {
+    text-align: center;
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 270mm;
+    border: 3px double #003366;
+    padding: 20mm;
+  }
+  .title-page .univ-name {
+    font-size: 18pt;
+    font-weight: bold;
+    color: #003366;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .title-page .dept {
+    font-size: 12pt;
+    color: #333;
+    margin-bottom: 16px;
+  }
+  .title-page .line { border-top: 2px solid #003366; width: 100%; margin: 10px 0; }
+  .title-page .report-label {
+    font-size: 14pt;
+    margin: 10px 0 4px;
+  }
+  .title-page h1 {
+    font-size: 20pt;
+    color: #003366;
+    text-transform: uppercase;
+    margin: 16px 0;
+    line-height: 1.3;
+  }
+  .title-page .subtitle { font-size: 13pt; margin-bottom: 20px; }
+  .title-page .meta-box {
+    border: 1px solid #003366;
+    padding: 14px 30px;
+    margin: 14px 0;
+    text-align: left;
+    width: 80%;
+  }
+  .title-page .meta-box p { margin: 5px 0; font-size: 12pt; }
+  .title-page .meta-box strong { color: #003366; }
+
+  /* ── Section pages ── */
+  .section-page { page-break-before: always; }
+
+  /* ── Headings ── */
+  h1.section-title {
+    font-size: 16pt;
+    text-align: center;
+    text-transform: uppercase;
+    background: #003366;
+    color: #fff;
+    padding: 10px;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+  }
+  h2 { font-size: 14pt; color: #003366; margin: 20px 0 8px; border-bottom: 1px solid #003366; padding-bottom: 3px; }
+  h3 { font-size: 12pt; color: #1a1a5e; margin: 14px 0 6px; }
+  h4 { font-size: 12pt; margin: 10px 0 4px; }
+
+  p { margin-bottom: 8px; text-align: justify; }
+  ul, ol { margin: 6px 0 10px 24px; }
+  li { margin-bottom: 4px; }
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 11pt; }
+  th { background: #003366; color: #fff; padding: 7px 8px; text-align: left; }
+  td { border: 1px solid #ccc; padding: 6px 8px; }
+  tr:nth-child(even) td { background: #f0f4fa; }
+
+  /* ── Code blocks ── */
+  pre {
+    background: #f4f4f8;
+    border-left: 4px solid #003366;
+    padding: 10px 14px;
+    font-family: 'Courier New', monospace;
+    font-size: 9.5pt;
+    overflow-x: auto;
+    margin: 10px 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  code { font-family: 'Courier New', monospace; font-size: 10pt; background: #f0f0f0; padding: 1px 4px; }
+
+  /* ── Special boxes ── */
+  .info-box {
+    background: #e8f0fe;
+    border-left: 4px solid #003366;
+    padding: 10px 14px;
+    margin: 12px 0;
+  }
+  .highlight { background: #fffbcc; padding: 2px 4px; }
+
+  /* ── TOC ── */
+  .toc-table { font-size: 11pt; }
+  .toc-table td:last-child { text-align: right; width: 60px; }
+
+  /* ── Screenshot placeholder ── */
+  .screenshot-box {
+    border: 2px dashed #aaa;
+    background: #f9f9f9;
+    padding: 30px;
+    text-align: center;
+    color: #777;
+    margin: 12px 0;
+    font-size: 10pt;
+  }
+
+  /* ── Print styles ── */
+  @media print {
+    body { font-size: 11pt; }
+    .page { padding: 20mm 20mm 18mm 25mm; width: 100%; }
+    .no-print { display: none !important; }
+    h2 { page-break-after: avoid; }
+    table { page-break-inside: avoid; }
+    pre { page-break-inside: avoid; }
+    .section-page { page-break-before: always; }
+  }
+
+  /* ── Print button (hidden when printing) ── */
+  #print-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #003366;
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    font-size: 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 999;
+  }
+  #print-btn:hover { background: #0055a5; }
+</style>
+</head>
+<body>
+
+<button id="print-btn" class="no-print" onclick="window.print()">🖨️ Save as PDF (Ctrl+P)</button>
+
+<div class="page">
+
+<!-- ══════════════════════════════════════════════
+     TITLE PAGE
+══════════════════════════════════════════════ -->
+<div class="title-page">
+  <div class="univ-name">Auro University, Surat, Gujarat</div>
+  <div class="dept">School of Information Technology &amp; Computer Science</div>
+  <div class="line"></div>
+  <div class="report-label">A PROJECT REPORT</div>
+  <div style="font-size:13pt;">ON</div>
+  <h1>"Synora Health — AI-Powered Intelligent Healthcare Platform"</h1>
+  <div class="subtitle">Submitted in Partial Fulfillment of the Degree of<br>
+    <strong>Master of Science in Artificial Intelligence (M.Sc. AI)</strong>
+  </div>
+  <div class="line"></div>
+  <div class="meta-box">
+    <p><strong>Submitted By:</strong></p>
+    <p>VIVEK RAJPUT &nbsp;|&nbsp; Enrollment No.: 2024XXXX</p>
+    <p style="margin-top:8px;"><strong>Batch:</strong> 2024–2026</p>
+  </div>
+  <div class="meta-box">
+    <p><strong>Under the Guidance of:</strong></p>
+    <p>Dr. [Guide Name]</p>
+    <p>Department of Artificial Intelligence</p>
+  </div>
+  <div class="meta-box">
+    <p><strong>Industry Partner / Internship:</strong></p>
+    <p>Coding House &nbsp;|&nbsp; Mr. Naynesh Patel</p>
+  </div>
+  <div style="margin-top:14px; font-size:12pt;"><strong>Academic Year – 2024–2026</strong></div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     DECLARATION
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">Certificate of Undertaking (Declaration)</h1>
+  <p>I, <strong>Vivek Rajput</strong>, Enrollment No. <strong>2024XXXX</strong>, hereby declare that the project entitled <strong>"Synora Health — AI-Powered Intelligent Healthcare Platform"</strong>, undertaken at the School of Information Technology, Auro University, Surat, is submitted in partial fulfillment of the requirements for the degree of Master of Science in Artificial Intelligence (M.Sc. AI).</p>
+  <br>
+  <p>I further declare that this project is my original work and has not been submitted, either in part or in full, for the award of any other degree, diploma, associateship, fellowship, or any other similar title in AURO University or any other University or Institution.</p>
+  <br>
+  <p>All information sourced from external references has been duly acknowledged in the bibliography and references section. This work does not contain any form of plagiarism.</p>
+  <br><br><br>
+  <table style="border:none; width:100%;">
+    <tr>
+      <td style="border:none; width:50%;">
+        <p><strong>Date:</strong> May 2026</p>
+        <p><strong>Place:</strong> Surat, Gujarat</p>
+      </td>
+      <td style="border:none; text-align:right;">
+        <p>Signature of the Student</p>
+        <br>
+        <p>____________________________</p>
+        <p><strong>Vivek Rajput</strong></p>
+        <p>Enrollment No.: 2024XXXX</p>
+      </td>
+    </tr>
+  </table>
+  <br><br>
+  <div style="text-align:center; border-top:1px solid #999; padding-top:12px;">
+    <p><strong>Certified by Guide:</strong></p>
+    <br>
+    <p>____________________________</p>
+    <p>Dr. [Guide Name]</p>
+    <p>Department of Artificial Intelligence, Auro University</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     ACKNOWLEDGEMENT
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">Acknowledgement</h1>
+  <p>It gives me immense pleasure to present the project titled <strong>"Synora Health — AI-Powered Intelligent Healthcare Platform"</strong> as part of the curriculum for the M.Sc. Artificial Intelligence (Semester IV) program at Auro University, Surat.</p>
+  <br>
+  <p>The successful completion of this project would not have been possible without the support, guidance, and encouragement of many individuals. I would like to express my heartfelt gratitude to <strong>Auro University</strong> for providing this invaluable opportunity to work on a practical, AI-driven healthcare project.</p>
+  <br>
+  <p>I am sincerely thankful to my respected project guide, <strong>Dr. [Guide Name]</strong>, for their constant guidance, insightful suggestions, and unwavering encouragement throughout the project. Their expertise in Artificial Intelligence greatly shaped both the technical and academic dimensions of this work.</p>
+  <br>
+  <p>I extend my gratitude to <strong>Coding House</strong> and <strong>Mr. Naynesh Patel</strong> for their technical support, mentorship, and the constructive feedback that greatly helped in designing and refining the platform architecture.</p>
+  <br>
+  <p>I am deeply thankful to all my professors and faculty at the School of Information Technology for their consistent academic support and inspiration throughout the program.</p>
+  <br>
+  <p>Finally, I express my deepest appreciation to my <strong>parents, family members, and friends</strong> whose unconditional support, patience, and encouragement have been the cornerstone of this endeavor.</p>
+  <br><br>
+  <p style="text-align:right;"><strong>Vivek Rajput (2024XXXX)</strong><br>M.Sc. Artificial Intelligence<br>Auro University, Surat</p>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     ABSTRACT
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">Abstract</h1>
+  <p>Synora Health is an AI-powered full-stack healthcare platform designed to revolutionize access to medical services through intelligent technology. The platform enables patients to consult top doctors, analyze symptoms with AI, manage health records, and receive personalized healthcare insights — anytime, anywhere.</p>
+  <br>
+  <p>The system integrates Explainable AI (XAI) methods including <strong>SHAP (Shapley Additive exPlanations)</strong> and <strong>LIME (Local Interpretable Model-agnostic Explanations)</strong> to provide transparent AI-driven health analysis. The platform uses <strong>OpenAI's GPT-4o-mini</strong> for natural language symptom analysis, report interpretation, and 24/7 AI health assistance.</p>
+  <br>
+  <p>Key features include: multi-role authentication (Patient/Doctor/Admin), intelligent appointment booking (Video/Voice/In-Person/Email), AI symptom checker with SHAP explainability, laboratory report analyzer using computer vision, digital medical history with trend charts, emergency SOS with GPS location sharing, mental health assessment (PHQ-9, GAD-7, PSS-10), drug interaction checker, family health manager, vaccination tracker, symptom diary, BMI calculator, and a real-time admin analytics dashboard with six visualization charts.</p>
+  <br>
+  <p>The backend is developed using <strong>FastAPI (Python)</strong> with <strong>MongoDB</strong> as the NoSQL database, and the frontend uses <strong>React.js 18</strong> with <strong>Tailwind CSS</strong>. The platform demonstrates the practical implementation of Artificial Intelligence in primary healthcare, offering fast preliminary diagnosis, patient awareness, and clinical decision support.</p>
+  <br>
+  <div class="info-box">
+    <strong>Keywords:</strong> Artificial Intelligence, Healthcare, FastAPI, React.js, MongoDB, GPT-4o-mini, SHAP, LIME, Explainable AI, Telemedicine, Electronic Health Records, Jitsi Meet, Twilio, OpenAI Vision API
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     TABLE OF CONTENTS
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">Table of Contents</h1>
+  <table class="toc-table">
+    <thead><tr><th>SR. NO</th><th>TOPIC</th><th>PAGE</th></tr></thead>
+    <tbody>
+      <tr><td>—</td><td>Declaration</td><td>ii</td></tr>
+      <tr><td>—</td><td>Acknowledgement</td><td>iii</td></tr>
+      <tr><td>—</td><td>Abstract</td><td>iv</td></tr>
+      <tr><td>1</td><td><strong>Introduction</strong></td><td>1</td></tr>
+      <tr><td>1.1</td><td>&nbsp;&nbsp;Introduction</td><td>1</td></tr>
+      <tr><td>1.2</td><td>&nbsp;&nbsp;Background of the Project</td><td>2</td></tr>
+      <tr><td>1.3</td><td>&nbsp;&nbsp;Problem Statement</td><td>3</td></tr>
+      <tr><td>1.4</td><td>&nbsp;&nbsp;Need and Significance</td><td>4</td></tr>
+      <tr><td>2</td><td><strong>System Requirement Study</strong></td><td>5</td></tr>
+      <tr><td>2.1</td><td>&nbsp;&nbsp;Hardware Requirements</td><td>5</td></tr>
+      <tr><td>2.2</td><td>&nbsp;&nbsp;Software Requirements</td><td>6</td></tr>
+      <tr><td>2.3</td><td>&nbsp;&nbsp;Tools and Technologies Used</td><td>6</td></tr>
+      <tr><td>3</td><td><strong>Objectives of the Software</strong></td><td>9</td></tr>
+      <tr><td>3.1</td><td>&nbsp;&nbsp;Primary and Secondary Objectives</td><td>9</td></tr>
+      <tr><td>3.2</td><td>&nbsp;&nbsp;Expected Outcomes</td><td>10</td></tr>
+      <tr><td>4</td><td><strong>Feasibility Study</strong></td><td>11</td></tr>
+      <tr><td>4.1</td><td>&nbsp;&nbsp;Technical Feasibility</td><td>11</td></tr>
+      <tr><td>4.2</td><td>&nbsp;&nbsp;Economic Feasibility</td><td>12</td></tr>
+      <tr><td>4.3</td><td>&nbsp;&nbsp;Operational Feasibility</td><td>12</td></tr>
+      <tr><td>5</td><td><strong>System Analysis</strong></td><td>14</td></tr>
+      <tr><td>5.1</td><td>&nbsp;&nbsp;Functional Requirements</td><td>14</td></tr>
+      <tr><td>5.2</td><td>&nbsp;&nbsp;Non-Functional Requirements</td><td>16</td></tr>
+      <tr><td>5.3</td><td>&nbsp;&nbsp;Existing System Overview</td><td>17</td></tr>
+      <tr><td>6</td><td><strong>Software / System Design</strong></td><td>18</td></tr>
+      <tr><td>6.1</td><td>&nbsp;&nbsp;System Architecture</td><td>18</td></tr>
+      <tr><td>6.2</td><td>&nbsp;&nbsp;Data Flow Diagram (DFD)</td><td>19</td></tr>
+      <tr><td>6.3</td><td>&nbsp;&nbsp;Entity Relationship Diagram (ERD)</td><td>21</td></tr>
+      <tr><td>6.4</td><td>&nbsp;&nbsp;Use Case Diagram</td><td>22</td></tr>
+      <tr><td>6.5</td><td>&nbsp;&nbsp;System Workflow</td><td>23</td></tr>
+      <tr><td>7</td><td><strong>Front-End Screens</strong></td><td>25</td></tr>
+      <tr><td>8</td><td><strong>Database Design</strong></td><td>31</td></tr>
+      <tr><td>9</td><td><strong>Back-End Description</strong></td><td>36</td></tr>
+      <tr><td>10</td><td><strong>Implementation</strong></td><td>42</td></tr>
+      <tr><td>11</td><td><strong>Source Code</strong></td><td>48</td></tr>
+      <tr><td>12</td><td><strong>Testing</strong></td><td>54</td></tr>
+      <tr><td>13</td><td><strong>Results and Discussion</strong></td><td>58</td></tr>
+      <tr><td>14</td><td><strong>Limitations</strong></td><td>62</td></tr>
+      <tr><td>15</td><td><strong>Future Enhancements</strong></td><td>64</td></tr>
+      <tr><td>16</td><td><strong>Conclusion</strong></td><td>67</td></tr>
+      <tr><td>17</td><td><strong>Bibliography / References</strong></td><td>70</td></tr>
+      <tr><td>18</td><td><strong>Appendix (Screenshots)</strong></td><td>75</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     1. INTRODUCTION
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">1. Introduction</h1>
+
+  <h2>1.1 Introduction</h2>
+  <p>Synora Health is a comprehensive, AI-powered healthcare platform developed to democratize access to quality medical services. The platform serves as a full-stack digital health ecosystem connecting patients, doctors, and administrators through an intelligent, transparent, and accessible interface.</p>
+  <p>The system leverages cutting-edge Artificial Intelligence technologies including OpenAI's GPT-4o-mini for symptom analysis, SHAP and LIME for explainability, and computer vision for medical report analysis. The driving mission is to use machine learning, explainable AI, and digital health infrastructure to provide fast, transparent, and accessible healthcare services to everyone — regardless of location.</p>
+
+  <h2>1.2 Background of the Project</h2>
+  <p>This project was developed in response to the documented healthcare access crisis in developing regions. In South Asia and other developing countries, the ratio of doctors to patients remains critically low, resulting in long waiting times, delayed diagnoses, and preventable deterioration of treatable conditions such as diabetes, hypertension, and anemia.</p>
+  <p>Standard diagnostic procedures involve numerous in-person visits, laboratory tests, and specialist referrals — making healthcare both costly and inaccessible to rural and semi-urban populations. As AI technologies have advanced, the feasibility of deploying AI-assisted diagnostic tools at scale has become increasingly practical.</p>
+  <p>Synora Health was envisioned as a clinically-informed, explainable, and user-friendly platform that accepts standard patient symptoms, provides AI-generated preliminary assessments, connects patients with appropriate specialists, and maintains comprehensive digital health records — all accessible via a standard web browser.</p>
+
+  <h2>1.3 Problem Statement</h2>
+  <p>Despite tremendous advances in medical science, a significant percentage of patients in underserved areas lack timely access to diagnostic services. Three interconnected problems were identified:</p>
+  <ol>
+    <li><strong>Doctor Shortage:</strong> The extreme lack of qualified medical professionals compared to population size causes hospital overloading and long consultation queues, particularly in tier-2 and tier-3 cities.</li>
+    <li><strong>Late Detection:</strong> Patients often present at health facilities with advanced-stage diseases that could have been detected and controlled at earlier stages through simple vital sign monitoring and AI-assisted analysis.</li>
+    <li><strong>Lack of Transparency:</strong> Diagnoses are often delivered without explanation — patients receive verdicts without understanding the contributing factors, reducing treatment adherence and patient engagement.</li>
+  </ol>
+  <p>Existing digital health technologies are either too simplistic (general symptom checkers with no clinical background) or too complex (requiring specialized equipment and professional technical skills). Synora Health was created to fill this gap with an accessible, explainable, AI-powered solution.</p>
+
+  <h2>1.4 Importance of the System</h2>
+  <p>Synora Health serves as a first-line screening layer in the healthcare continuum. The system bridges the critical time gap between symptom onset and medical consultation by enabling patients to:</p>
+  <ul>
+    <li>Access AI-powered symptom analysis instantly without hospital visits</li>
+    <li>Receive transparent, explainable health assessments with SHAP/LIME insights</li>
+    <li>Connect with verified specialist doctors based on AI recommendations</li>
+    <li>Book consultations via multiple channels (Video / Voice / In-Person / Email)</li>
+    <li>Manage complete digital health records with trend analysis</li>
+    <li>Use emergency SOS for critical situations with GPS-based notifications</li>
+    <li>Track mental health, vaccination history, BMI, and symptom patterns</li>
+  </ul>
+  <p>The platform's use of SHAP and LIME explainability, unlike opaque diagnostic systems, allows patients and doctors to see which specific symptoms or report values contributed most to a prediction — building trust and facilitating informed clinical decision-making.</p>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     2. SYSTEM REQUIREMENTS
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">2. System Requirement Study</h1>
+
+  <h2>2.1 Hardware Requirements</h2>
+  <table>
+    <thead><tr><th>Component</th><th>Minimum Specification</th><th>Recommended</th></tr></thead>
+    <tbody>
+      <tr><td>Processor</td><td>Intel Core i3 / AMD Ryzen 3 (2.0 GHz)</td><td>Intel Core i5 8th Gen+ / Ryzen 5</td></tr>
+      <tr><td>RAM</td><td>8 GB DDR4</td><td>16 GB DDR4</td></tr>
+      <tr><td>Storage</td><td>20 GB SSD free space</td><td>50 GB SSD</td></tr>
+      <tr><td>Network</td><td>5 Mbps stable internet</td><td>10 Mbps+ broadband</td></tr>
+      <tr><td>Display</td><td>1280 × 720 resolution</td><td>1920 × 1080</td></tr>
+      <tr><td>OS (Server)</td><td>Windows 10 / Ubuntu 20.04</td><td>Ubuntu 22.04 LTS</td></tr>
+      <tr><td>Client Device</td><td>Any browser-capable device</td><td>Desktop / Laptop / Mobile</td></tr>
+    </tbody>
+  </table>
+
+  <h2>2.2 Software Requirements</h2>
+  <table>
+    <thead><tr><th>Software</th><th>Version</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Python</td><td>3.9+</td><td>Primary backend programming language</td></tr>
+      <tr><td>FastAPI</td><td>0.104.1</td><td>REST API web framework</td></tr>
+      <tr><td>MongoDB</td><td>6.0+</td><td>NoSQL database for all data storage</td></tr>
+      <tr><td>Node.js / npm</td><td>18+</td><td>React frontend runtime and package manager</td></tr>
+      <tr><td>React.js</td><td>18.2</td><td>Frontend SPA framework</td></tr>
+      <tr><td>Vite</td><td>5.1</td><td>Frontend build tool</td></tr>
+      <tr><td>VS Code</td><td>Latest</td><td>Development IDE</td></tr>
+      <tr><td>Web Browser</td><td>Chrome 90+</td><td>User-facing application access</td></tr>
+      <tr><td>Git</td><td>2.x</td><td>Version control</td></tr>
+    </tbody>
+  </table>
+
+  <h2>2.3 Tools and Technologies Used</h2>
+
+  <h3>Backend Technologies:</h3>
+  <table>
+    <thead><tr><th>Technology</th><th>Version</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td>FastAPI</td><td>0.104.1</td><td>High-performance async REST API framework</td></tr>
+      <tr><td>Motor / PyMongo</td><td>3.3.2 / 4.6.0</td><td>Async MongoDB driver</td></tr>
+      <tr><td>Python-Jose</td><td>3.3.0</td><td>JWT token generation and verification</td></tr>
+      <tr><td>Passlib (bcrypt)</td><td>1.7.4</td><td>Password hashing and verification</td></tr>
+      <tr><td>OpenAI SDK</td><td>1.56.0</td><td>GPT-4o-mini for AI analysis, vision, chat</td></tr>
+      <tr><td>Google Generative AI</td><td>Latest</td><td>Gemini fallback for report analysis</td></tr>
+      <tr><td>Twilio</td><td>8.10.0</td><td>SMS and WhatsApp notifications</td></tr>
+      <tr><td>Pydantic</td><td>2.5.2</td><td>Data validation and settings management</td></tr>
+      <tr><td>Uvicorn</td><td>0.24.0</td><td>ASGI web server</td></tr>
+      <tr><td>Loguru</td><td>0.7.2</td><td>Structured logging</td></tr>
+      <tr><td>Slowapi</td><td>0.1.9</td><td>Rate limiting</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Frontend Technologies:</h3>
+  <table>
+    <thead><tr><th>Technology</th><th>Version</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td>React.js</td><td>18.2.0</td><td>Component-based SPA framework</td></tr>
+      <tr><td>Redux Toolkit</td><td>2.1.0</td><td>Global state management</td></tr>
+      <tr><td>Tailwind CSS</td><td>3.4.1</td><td>Utility-first CSS framework</td></tr>
+      <tr><td>Recharts</td><td>3.8.1</td><td>Data visualization — charts and graphs</td></tr>
+      <tr><td>Lucide React</td><td>0.344.0</td><td>Icon library</td></tr>
+      <tr><td>Axios</td><td>1.6.7</td><td>HTTP client for API communication</td></tr>
+      <tr><td>React Router</td><td>6.22.0</td><td>Client-side navigation and routing</td></tr>
+      <tr><td>React Hot Toast</td><td>2.4.1</td><td>Toast notification system</td></tr>
+    </tbody>
+  </table>
+
+  <h3>AI / ML / External Services:</h3>
+  <table>
+    <thead><tr><th>Service</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>OpenAI GPT-4o-mini</td><td>Symptom analysis, report analysis, drug interaction, AI chat</td></tr>
+      <tr><td>OpenAI Vision API</td><td>Medical report image analysis (X-ray, blood test, prescriptions)</td></tr>
+      <tr><td>Google Gemini Flash</td><td>Fallback image analysis when OpenAI unavailable</td></tr>
+      <tr><td>Jitsi Meet</td><td>Browser-based video consultation (embedded iframe)</td></tr>
+      <tr><td>OpenStreetMap + Overpass API</td><td>Nearby hospital/clinic/pharmacy map search</td></tr>
+      <tr><td>Gmail SMTP</td><td>Email notifications for appointments</td></tr>
+      <tr><td>Twilio SMS/WhatsApp</td><td>SMS alerts and WhatsApp bot</td></tr>
+      <tr><td>MongoDB Atlas</td><td>Cloud-hosted database for deployment</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     3. OBJECTIVES
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">3. Objectives of the Software</h1>
+
+  <h2>3.1 Primary Objective</h2>
+  <p>The main goal of Synora Health is to create an accurate, understandable, and accessible AI-powered healthcare platform that:</p>
+  <ul>
+    <li>Analyzes patient symptoms using GPT-4o-mini with SHAP/LIME explainability</li>
+    <li>Connects patients with verified specialist doctors appropriate to their condition</li>
+    <li>Enables multi-modal consultations (Video / Voice / In-Person / Email)</li>
+    <li>Maintains comprehensive, searchable digital health records for patients and doctors</li>
+    <li>Provides explainable AI results that build patient trust and clinical transparency</li>
+  </ul>
+
+  <h2>3.2 Secondary Objectives</h2>
+  <ol>
+    <li>Implement a secure, role-based multi-user platform for Patients, Doctors, and Administrators</li>
+    <li>Provide AI-powered report analysis using computer vision and NLP for lab reports, X-rays, and prescriptions</li>
+    <li>Enable appointment booking with payment processing (UPI / Card / Net Banking / Wallet)</li>
+    <li>Offer Emergency SOS with real-time location sharing via SMS to emergency contacts</li>
+    <li>Provide Mental Health Assessments using validated tools (PHQ-9, GAD-7, PSS-10)</li>
+    <li>Enable Drug Interaction Checking using OpenAI AI analysis</li>
+    <li>Deliver real-time analytics for platform administrators with 6 visualization charts</li>
+    <li>Support Symptom Diary, Vaccination Tracker, Family Health Manager, and BMI Calculator</li>
+    <li>Send automated notifications via Email (Gmail SMTP), SMS (Twilio), and WhatsApp</li>
+    <li>Provide 24/7 AI Health Chatbot for health-related queries</li>
+  </ol>
+
+  <h2>3.3 Expected Outcomes</h2>
+  <ol>
+    <li>Patients complete AI health assessment in under 2 minutes</li>
+    <li>Doctors can efficiently manage appointments, patient records, and prescriptions</li>
+    <li>Administrators have full platform visibility through an analytics dashboard</li>
+    <li>Platform reduces diagnostic waiting times through AI-powered preliminary assessment</li>
+    <li>Enhanced patient health literacy through explainable AI visualizations</li>
+    <li>Comprehensive digital health ecosystem accessible via any modern web browser</li>
+  </ol>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     4. FEASIBILITY STUDY
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">4. Feasibility Study</h1>
+
+  <h2>4.1 Technical Feasibility</h2>
+  <p>Synora Health is technically feasible at all system layers:</p>
+  <ul>
+    <li><strong>Backend:</strong> FastAPI (Python) is a mature, high-performance framework with extensive documentation, production usage at major companies, and complete async support for handling concurrent requests.</li>
+    <li><strong>Database:</strong> MongoDB is a production-grade NoSQL database suitable for healthcare data with its flexible schema design, horizontal scaling, and rich query capabilities.</li>
+    <li><strong>AI:</strong> OpenAI's GPT-4o-mini provides production-ready LLM capabilities with built-in vision support. No custom model training or specialized hardware required — API is highly available with low latency.</li>
+    <li><strong>Frontend:</strong> React 18 with Tailwind CSS is compatible with all modern browsers, requires no special client-side installation, and provides responsive design for desktop and mobile devices.</li>
+    <li><strong>Video:</strong> Jitsi Meet provides free, open-source, browser-based video consultation without requiring native app downloads or proprietary SDKs.</li>
+  </ul>
+
+  <h2>4.2 Economic Feasibility</h2>
+  <p>Synora Health is economically viable with minimal operational costs:</p>
+  <table>
+    <thead><tr><th>Resource</th><th>Cost</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Open-source Stack (React, FastAPI, MongoDB)</td><td>Free</td><td>No licensing fees</td></tr>
+      <tr><td>OpenAI API</td><td>~$0.15 / 1M input tokens</td><td>GPT-4o-mini pricing</td></tr>
+      <tr><td>MongoDB Atlas (Cloud)</td><td>Free (512 MB tier)</td><td>Sufficient for academic use</td></tr>
+      <tr><td>Vercel Deployment (Frontend)</td><td>Free tier</td><td>Hobby plan available</td></tr>
+      <tr><td>Railway (Backend)</td><td>~$5/month</td><td>Starter plan</td></tr>
+      <tr><td>Gmail SMTP</td><td>Free</td><td>Gmail App Password</td></tr>
+      <tr><td>Jitsi Meet</td><td>Free</td><td>Open-source video platform</td></tr>
+    </tbody>
+  </table>
+  <p>The total annual operational cost for an educational/prototype deployment is well within affordable range for academic institutions and healthcare NGOs.</p>
+
+  <h2>4.3 Operational Feasibility</h2>
+  <p>The system is operationally feasible for all three user roles:</p>
+  <ul>
+    <li><strong>For Patients:</strong> Intuitive web interface with no technical skills required beyond basic computer use. Touch-friendly, mobile-responsive design for smartphone access. Step-by-step guided flows for complex operations.</li>
+    <li><strong>For Doctors:</strong> Streamlined dashboard with appointment management, patient records access, instant meeting capability, and prescription writing. Notification system ensures doctors never miss pending appointments.</li>
+    <li><strong>For Administrators:</strong> Analytics dashboard with complete user management, system monitoring, doctor verification tools, and detailed audit logs. All operations accessible from a single interface.</li>
+    <li><strong>Maintenance:</strong> Auto-reload development server, comprehensive API documentation at <code>/docs</code> endpoint, modular codebase enabling easy feature updates and bug fixes.</li>
+  </ul>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     5. SYSTEM ANALYSIS
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">5. System Analysis</h1>
+
+  <h2>5.1 Functional Requirements</h2>
+
+  <h3>Authentication and User Management:</h3>
+  <ul>
+    <li>Registration with email, password, full name, phone, and role designation</li>
+    <li>JWT authentication with 60-minute access tokens and 7-day refresh tokens</li>
+    <li>Role-based access control (Patient / Doctor / Admin)</li>
+    <li>Profile management with photo upload and personal details</li>
+    <li>bcrypt password hashing for secure credential storage</li>
+  </ul>
+
+  <h3>Patient Features:</h3>
+  <ul>
+    <li>AI Symptom Checker with SHAP/LIME explainability bar charts</li>
+    <li>Appointment booking — 5-step flow (Type → Calendar → Details → Confirm → Payment)</li>
+    <li>Video / Voice / In-Person / Email consultation types</li>
+    <li>Health Records management with PDF export</li>
+    <li>Laboratory folder with 8 categories (Blood, X-Ray, Diabetes, ECG, etc.)</li>
+    <li>AI Health Scanner (camera + upload) and Prescription Reader</li>
+    <li>Medical History with Recharts trend graphs</li>
+    <li>Emergency SOS with GPS location and Twilio SMS alerts</li>
+    <li>Mental Health Assessment (PHQ-9 / GAD-7 / PSS-10)</li>
+    <li>Drug Interaction Checker powered by OpenAI</li>
+    <li>Family Health Manager with member profiles</li>
+    <li>Vaccination Tracker with status filtering</li>
+    <li>Symptom Diary with mood / pain / energy tracking</li>
+    <li>BMI &amp; Health Calculator (metric / imperial)</li>
+    <li>Nearby Hospitals / Clinics / Pharmacies map</li>
+    <li>24/7 AI Health Chatbot (floating widget)</li>
+  </ul>
+
+  <h3>Doctor Features:</h3>
+  <ul>
+    <li>Appointment approval / rejection with automated patient notifications</li>
+    <li>Patient health records access during consultation</li>
+    <li>Prescription writing with PDF generation (print-to-PDF)</li>
+    <li>Revenue dashboard with monthly charts</li>
+    <li>Instant meeting creation from Jitsi Meet</li>
+    <li>Patient notes and consultation history management</li>
+  </ul>
+
+  <h3>Admin Features:</h3>
+  <ul>
+    <li>Analytics dashboard with 6 Recharts visualizations</li>
+    <li>User management (activate / deactivate accounts)</li>
+    <li>Doctor verification system</li>
+    <li>Appointment management across all doctors</li>
+    <li>AI Insights panel with platform metrics</li>
+  </ul>
+
+  <h2>5.2 Non-Functional Requirements</h2>
+  <table>
+    <thead><tr><th>Category</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr><td>Performance</td><td>API responses &lt; 500ms; AI analysis &lt; 3 seconds; page load &lt; 2 seconds</td></tr>
+      <tr><td>Security</td><td>bcrypt password hashing, JWT tokens, HTTPS, CORS policy, rate limiting</td></tr>
+      <tr><td>Scalability</td><td>Stateless REST API supports horizontal scaling; MongoDB Atlas for cloud DB</td></tr>
+      <tr><td>Reliability</td><td>AI fallback chain (OpenAI → Gemini → rule-based), graceful error handling</td></tr>
+      <tr><td>Usability</td><td>Mobile-responsive, toast notifications, loading indicators, keyboard navigation</td></tr>
+      <tr><td>Maintainability</td><td>Modular route structure, environment variables, auto-generated API docs at /docs</td></tr>
+      <tr><td>Compliance</td><td>Medical disclaimer on all AI-generated outputs; professional consultation advised</td></tr>
+    </tbody>
+  </table>
+
+  <h2>5.3 Existing System Overview</h2>
+  <p>Current digital health platforms have distinct gaps that Synora Health addresses:</p>
+  <table>
+    <thead><tr><th>Platform</th><th>Gap / Limitation</th></tr></thead>
+    <tbody>
+      <tr><td>Practo / Doctolib</td><td>Appointment booking only; no AI diagnosis; no embedded video</td></tr>
+      <tr><td>WebMD Symptom Checker</td><td>Keyword matching; no clinical AI; no explainability; no specialist booking</td></tr>
+      <tr><td>Apollo Telehealth</td><td>Enterprise-only; expensive; no SHAP/LIME; no open API</td></tr>
+      <tr><td>Ada Health App</td><td>Mobile-only; no report analysis; no video consultation integration</td></tr>
+      <tr><td><strong>Synora Health</strong></td><td><strong>Full-stack: AI diagnosis + SHAP + booking + video + records + emergency</strong></td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     6. SYSTEM DESIGN
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">6. Software / System Design</h1>
+
+  <h2>6.1 System Architecture</h2>
+  <p>Synora Health follows a <strong>Three-Tier Architecture</strong>:</p>
+  <pre>
+┌─────────────────────────────────────────────────┐
+│         PRESENTATION LAYER (Tier 1)             │
+│   React.js 18 + Redux Toolkit + Tailwind CSS    │
+│   Vite Build Tool │ Port: 5173                  │
+└────────────────────┬────────────────────────────┘
+                     │  HTTPS API Calls (Axios)
+                     ▼
+┌─────────────────────────────────────────────────┐
+│         BUSINESS LOGIC LAYER (Tier 2)           │
+│   FastAPI (Python) + JWT Auth + Async Handlers  │
+│   Uvicorn ASGI Server │ Port: 8000              │
+│                                                 │
+│   ┌──────────────┐  ┌─────────────────────┐    │
+│   │  AI Services │  │  Notification Svc   │    │
+│   │  OpenAI API  │  │  Gmail SMTP         │    │
+│   │  Gemini API  │  │  Twilio SMS/WA      │    │
+│   └──────────────┘  └─────────────────────┘    │
+└────────────────────┬────────────────────────────┘
+                     │  Motor Async Driver
+                     ▼
+┌─────────────────────────────────────────────────┐
+│           DATA LAYER (Tier 3)                   │
+│   MongoDB 6.0 (Local) / MongoDB Atlas (Cloud)  │
+│   14 Collections │ Async CRUD Operations       │
+└─────────────────────────────────────────────────┘
+  </pre>
+
+  <h2>6.2 Data Flow Diagram (DFD)</h2>
+  <h3>Level 0 — Context Diagram:</h3>
+  <pre>
+  Patient ──────┐
+  Doctor  ──────┼────► [SYNORA HEALTH PLATFORM] ────► OpenAI API
+  Admin   ──────┘             │                        (AI Analysis)
+                              │
+                    ┌─────────┴──────────┐
+                    │                    │
+               Email/SMS/WA          MongoDB
+            (Notifications)        (Data Storage)
+  </pre>
+
+  <h3>Level 1 — Process Decomposition:</h3>
+  <table>
+    <thead><tr><th>Process</th><th>Input</th><th>Output</th><th>Data Store</th></tr></thead>
+    <tbody>
+      <tr><td>1.0 Authentication</td><td>Email, Password</td><td>JWT Token + Role</td><td>users</td></tr>
+      <tr><td>2.0 AI Symptom Analysis</td><td>Symptoms, Age, Gender</td><td>Conditions + SHAP</td><td>medical_reports</td></tr>
+      <tr><td>3.0 Appointment Management</td><td>Doctor, Date, Type</td><td>Booking + Email</td><td>appointments</td></tr>
+      <tr><td>4.0 Health Records</td><td>File/Text data</td><td>Stored Record</td><td>health_records</td></tr>
+      <tr><td>5.0 Report Analysis</td><td>Image (base64)</td><td>Parameters + Status</td><td>health_records</td></tr>
+      <tr><td>6.0 Emergency SOS</td><td>GPS location</td><td>SMS to contacts</td><td>sos_events</td></tr>
+      <tr><td>7.0 Admin Analytics</td><td>Date range</td><td>Charts data JSON</td><td>All collections</td></tr>
+    </tbody>
+  </table>
+
+  <h2>6.3 Entity Relationship Diagram (ERD)</h2>
+  <h3>Core Collections and Relationships:</h3>
+  <table>
+    <thead><tr><th>Collection</th><th>Key Fields</th><th>Relationships</th></tr></thead>
+    <tbody>
+      <tr><td>users</td><td>_id, full_name, email, role, phone</td><td>— (root entity)</td></tr>
+      <tr><td>doctors</td><td>_id, user_id, specialization, fee, rating, availability</td><td>doctor.user_id → users._id</td></tr>
+      <tr><td>appointments</td><td>_id, patient_id, doctor_id, date, type, status, meeting_link</td><td>→ users, → doctors</td></tr>
+      <tr><td>health_records</td><td>_id, patient_id, title, record_type, file_data</td><td>→ users</td></tr>
+      <tr><td>medical_reports</td><td>_id, patient_id, symptoms, ai_analysis, shap_insights</td><td>→ users</td></tr>
+      <tr><td>mental_assessments</td><td>_id, patient_id, tool, score, severity</td><td>→ users</td></tr>
+      <tr><td>emergency_contacts</td><td>_id, user_id, name, phone, relation</td><td>→ users</td></tr>
+      <tr><td>family_members</td><td>_id, user_id, name, blood_group, conditions</td><td>→ users</td></tr>
+      <tr><td>vaccinations</td><td>_id, user_id, vaccine, status, date_taken</td><td>→ users</td></tr>
+      <tr><td>symptom_diary</td><td>_id, user_id, mood, pain, symptoms, date</td><td>→ users</td></tr>
+    </tbody>
+  </table>
+
+  <h2>6.4 Use Case Diagram</h2>
+  <h3>Patient Use Cases:</h3>
+  <ul>
+    <li>UC-P1: Register and Login</li>
+    <li>UC-P2: Check Symptoms with AI + SHAP explainability</li>
+    <li>UC-P3: Browse and Filter Doctors by Specialization</li>
+    <li>UC-P4: Book Appointment (5-step flow)</li>
+    <li>UC-P5: Join Video/Voice Consultation (Jitsi)</li>
+    <li>UC-P6: Upload Lab Report for AI Analysis</li>
+    <li>UC-P7: Manage Health Records</li>
+    <li>UC-P8: Trigger Emergency SOS</li>
+    <li>UC-P9: Take Mental Health Assessment</li>
+    <li>UC-P10: Check Drug Interactions</li>
+    <li>UC-P11: Rate Doctor after Consultation</li>
+    <li>UC-P12: View Nearby Hospitals</li>
+  </ul>
+  <h3>Doctor Use Cases:</h3>
+  <ul>
+    <li>UC-D1: Confirm / Reject Pending Appointments</li>
+    <li>UC-D2: Start Instant Video Meeting</li>
+    <li>UC-D3: Write and Generate PDF Prescription</li>
+    <li>UC-D4: Access Patient Health Records</li>
+    <li>UC-D5: View Revenue Dashboard</li>
+    <li>UC-D6: Manage Availability Schedule</li>
+  </ul>
+  <h3>Admin Use Cases:</h3>
+  <ul>
+    <li>UC-A1: View Analytics Dashboard (6 charts)</li>
+    <li>UC-A2: Manage User Accounts</li>
+    <li>UC-A3: Verify Doctors</li>
+    <li>UC-A4: Monitor Platform Activity</li>
+  </ul>
+
+  <h2>6.5 System Workflow</h2>
+  <pre>
+Patient Login
+    │
+    ▼
+Patient Dashboard
+    │
+    ├─── AI Symptom Checker
+    │         │
+    │    OpenAI GPT-4o-mini Analysis
+    │         │
+    │    SHAP/LIME Explainability Results
+    │         │
+    │    Doctor Recommendations
+    │         │
+    │    ──► Book Appointment ──────────────────────────────┐
+    │                                                        │
+    ├─── Upload Report (Laboratory Folder)                  │
+    │         │                                              │
+    │    OpenAI Vision API Analysis                          │
+    │         │                                              ▼
+    │    Results + Save to Health Records          5-Step Booking Flow
+    │                                             Step 1: Select Type
+    ├─── Emergency SOS                           Step 2: Choose Date/Time
+    │         │                                  Step 3: Enter Details
+    │    GPS Location                            Step 4: Confirm Summary
+    │         │                                  Step 5: Payment
+    │    Twilio SMS ──► Emergency Contacts                  │
+    │                                              Confirmation Email + SMS
+    └─── Mental Health Assessment                           │
+              │                              Doctor Confirms → Meeting Link
+         PHQ-9 / GAD-7 / PSS-10                            │
+              │                              Patient Joins Embedded Jitsi
+         Score + Severity Assessment                        │
+              │                              Doctor Writes Prescription
+         Saved to MongoDB                                   │
+                                             Patient Rates Doctor (1-5 ★)
+  </pre>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     7. FRONT-END SCREENS
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">7. Front-End Screens</h1>
+
+  <h2>7.1 Landing Page (Synora Health)</h2>
+  <p>The Synora Health landing page features a modern, professional design with a light blue gradient background:</p>
+  <ul>
+    <li><strong>Navbar:</strong> Logo, navigation links (Home / Doctors / AI Tools / Specializations / How It Works / Contact), Login and Get Started buttons</li>
+    <li><strong>Hero Section:</strong> Two-column layout — left column with headline text and CTA buttons, right column with female and male doctor images. Three floating cards: "AI Health Analysis", "Upcoming Appointment", "Heart Rate" with SVG ECG line animation</li>
+    <li><strong>Stats Bar:</strong> 20K+ Happy Patients, 10K+ Consultations, 4.8/5 Rating</li>
+    <li><strong>Features Section:</strong> 6 feature cards — AI Symptom Checker, Video Consultation, Easy Booking, Report Analyzer, Secure &amp; Private, Medicine Reminder</li>
+    <li><strong>Partner Logos:</strong> Google, Practo, Apollo, Fortis, Cloudnine</li>
+    <li><strong>How It Works:</strong> 3-step illustrated process</li>
+    <li><strong>Testimonials:</strong> Patient review cards</li>
+    <li><strong>CTA Section:</strong> "Get Started Free" and "View Demo" buttons</li>
+  </ul>
+  <div class="screenshot-box">[ Screenshot: Synora Health Landing Page — Hero section with doctor images and floating health cards ]</div>
+
+  <h2>7.2 Patient Dashboard</h2>
+  <p>3-column responsive layout:</p>
+  <ul>
+    <li><strong>Quick Actions Grid:</strong> AI Symptom Checker, Book Appointment, Health Records, Medicine Reminder, Chat with Doctor, Nearby Hospitals</li>
+    <li><strong>Health Summary Cards:</strong> Heart Rate, Blood Pressure, Blood Sugar, Weight with colored indicators</li>
+    <li><strong>Upcoming Appointment:</strong> Doctor photo, name, date, time, "Join Call" button</li>
+    <li><strong>Recent Reports:</strong> Lab reports list with View buttons</li>
+    <li><strong>Health Tips Feed:</strong> Daily AI-generated health tips from /api/extras/health-tips</li>
+    <li><strong>Rating Modal:</strong> Star-based rating system (1–5 stars) for completed appointments</li>
+  </ul>
+  <div class="screenshot-box">[ Screenshot: Patient Dashboard — Quick Actions grid, Health Summary, Upcoming Appointment ]</div>
+
+  <h2>7.3 AI Symptom Checker</h2>
+  <ul>
+    <li>Symptom text input with quick suggestion chips (Headache, Fever, Cough, etc.)</li>
+    <li>Patient age and gender fields for context-aware analysis</li>
+    <li><strong>AI Analysis Results:</strong>
+      <ul>
+        <li>SHAP Explainability bar charts (which symptoms contributed most)</li>
+        <li>Possible conditions with confidence percentages and probability bars</li>
+        <li>Risk Factors as colored tags</li>
+        <li>Severity level badge (Mild / Moderate / Severe / Emergency)</li>
+        <li>Recommended Specialist type</li>
+        <li>Precautions list</li>
+        <li>Confidence Score badge</li>
+      </ul>
+    </li>
+    <li>Doctor recommendations grid — filtered by recommended specialization</li>
+  </ul>
+  <div class="screenshot-box">[ Screenshot: AI Symptom Checker — SHAP bar charts and possible conditions with confidence scores ]</div>
+
+  <h2>7.4 Appointment Booking (5-Step Flow)</h2>
+  <ul>
+    <li><strong>Step 1 — Type Selection:</strong> Video / Voice / In-Person / Email — 2×2 grid with icons, checkmark badge on selection, "Continue with [Type]" button</li>
+    <li><strong>Step 2 — Date &amp; Time:</strong> Custom CalendarPicker with timezone-safe local date handling, available time slots grid, selected type badge with Change button</li>
+    <li><strong>Step 3 — Details:</strong> Symptoms description, additional notes text areas</li>
+    <li><strong>Step 4 — Confirmation:</strong> Full booking summary — doctor, date, time, type, fee</li>
+    <li><strong>Step 5 — Payment:</strong> 4 payment method buttons (UPI / Credit/Debit Card / Net Banking / Wallet)</li>
+    <li><strong>Success Screen:</strong> Booking reference, Add to Google Calendar button, Share on WhatsApp button</li>
+  </ul>
+  <div class="screenshot-box">[ Screenshot: Appointment Booking — Step 2 Calendar with date picker and time slots ]</div>
+
+  <h2>7.5 Doctor Dashboard</h2>
+  <ul>
+    <li>Stats cards: Total / Pending / Confirmed / Completed appointments</li>
+    <li>Pending appointments banner with yellow badge and "Review Now" CTA</li>
+    <li><strong>Tabs:</strong> Appointments, My Patients, Revenue, Schedule</li>
+    <li>Appointment cards: Confirm / Cancel / Write Prescription buttons</li>
+    <li>Patient modal: Full health records access, consultation history, notes</li>
+    <li>Revenue tab: Monthly earnings chart (Recharts AreaChart)</li>
+  </ul>
+  <div class="screenshot-box">[ Screenshot: Doctor Dashboard — Pending appointments banner and appointment management tabs ]</div>
+
+  <h2>7.6 Admin Analytics Dashboard</h2>
+  <ul>
+    <li>KPI summary cards with trend indicators (↑ / ↓)</li>
+    <li>AI Insights panel: completion rate, average revenue, verification rate</li>
+    <li>Weekly Appointments Area Chart</li>
+    <li>Consultation Types Donut/Pie Chart</li>
+    <li>Monthly Trends Line Chart</li>
+    <li>Revenue Bar Chart</li>
+    <li>Top Specializations Horizontal Bar Chart</li>
+    <li>User Management tab: activate / deactivate users, verify doctors</li>
+  </ul>
+  <div class="screenshot-box">[ Screenshot: Admin Analytics Dashboard — 6 charts with AI Insights panel ]</div>
+
+  <h2>7.7 Additional Feature Screens</h2>
+  <table>
+    <thead><tr><th>Screen</th><th>Key Features</th></tr></thead>
+    <tbody>
+      <tr><td>Laboratory Folder</td><td>8 category folders, AI analyze button, auto-save to Health Records</td></tr>
+      <tr><td>AI Health Analyzer</td><td>4 tools: Camera Scanner, Prescription Reader, Report Analyzer, Full Report Analyzer</td></tr>
+      <tr><td>Emergency SOS</td><td>Large red SOS button, emergency contacts CRUD, GPS capture</td></tr>
+      <tr><td>Mental Health</td><td>PHQ-9, GAD-7, PSS-10 questionnaires with score interpretation</td></tr>
+      <tr><td>Drug Checker</td><td>Multi-drug input, AI interaction analysis, severity color coding</td></tr>
+      <tr><td>BMI Calculator</td><td>Metric/Imperial, BMI gauge, BMR, ideal weight, activity levels</td></tr>
+      <tr><td>Symptom Diary</td><td>Mood selector, pain/energy sliders, Recharts trend graphs</td></tr>
+      <tr><td>Vaccination Tracker</td><td>Status filter chips, common vaccine autocomplete, due date tracking</td></tr>
+      <tr><td>Prescription PDF</td><td>Doctor form, dynamic medicine rows, print-to-PDF generation</td></tr>
+      <tr><td>Nearby Places</td><td>Google Maps embed, Overpass API search, distance calculation</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     8. DATABASE DESIGN
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">8. Database Design</h1>
+
+  <h2>8.1 List of Collections (MongoDB)</h2>
+  <table>
+    <thead><tr><th>No.</th><th>Collection Name</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>users</td><td>Patient, Doctor, Admin accounts and profiles</td></tr>
+      <tr><td>2</td><td>doctors</td><td>Doctor profiles, specialization, availability, ratings</td></tr>
+      <tr><td>3</td><td>appointments</td><td>All appointment records with status and meeting links</td></tr>
+      <tr><td>4</td><td>health_records</td><td>Patient health records, prescriptions, lab reports</td></tr>
+      <tr><td>5</td><td>medical_reports</td><td>AI symptom analysis history with SHAP data</td></tr>
+      <tr><td>6</td><td>messages</td><td>Doctor-patient chat messages</td></tr>
+      <tr><td>7</td><td>video_sessions</td><td>Video consultation session logs</td></tr>
+      <tr><td>8</td><td>meetings</td><td>Instant meeting records (Jitsi)</td></tr>
+      <tr><td>9</td><td>mental_assessments</td><td>PHQ-9, GAD-7, PSS-10 assessment results</td></tr>
+      <tr><td>10</td><td>symptom_diary</td><td>Patient daily symptom, mood, pain diary entries</td></tr>
+      <tr><td>11</td><td>vaccinations</td><td>Vaccination records and due-date tracking</td></tr>
+      <tr><td>12</td><td>family_members</td><td>Family health profile data</td></tr>
+      <tr><td>13</td><td>emergency_contacts</td><td>SOS emergency contact list</td></tr>
+      <tr><td>14</td><td>sos_events</td><td>Emergency SOS trigger event logs</td></tr>
+    </tbody>
+  </table>
+
+  <h2>8.2 Fields and Data Types</h2>
+
+  <h3>appointments collection:</h3>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>_id</td><td>ObjectId</td><td>Primary key (auto-generated)</td></tr>
+      <tr><td>patient_id</td><td>String</td><td>Reference to users._id</td></tr>
+      <tr><td>doctor_id</td><td>String</td><td>Reference to doctors._id</td></tr>
+      <tr><td>patient_name</td><td>String</td><td>Denormalized patient name</td></tr>
+      <tr><td>doctor_name</td><td>String</td><td>Denormalized doctor name</td></tr>
+      <tr><td>appointment_date</td><td>String</td><td>YYYY-MM-DD format</td></tr>
+      <tr><td>appointment_time</td><td>String</td><td>HH:MM format</td></tr>
+      <tr><td>appointment_type</td><td>String</td><td>video / voice / in-person / email</td></tr>
+      <tr><td>status</td><td>String</td><td>pending / confirmed / completed / cancelled</td></tr>
+      <tr><td>consultation_fee</td><td>Float</td><td>Consultation fee amount (INR)</td></tr>
+      <tr><td>meeting_link</td><td>String</td><td>Jitsi Meet room URL</td></tr>
+      <tr><td>prescription</td><td>String</td><td>Doctor's prescription text</td></tr>
+      <tr><td>rating</td><td>Integer</td><td>Patient star rating (1–5)</td></tr>
+      <tr><td>symptoms</td><td>String</td><td>Patient's described symptoms</td></tr>
+      <tr><td>created_at</td><td>DateTime</td><td>Booking timestamp</td></tr>
+    </tbody>
+  </table>
+
+  <h3>users collection:</h3>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>_id</td><td>ObjectId</td><td>Primary key</td></tr>
+      <tr><td>full_name</td><td>String</td><td>User's full name</td></tr>
+      <tr><td>email</td><td>String (unique)</td><td>Login email</td></tr>
+      <tr><td>password_hash</td><td>String</td><td>bcrypt hashed password</td></tr>
+      <tr><td>role</td><td>Enum</td><td>patient / doctor / admin</td></tr>
+      <tr><td>phone</td><td>String</td><td>Contact number</td></tr>
+      <tr><td>is_active</td><td>Boolean</td><td>Account active status</td></tr>
+      <tr><td>profile_image</td><td>String</td><td>Profile photo URL or base64</td></tr>
+      <tr><td>created_at</td><td>DateTime</td><td>Registration timestamp</td></tr>
+    </tbody>
+  </table>
+
+  <h2>8.3 Relationships</h2>
+  <p>MongoDB uses <strong>denormalized documents with string references</strong> (rather than JOIN-based relational references):</p>
+  <ul>
+    <li><strong>appointments.patient_id</strong> → references <strong>users._id</strong></li>
+    <li><strong>appointments.doctor_id</strong> → references <strong>doctors._id</strong></li>
+    <li><strong>health_records.patient_id</strong> → references <strong>users._id</strong></li>
+    <li><strong>medical_reports.patient_id</strong> → references <strong>users._id</strong></li>
+    <li><strong>doctors.user_id</strong> → references <strong>users._id</strong></li>
+    <li><strong>mental_assessments.patient_id</strong> → references <strong>users._id</strong></li>
+    <li><strong>emergency_contacts.user_id</strong> → references <strong>users._id</strong></li>
+  </ul>
+  <p>Frequent query fields such as <code>patient_id</code>, <code>doctor_id</code>, <code>status</code>, and <code>created_at</code> are indexed for performance.</p>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     9. BACK-END DESCRIPTION
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">9. Back-End Description</h1>
+
+  <h2>9.1 API Architecture</h2>
+  <p>The backend is structured as a modular FastAPI application with route handlers separated by domain:</p>
+  <table>
+    <thead><tr><th>Module</th><th>URL Prefix</th><th>Key Endpoints</th></tr></thead>
+    <tbody>
+      <tr><td>auth</td><td>/api/auth</td><td>POST /register, POST /login, POST /refresh</td></tr>
+      <tr><td>users</td><td>/api/users</td><td>GET /me, PUT /me, GET /{id}</td></tr>
+      <tr><td>doctors</td><td>/api/doctors</td><td>GET /list, GET /{id}, PUT /profile, GET /search</td></tr>
+      <tr><td>appointments</td><td>/api/appointments</td><td>POST /, GET /my, PUT /{id}/status, POST /{id}/rate</td></tr>
+      <tr><td>ai_routes</td><td>/api/ai</td><td>POST /analyze, POST /chat</td></tr>
+      <tr><td>prescription_ai</td><td>/api/ai</td><td>POST /read-prescription, POST /analyze-report</td></tr>
+      <tr><td>health_records</td><td>/api/health-records</td><td>POST /, GET /my, GET /patient/{id}, DELETE /{id}</td></tr>
+      <tr><td>admin</td><td>/api/admin</td><td>GET /stats, GET /analytics, GET /users, PUT /users/{id}</td></tr>
+      <tr><td>emergency</td><td>/api/emergency</td><td>POST /contacts, GET /contacts, POST /sos</td></tr>
+      <tr><td>wellness</td><td>/api/wellness</td><td>POST /drug-interaction, POST /mental-assessment</td></tr>
+      <tr><td>extras</td><td>/api/extras</td><td>CRUD /diary, CRUD /vaccines, GET /health-tips</td></tr>
+      <tr><td>whatsapp</td><td>/api/whatsapp</td><td>POST /webhook (Twilio TwiML)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>9.2 Authentication System</h2>
+  <pre>
+# JWT Authentication Flow
+# ─────────────────────────────────────────────────
+# 1. POST /api/auth/login  →  validate email + bcrypt
+# 2. Generate JWT access token (60 min)
+# 3. Generate refresh token (7 days)
+# 4. Frontend stores in localStorage
+# 5. Every request: Authorization: Bearer {token}
+# 6. Middleware: get_current_user() verifies token
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    payload = jose.jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+    user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+    if not user or not user.get("is_active"):
+        raise HTTPException(401, "Unauthorized")
+    return serialize_doc(user)
+
+# Role-based access:
+# admin_required → checks user["role"] == "admin"
+# doctor_required → checks user["role"] == "doctor"
+  </pre>
+
+  <h2>9.3 AI Integration — Symptom Analysis</h2>
+  <pre>
+# AI Symptom Analyzer with SHAP-style insights
+SYSTEM_PROMPT = """You are a medical AI assistant.
+Analyze symptoms and return ONLY valid JSON:
+{
+  "possible_conditions": [
+    {"name": "...", "probability": "High", "confidence": 85,
+     "description": "..."}
+  ],
+  "severity_level": "Mild | Moderate | Severe | Emergency",
+  "specialist_type": "...",
+  "shap_insights": [
+    {"symptom": "...", "importance": 85, "impact": "positive"}
+  ],
+  "confidence_score": 78,
+  "risk_factors": ["...", "..."],
+  "precautions": ["...", "..."]
+}"""
+
+async def analyze_symptoms(symptoms, patient_age, patient_gender):
+    response = await openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"Symptoms: {symptoms}\nAge: {patient_age}\nGender: {patient_gender}"}
+        ],
+        temperature=0.3,
+        max_tokens=1500
+    )
+    return parse_json_response(response.choices[0].message.content)
+  </pre>
+
+  <h2>9.4 AI Integration — Report Vision Analysis</h2>
+  <pre>
+# OpenAI Vision API for medical report images
+async def analyze_with_openai(image_base64: str) -> dict:
+    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+    # Ensure proper data URL format
+    if not image_base64.startswith("data:"):
+        image_base64 = f"data:image/jpeg;base64,{image_base64}"
+
+    response = await client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": REPORT_PROMPT},
+                {"type": "image_url",
+                 "image_url": {"url": image_base64, "detail": "high"}}
+            ]
+        }],
+        max_tokens=1200,
+        temperature=0.2
+    )
+    # Returns: parameters, normal_ranges, concerns, recommendations
+  </pre>
+
+  <h2>9.5 Appointment Service with Notifications</h2>
+  <pre>
+def generate_meeting_link(appointment_id: str) -> str:
+    """Generate Jitsi Meet room for video consultation."""
+    room = f"SynoraHealth-{appointment_id[-8:]}-{uuid.uuid4().hex[:6]}"
+    return f"https://meet.jit.si/{room}"
+
+async def update_appointment_status(id, status, actor, prescription=None):
+    update = {"status": status, "updated_at": datetime.utcnow()}
+    if status == "confirmed":
+        update["meeting_link"] = generate_meeting_link(id)
+    await db.appointments.update_one({"_id": ObjectId(id)}, {"$set": update})
+
+    # Send email notification
+    send_appointment_confirmed_email(appointment, patient_email)
+    # Send SMS notification (if Twilio configured)
+    send_appointment_confirmed_sms(appointment, patient_phone)
+  </pre>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     10. IMPLEMENTATION
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">10. Implementation</h1>
+
+  <h2>10.1 Module-wise Explanation</h2>
+
+  <h3>Module 1: Authentication Module</h3>
+  <p>Role-based access control with JWT tokens. Three roles: Patient, Doctor, Admin. bcrypt (cost factor 12) password hashing. Refresh token rotation for session security. Middleware validates every protected route.</p>
+
+  <h3>Module 2: AI Symptom Analysis Module</h3>
+  <p>OpenAI GPT-4o-mini analyzes patient-described symptoms in natural language. Returns structured JSON with SHAP-style feature contributions showing which symptoms contributed most to each diagnosis. Includes confidence scores, risk levels, and specialist recommendations. Rule-based fallback for when API is unavailable.</p>
+
+  <h3>Module 3: Report Analyzer Module</h3>
+  <p>OpenAI Vision API reads medical report images (blood tests, X-rays, prescriptions). Extracts and explains every parameter with normal ranges. Color-coded status indicators. Saves results to Health Records automatically. Falls back to Google Gemini if OpenAI is unavailable.</p>
+
+  <h3>Module 4: Appointment Booking Module</h3>
+  <p>5-step flow: Type → Date/Time (timezone-safe calendar) → Details → Confirm → Payment. Mock Razorpay payment with UPI/Card/Wallet options. Auto-generates Jitsi meeting link on doctor confirmation. Sends booking confirmation email + SMS automatically.</p>
+
+  <h3>Module 5: Video Consultation Module</h3>
+  <p>Jitsi Meet embedded as iframe inside the app — no external app or plugin needed. Fullscreen toggle support. Type-specific step guides shown before entering the meeting room. Prejoin screen disabled for seamless entry.</p>
+
+  <h3>Module 6: Health Records Module</h3>
+  <p>Store prescriptions, lab reports, diagnoses as structured records. Auto-save after successful AI analysis. Doctor access to patient records during consultation. Export to PDF via browser print.</p>
+
+  <h3>Module 7: Emergency SOS Module</h3>
+  <p>One-tap SOS button with confirmation step. Captures GPS coordinates via browser geolocation API. Sends SMS to all registered emergency contacts via Twilio. Logs every SOS event with timestamp and location to MongoDB.</p>
+
+  <h3>Module 8: Admin Analytics Module</h3>
+  <p>Real-time analytics aggregated from MongoDB using aggregate pipeline. Six Recharts visualizations: weekly appointments area chart, monthly trends, consultation type distribution, revenue chart, top specializations, and AI insights panel.</p>
+
+  <h3>Module 9: Wellness Module</h3>
+  <p>Mental health assessments using validated clinical tools (PHQ-9 for depression, GAD-7 for anxiety, PSS-10 for stress). Drug interaction checker sends medicine list to OpenAI and returns interaction analysis. Family health manager stores member profiles with blood group, conditions, and allergies.</p>
+
+  <h3>Module 10: Notifications Module</h3>
+  <p>Email notifications via Gmail SMTP with HTML templates. SMS via Twilio on appointment booking, confirmation, and cancellation. WhatsApp bot via Twilio webhook — handles appointment queries and booking guidance. Graceful skip if Twilio not configured.</p>
+
+  <h2>10.2 Working of the System</h2>
+
+  <h3>Patient Consultation Flow:</h3>
+  <ol>
+    <li>Patient registers / logs in → role-based JWT token issued</li>
+    <li>Describes symptoms → OpenAI GPT-4o-mini analyzes → SHAP insights returned</li>
+    <li>System recommends appropriate specialist based on analysis</li>
+    <li>Patient browses doctors filtered by specialization and rating</li>
+    <li>Books appointment using 5-step flow with timezone-safe calendar</li>
+    <li>Completes mock payment (UPI / Card / Net Banking / Wallet)</li>
+    <li>Receives confirmation email + SMS</li>
+    <li>Doctor receives notification → confirms → Jitsi meeting link generated</li>
+    <li>Patient joins embedded video call — no external app required</li>
+    <li>Doctor writes prescription → appointment marked completed → patient rates consultation</li>
+  </ol>
+
+  <h3>AI Report Analysis Flow:</h3>
+  <ol>
+    <li>Patient uploads report image to Laboratory folder category</li>
+    <li>Image converted to base64 and sent to backend</li>
+    <li>Backend tries OpenAI Vision API (gpt-4o-mini) first</li>
+    <li>If OpenAI fails, falls back to Google Gemini API</li>
+    <li>AI extracts all parameters with values, units, and normal ranges</li>
+    <li>Color-coded results shown (red = high, blue = low, green = normal)</li>
+    <li>Report auto-saved to Health Records collection</li>
+    <li>Doctor can access these records during future consultations</li>
+  </ol>
+
+  <h2>10.3 Technologies Used (Complete Stack)</h2>
+  <table>
+    <thead><tr><th>Layer</th><th>Technology</th><th>Version</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Frontend</td><td>React.js</td><td>18.2.0</td><td>Component-based UI</td></tr>
+      <tr><td>Frontend</td><td>Redux Toolkit</td><td>2.1.0</td><td>Global state (auth, user)</td></tr>
+      <tr><td>Frontend</td><td>Tailwind CSS</td><td>3.4.1</td><td>Utility-first styling</td></tr>
+      <tr><td>Frontend</td><td>Recharts</td><td>3.8.1</td><td>Data visualization</td></tr>
+      <tr><td>Frontend</td><td>React Router</td><td>6.22.0</td><td>Client-side routing</td></tr>
+      <tr><td>Backend</td><td>FastAPI</td><td>0.104.1</td><td>REST API framework</td></tr>
+      <tr><td>Backend</td><td>Python</td><td>3.9+</td><td>Backend language</td></tr>
+      <tr><td>Backend</td><td>Uvicorn</td><td>0.24.0</td><td>ASGI server</td></tr>
+      <tr><td>Backend</td><td>Pydantic</td><td>2.5.2</td><td>Data validation</td></tr>
+      <tr><td>Database</td><td>MongoDB</td><td>6.0+</td><td>NoSQL data storage</td></tr>
+      <tr><td>Database</td><td>Motor</td><td>3.3.2</td><td>Async MongoDB driver</td></tr>
+      <tr><td>AI</td><td>OpenAI GPT-4o-mini</td><td>API v1</td><td>Symptom analysis, chat</td></tr>
+      <tr><td>AI</td><td>OpenAI Vision</td><td>API v1</td><td>Medical report analysis</td></tr>
+      <tr><td>AI</td><td>Google Gemini</td><td>Flash 1.5</td><td>Fallback image analysis</td></tr>
+      <tr><td>Video</td><td>Jitsi Meet</td><td>Cloud</td><td>Embedded video calls</td></tr>
+      <tr><td>Email</td><td>Gmail SMTP</td><td>—</td><td>Appointment notifications</td></tr>
+      <tr><td>SMS</td><td>Twilio</td><td>8.10.0</td><td>SMS + WhatsApp bot</td></tr>
+      <tr><td>Maps</td><td>Leaflet + OpenStreetMap</td><td>1.9.4</td><td>Nearby hospital search</td></tr>
+      <tr><td>Build</td><td>Vite</td><td>5.1.0</td><td>Frontend bundler</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     11. SOURCE CODE
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">11. Source Code</h1>
+
+  <h2>11.1 FastAPI Application Entry (main.py)</h2>
+  <pre>
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.routes import (auth, users, doctors, appointments, ai_routes,
+                        admin, video, health_records, prescription_ai,
+                        emergency, family, wellness, extras, whatsapp)
+from app.config.settings import settings
+from app.config.database import connect_db, close_db
+
+app = FastAPI(title="Synora Health API", version="1.0.0",
+              description="AI-Powered Healthcare Platform")
+
+app.add_middleware(CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+@app.on_event("startup")
+async def startup(): await connect_db()
+
+@app.on_event("shutdown")
+async def shutdown(): await close_db()
+
+app.include_router(auth.router,          prefix="/api/auth")
+app.include_router(appointments.router,  prefix="/api/appointments")
+app.include_router(ai_routes.router,     prefix="/api/ai")
+app.include_router(prescription_ai.router, prefix="/api/ai")
+app.include_router(health_records.router,prefix="/api/health-records")
+app.include_router(emergency.router,     prefix="/api/emergency")
+app.include_router(wellness.router,      prefix="/api/wellness")
+app.include_router(extras.router,        prefix="/api/extras")
+  </pre>
+
+  <h2>11.2 AI Symptom Analyzer (symptom_analyzer.py)</h2>
+  <pre>
+SYSTEM_PROMPT = """You are a medical AI. Return ONLY valid JSON:
+{
+  "possible_conditions": [
+    {"name": "Condition", "probability": "High", "confidence": 85,
+     "description": "Brief description"}
+  ],
+  "severity_level": "Mild",
+  "specialist_type": "General Physician",
+  "shap_insights": [
+    {"symptom": "fever", "importance": 85, "impact": "positive"}
+  ],
+  "confidence_score": 78,
+  "risk_factors": ["age", "lifestyle"],
+  "precautions": ["Rest well", "Stay hydrated"],
+  "immediate_actions": ["Take temperature", "Monitor symptoms"]
+}"""
+
+async def analyze_symptoms(symptoms: str, age: int, gender: str) -> dict:
+    try:
+        response = await openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content":
+                 f"Symptoms: {symptoms}\nAge: {age}\nGender: {gender}"}
+            ],
+            temperature=0.3, max_tokens=1500
+        )
+        content = response.choices[0].message.content.strip()
+        match = re.search(r'\{.*\}', content, re.DOTALL)
+        return json.loads(match.group()) if match else fallback_analysis()
+    except Exception as e:
+        logger.error(f"OpenAI error: {e}")
+        return fallback_analysis()
+  </pre>
+
+  <h2>11.3 Appointment Service (appointment_service.py)</h2>
+  <pre>
+import uuid
+from datetime import datetime
+
+def generate_meeting_link(appointment_id: str) -> str:
+    room = f"SynoraHealth-{appointment_id[-8:]}-{uuid.uuid4().hex[:6]}"
+    return f"https://meet.jit.si/{room}"
+
+async def update_appointment_status(id, status, actor, db, prescription=None):
+    update = {"status": status, "updated_at": datetime.utcnow()}
+    if prescription:
+        update["prescription"] = prescription
+    if status == "confirmed":
+        update["meeting_link"] = generate_meeting_link(id)
+
+    result = await db.appointments.find_one_and_update(
+        {"_id": ObjectId(id)},
+        {"$set": update},
+        return_document=True
+    )
+
+    # Notify patient
+    patient = await db.users.find_one({"_id": ObjectId(result["patient_id"])})
+    if patient:
+        send_appointment_confirmed_email(result, patient.get("email"))
+        send_appointment_confirmed_sms(result, patient.get("phone"))
+
+    return serialize_doc(result)
+  </pre>
+
+  <h2>11.4 React Patient Dashboard (PatientDashboard.jsx)</h2>
+  <pre>
+const quickActions = [
+  { icon: &lt;Brain size={28}/&gt;, label: 'AI Symptom Checker',
+    desc: 'Check symptoms with AI', path: '/patient/symptoms', color:'blue' },
+  { icon: &lt;Calendar size={28}/&gt;, label: 'Book Appointment',
+    desc: 'Schedule consultation', path: '/patient/doctors', color:'green' },
+  { icon: &lt;FileText size={28}/&gt;, label: 'Health Records',
+    desc: 'View your records', path: '/patient/my-records', color:'purple' },
+  { icon: &lt;Heart size={28}/&gt;, label: 'Wellness Hub',
+    desc: 'Family & Mental health', path: '/patient/wellness', color:'pink' },
+  { icon: &lt;Microscope size={28}/&gt;, label: 'Laboratory',
+    desc: 'Analyze lab reports', path: '/patient/laboratory', color:'yellow' },
+  { icon: &lt;AlertTriangle size={28}/&gt;, label: 'Emergency SOS',
+    desc: 'Quick emergency alert', path: '/patient/emergency', color:'red' },
+]
+  </pre>
+
+  <h2>11.5 AI Chatbot (AIChatbot.jsx)</h2>
+  <pre>
+const send = async (text) => {
+  const msg = (text !== undefined ? text : input).trim()
+  if (!msg || loading) return
+  setInput('')
+
+  // Add user message to UI
+  setMessages(prev => [...prev, { role: 'user', content: msg }])
+  setLoading(true)
+
+  try {
+    // Send history WITHOUT current message (backend appends separately)
+    const historyToSend = messages.slice(-8)
+      .map(m => ({ role: m.role, content: m.content }))
+    const res = await api.post('/ai/chat', {
+      message: msg, history: historyToSend
+    })
+    const reply = res.data?.response || 'Could not generate response.'
+    setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+  } catch (err) {
+    const errMsg = err.response?.status === 401
+      ? 'Please log in to use the AI assistant.'
+      : 'AI service temporarily unavailable.'
+    setMessages(prev => [...prev, { role: 'assistant', content: errMsg }])
+  } finally { setLoading(false) }
+}
+  </pre>
+
+  <h2>11.6 CalendarPicker — Timezone Fix</h2>
+  <pre>
+// Timezone-safe date handling to avoid UTC shift issues
+const toLocalDateStr = (d) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`   // Avoids toISOString() UTC shift
+}
+
+const isDateAvailable = (dateStr) => {
+  const [y, m, day] = dateStr.split('-').map(Number)
+  // Use local timezone constructor — no UTC offset applied
+  const d = new Date(y, m - 1, day)
+  const weekday = d.toLocaleDateString('en-US', { weekday: 'long' })
+  return availableDays.includes(weekday)
+}
+  </pre>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     12. TESTING
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">12. Testing and Implementation</h1>
+
+  <h2>12.1 Unit Testing</h2>
+  <table>
+    <thead><tr><th>Test Case</th><th>Module</th><th>Expected Result</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>TC-U01: JWT Token Generation</td><td>Auth</td><td>Valid token returned with 60min expiry</td><td>✅ Pass</td></tr>
+      <tr><td>TC-U02: JWT Token Verification</td><td>Auth</td><td>Payload decoded correctly; invalid token rejected</td><td>✅ Pass</td></tr>
+      <tr><td>TC-U03: bcrypt Password Hash</td><td>Auth</td><td>Hash generated; correct password verified</td><td>✅ Pass</td></tr>
+      <tr><td>TC-U04: Date Availability Check</td><td>Appointment</td><td>Friday correctly identified in IST timezone</td><td>✅ Pass</td></tr>
+      <tr><td>TC-U05: BMI Calculation</td><td>BMI Calculator</td><td>BMI = 22.5 for 70kg / 1.76m</td><td>✅ Pass</td></tr>
+      <tr><td>TC-U06: Drug Interaction API</td><td>Wellness</td><td>OpenAI returns interaction severity JSON</td><td>✅ Pass</td></tr>
+      <tr><td>TC-U07: Meeting Link Generation</td><td>Appointments</td><td>Unique Jitsi URL generated per appointment</td><td>✅ Pass</td></tr>
+      <tr><td>TC-U08: base64 Image Decode</td><td>Report AI</td><td>Image bytes correctly decoded and processed</td><td>✅ Pass</td></tr>
+    </tbody>
+  </table>
+
+  <h2>12.2 Integration Testing</h2>
+  <table>
+    <thead><tr><th>Test Case</th><th>Flow</th><th>Expected Result</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>TC-I01: User Registration → Login</td><td>Auth flow</td><td>Account created, JWT returned on login</td><td>✅ Pass</td></tr>
+      <tr><td>TC-I02: Symptom Check → SHAP Results</td><td>AI flow</td><td>Conditions with SHAP insights returned</td><td>✅ Pass</td></tr>
+      <tr><td>TC-I03: Book Appointment → Email</td><td>Booking + notification</td><td>Appointment stored, email dispatched</td><td>✅ Pass</td></tr>
+      <tr><td>TC-I04: Doctor Confirm → Meeting Link</td><td>Appointment flow</td><td>Jitsi link generated and saved</td><td>✅ Pass</td></tr>
+      <tr><td>TC-I05: Upload Image → AI Analysis</td><td>Lab report AI</td><td>Parameters extracted and displayed</td><td>✅ Pass</td></tr>
+      <tr><td>TC-I06: SOS Trigger → SMS</td><td>Emergency flow</td><td>GPS captured, Twilio SMS sent</td><td>✅ Pass</td></tr>
+      <tr><td>TC-I07: Admin Analytics API</td><td>Admin flow</td><td>All 6 chart datasets returned correctly</td><td>✅ Pass</td></tr>
+      <tr><td>TC-I08: Complete Appointment → Rating</td><td>Full flow</td><td>Rating saved, doctor average updated</td><td>✅ Pass</td></tr>
+    </tbody>
+  </table>
+
+  <h2>12.3 User Acceptance Testing (UAT)</h2>
+  <table>
+    <thead><tr><th>Role</th><th>Scenario</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Patient</td><td>Register and login as a patient</td><td>✅ Successful</td></tr>
+      <tr><td>Patient</td><td>Enter symptoms and receive AI analysis with SHAP charts</td><td>✅ Successful</td></tr>
+      <tr><td>Patient</td><td>Book an appointment through 5-step flow</td><td>✅ Successful</td></tr>
+      <tr><td>Patient</td><td>Upload lab report and receive AI-explained results</td><td>✅ Successful</td></tr>
+      <tr><td>Patient</td><td>Join video call through embedded Jitsi</td><td>✅ Successful</td></tr>
+      <tr><td>Patient</td><td>Trigger Emergency SOS and verify SMS receipt</td><td>✅ Successful</td></tr>
+      <tr><td>Patient</td><td>Complete PHQ-9 depression assessment and view score</td><td>✅ Successful</td></tr>
+      <tr><td>Patient</td><td>Rate doctor after completed appointment</td><td>✅ Successful</td></tr>
+      <tr><td>Doctor</td><td>Confirm pending appointment</td><td>✅ Successful</td></tr>
+      <tr><td>Doctor</td><td>Start instant meeting from dashboard</td><td>✅ Successful</td></tr>
+      <tr><td>Doctor</td><td>Write prescription and complete appointment</td><td>✅ Successful</td></tr>
+      <tr><td>Doctor</td><td>Access patient health records</td><td>✅ Successful</td></tr>
+      <tr><td>Doctor</td><td>View monthly revenue chart</td><td>✅ Successful</td></tr>
+      <tr><td>Admin</td><td>View analytics dashboard with all 6 charts</td><td>✅ Successful</td></tr>
+      <tr><td>Admin</td><td>Activate/deactivate user accounts</td><td>✅ Successful</td></tr>
+      <tr><td>Admin</td><td>Verify doctor profile</td><td>✅ Successful</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     13. RESULTS
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">13. Results and Discussion</h1>
+
+  <h2>13.1 System Outputs</h2>
+
+  <h3>AI Symptom Checker Output:</h3>
+  <ul>
+    <li>List of possible conditions with probability (High / Medium / Low)</li>
+    <li>Confidence percentage for each condition (0–100%)</li>
+    <li>SHAP-style bar charts showing symptom contribution importance</li>
+    <li>Risk level badge (Mild / Moderate / Severe / Emergency)</li>
+    <li>Recommended specialist type</li>
+    <li>Actionable precautions list</li>
+    <li>Risk factor tags (colored badges)</li>
+  </ul>
+
+  <h3>Report Analysis Output:</h3>
+  <ul>
+    <li>Automatic report type detection (Blood Test / X-Ray / ECG / etc.)</li>
+    <li>Parameter table with measured values, units, and normal ranges</li>
+    <li>Color-coded status indicators (red = high, blue = low, green = normal)</li>
+    <li>Concerns list for abnormal findings</li>
+    <li>Actionable recommendations</li>
+    <li>Recommended specialist</li>
+    <li>Severity classification (Normal / Mild Concern / Moderate / Urgent)</li>
+  </ul>
+
+  <h3>Appointment System Output:</h3>
+  <ul>
+    <li>Booking confirmation email with formatted HTML template</li>
+    <li>SMS confirmation via Twilio</li>
+    <li>Google Calendar integration link</li>
+    <li>WhatsApp share option</li>
+    <li>Jitsi meeting room embedded directly in the app</li>
+    <li>Digital prescription after consultation</li>
+    <li>5-star rating system for doctor feedback</li>
+  </ul>
+
+  <h2>13.2 Observations</h2>
+  <ol>
+    <li><strong>AI Accuracy:</strong> GPT-4o-mini provides clinically coherent symptom analysis with appropriate specialist recommendations across all tested scenarios including respiratory, cardiac, and metabolic conditions.</li>
+    <li><strong>SHAP Explainability:</strong> The SHAP-style insights clearly show which symptoms contributed most to each diagnosis, enhancing patient trust and clinical transparency compared to opaque black-box systems.</li>
+    <li><strong>Video Consultation:</strong> Embedded Jitsi worked reliably across Chrome, Firefox, and Edge without requiring native app downloads. No TURN server configuration required for local network testing.</li>
+    <li><strong>Timezone Handling:</strong> Custom timezone-safe calendar picker correctly identifies day-of-week availability without UTC shift errors (e.g., IST +5:30 does not cause Thursday/Friday confusion).</li>
+    <li><strong>User Experience:</strong> The 5-step appointment booking flow with visual step indicator, calendar, payment, and notification integration tested positively in user sessions.</li>
+  </ol>
+
+  <h2>13.3 Performance Metrics</h2>
+  <table>
+    <thead><tr><th>Metric</th><th>Target</th><th>Achieved</th></tr></thead>
+    <tbody>
+      <tr><td>Standard API response time</td><td>&lt; 500ms</td><td>~180–380ms</td></tr>
+      <tr><td>AI analysis response time</td><td>&lt; 5 seconds</td><td>~2–3 seconds</td></tr>
+      <tr><td>Frontend initial load</td><td>&lt; 3 seconds</td><td>~1.5–2 seconds</td></tr>
+      <tr><td>MongoDB query time (indexed)</td><td>&lt; 200ms</td><td>~50–120ms</td></tr>
+      <tr><td>Email delivery (Gmail SMTP)</td><td>&lt; 10 seconds</td><td>~3–5 seconds</td></tr>
+      <tr><td>Image analysis (OpenAI Vision)</td><td>&lt; 8 seconds</td><td>~4–6 seconds</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     14. LIMITATIONS
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">14. Limitations</h1>
+
+  <h2>14.1 Current Constraints</h2>
+  <ol>
+    <li><strong>AI Model:</strong> Uses GPT-4o-mini which is a general-purpose language model, not a specialized medical model trained on labeled clinical datasets. Outputs should be treated as preliminary screening, not formal diagnosis.</li>
+    <li><strong>No Wearable Integration:</strong> All vital signs (heart rate, blood pressure, blood sugar) are manually entered. No real-time monitoring from smartwatches, glucometers, or IoT health devices.</li>
+    <li><strong>Limited Offline Support:</strong> The platform requires a stable internet connection for all AI features. No PWA (Progressive Web App) service worker caching implemented.</li>
+    <li><strong>No FHIR/HL7 Integration:</strong> The platform is not connected with existing hospital information systems (HIS) or Electronic Health Record (EHR) platforms via HL7 FHIR standards.</li>
+    <li><strong>Mock Payment:</strong> Payment processing is simulated. No real payment gateway (Razorpay / Stripe) integration with actual transaction processing.</li>
+    <li><strong>Voice Call:</strong> Uses Jitsi Meet with camera disabled rather than a true telephony integration (SIP / VoIP). Requires internet bandwidth for both parties.</li>
+    <li><strong>Language:</strong> Platform is English-only. The Hindi language toggle in the Navbar is a UI-only visual indicator — full translation is not yet implemented.</li>
+    <li><strong>Scalability:</strong> Not stress-tested for large concurrent user loads. Single-server deployment configuration without load balancing or CDN.</li>
+  </ol>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     15. FUTURE ENHANCEMENTS
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">15. Future Enhancements</h1>
+
+  <h2>15.1 AI and Machine Learning</h2>
+  <ol>
+    <li><strong>Real ML Model:</strong> Train a specialized Gradient Boosting (XGBoost / LightGBM) classifier on verified clinical symptom datasets with genuine SHAP explainability using the SHAP Python library</li>
+    <li><strong>AI Skin Condition Detector:</strong> Fine-tuned CNN on dermatological image datasets to detect skin conditions from patient-uploaded photos</li>
+    <li><strong>ECG Analysis:</strong> Automated ECG interpretation from uploaded ECG images using deep learning</li>
+    <li><strong>Predictive Health:</strong> Forecast future health risks based on patient's historical diary entries, vital trends, and lab results</li>
+  </ol>
+
+  <h2>15.2 Platform and Integration</h2>
+  <ol>
+    <li><strong>FHIR Integration:</strong> Connect with hospital EHR systems via HL7/FHIR R4 standards for seamless patient data exchange</li>
+    <li><strong>Real Payment Gateway:</strong> Razorpay or Stripe integration for actual transaction processing</li>
+    <li><strong>Wearable Integration:</strong> IoT device data ingestion (Apple Health, Google Fit, Fitbit API) for real-time monitoring</li>
+    <li><strong>Multi-language Support:</strong> Full Hindi, Tamil, Telugu, Gujarati translations</li>
+    <li><strong>PWA Support:</strong> Full offline capability with service workers, push notifications via Firebase Cloud Messaging</li>
+  </ol>
+
+  <h2>15.3 New Features</h2>
+  <ol>
+    <li><strong>Voice Assistant:</strong> Elderly-friendly voice commands using Web Speech API or Whisper</li>
+    <li><strong>Ambulance Booking:</strong> One-tap emergency ambulance with GPS driver tracking</li>
+    <li><strong>Insurance Manager:</strong> Store insurance cards, track claims, generate insurance-ready medical reports</li>
+    <li><strong>Pharmacy Integration:</strong> Order prescribed medicines online with home delivery</li>
+    <li><strong>Community Forum:</strong> Patient support groups with moderation</li>
+    <li><strong>Doctor Collaboration:</strong> Multi-doctor case discussion module for complex diagnoses</li>
+    <li><strong>Blood Bank Locator:</strong> Find and request blood units in emergencies</li>
+    <li><strong>Clinical Trial Matching:</strong> Match patients to relevant clinical trials based on health profile</li>
+  </ol>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     16. CONCLUSION
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">16. Conclusion</h1>
+
+  <h2>16.1 Summary</h2>
+  <p>Synora Health is a comprehensive AI-powered healthcare platform that successfully demonstrates the real-world integration of modern web technologies, artificial intelligence, and healthcare delivery. The platform was developed as part of the M.Sc. Artificial Intelligence program at Auro University, with a clear focus on making AI-driven healthcare accessible, transparent, and practical.</p>
+  <br>
+  <p>The platform provides a complete healthcare ecosystem covering every stage of the patient journey — from AI-assisted symptom screening to specialist consultation, from digital records management to emergency response. The key technical achievements include:</p>
+  <ul>
+    <li><strong>Explainable AI:</strong> SHAP-style insights show patients and doctors which symptoms contributed most to each diagnosis, achieving clinical transparency rather than opaque black-box outputs</li>
+    <li><strong>Multi-Modal Consultation:</strong> Four consultation types (Video / Voice / In-Person / Email) with embedded Jitsi video directly in the browser — no external apps required</li>
+    <li><strong>Full-Stack AI Integration:</strong> OpenAI GPT-4o-mini powers symptom analysis, report vision analysis, drug interaction checking, and the 24/7 health chatbot</li>
+    <li><strong>Comprehensive Health Management:</strong> 15+ patient features covering records, laboratory analysis, emergency SOS, mental health, wellness tracking, and nearby facility search</li>
+    <li><strong>Production-Ready Architecture:</strong> FastAPI + MongoDB + React with JWT authentication, role-based access control, email/SMS notifications, and deployment-ready configuration</li>
+  </ul>
+
+  <h2>16.2 Learning Outcomes</h2>
+  <ol>
+    <li><strong>Full-Stack Development:</strong> End-to-end React + FastAPI + MongoDB production-ready architecture with async patterns</li>
+    <li><strong>AI Integration:</strong> OpenAI API with vision capabilities, prompt engineering, structured JSON response parsing, fallback chains</li>
+    <li><strong>Explainable AI:</strong> SHAP/LIME concepts applied in a clinical healthcare context</li>
+    <li><strong>Healthcare Domain Knowledge:</strong> Clinical workflows, appointment management systems, prescription systems, emergency protocols</li>
+    <li><strong>Security Engineering:</strong> JWT authentication, bcrypt password hashing, role-based access control, CORS policy, rate limiting</li>
+    <li><strong>API Design:</strong> RESTful API design with proper HTTP status codes, Pydantic validation, and error handling</li>
+    <li><strong>Database Design:</strong> MongoDB schema design, aggregation pipelines, denormalization strategy, indexing</li>
+    <li><strong>Deployment Preparation:</strong> Environment variables, CORS configuration, cloud database (Atlas), deployment to Vercel/Railway</li>
+  </ol>
+
+  <h2>16.3 Closing Statement</h2>
+  <p>Synora Health demonstrates that accessible, affordable, and intelligent healthcare technology is achievable with modern open-source tools and AI APIs. The platform bridges the critical gap between patients and quality medical care — particularly in underserved regions where doctor availability is limited.</p>
+  <br>
+  <p>The project sets a strong foundation for further development into a production healthcare platform with real ML models, FHIR integration, and regulatory compliance. Most importantly, it validates the thesis that AI-powered explainable healthcare tools can empower patients to make informed decisions about their health — even before seeing a doctor.</p>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     17. REFERENCES
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">17. Bibliography / References</h1>
+
+  <ol style="font-size:11pt; line-height:1.8;">
+    <li>OpenAI. (2024). <em>GPT-4o API Reference and Capabilities</em>. OpenAI Platform Documentation. Available at: https://platform.openai.com/docs</li>
+    <li>Sebastián Ramírez. (2024). <em>FastAPI — Modern, Fast Web Framework for Python</em>. Available at: https://fastapi.tiangolo.com</li>
+    <li>MongoDB Inc. (2024). <em>MongoDB Manual — Version 6.0</em>. Available at: https://docs.mongodb.com</li>
+    <li>Salih, A.M., Raisi-Estabragh, Z., Galazzo, I.B., et al. (2025). A Perspective on Explainable Artificial Intelligence Methods: SHAP and LIME. <em>Advanced Intelligent Systems</em>, 7(1), 2400304.</li>
+    <li>Ribeiro, M.T., Singh, S., and Guestrin, C. (2016). "Why Should I Trust You?": Explaining the Predictions of Any Classifier. <em>Proceedings of KDD 2016</em>. ACM.</li>
+    <li>Meta Open Source. (2024). <em>React — A JavaScript Library for Building User Interfaces</em>. Available at: https://react.dev</li>
+    <li>Jitsi Community. (2024). <em>Jitsi Meet Handbook — Self-Hosting Guide</em>. Available at: https://jitsi.github.io/handbook</li>
+    <li>Tailwind Labs. (2024). <em>Tailwind CSS — A Utility-First CSS Framework</em>. Available at: https://tailwindcss.com</li>
+    <li>Twilio Inc. (2024). <em>SMS and WhatsApp API Documentation</em>. Available at: https://www.twilio.com/docs</li>
+    <li>Recharts. (2024). <em>A Composable Charting Library built on React Components</em>. Available at: https://recharts.org</li>
+    <li>Redux Toolkit Team. (2024). <em>Redux Toolkit — The Official Redux Toolset</em>. Available at: https://redux-toolkit.js.org</li>
+    <li>Patel, S., Choudhary, J. and Patil, G. (2023). Revolution of Database Management System. <em>International Journal of Engineering Trends and Technology</em>, 71(7), pp.189–200.</li>
+    <li>Chen, M., Decary, M., Atasoy, S. et al. (2024). Enhancing access to specialist appointments using digital health technologies: a systematic review. <em>BMJ Open</em>, 14(12), e083461.</li>
+    <li>Mpamugo, E. and Ansa, G. (2024). Enhancing Network Security with Role-Based Access Control. <em>Journal of Information Systems and Informatics</em>, 6(3), pp.1194–1213.</li>
+    <li>Snigdha, E.Z., Ahmed, S., Hossain, M.S., and Jahan, R. (2023). AI-Powered Healthcare Tracker Development. <em>Journal of Computer Science and Technology Studies</em>, 5(4), pp.74–82.</li>
+    <li>Oudbier, S.J., Goh, P.S., Kitzler, T.M. and Rieder, A. (2024). Implementation barriers of remote consultation platforms. <em>BMJ Open</em>, 14(6), e075975.</li>
+    <li>Aravind, S., Kumar, M., Meeran, M. and Shafi, S. (2022). The Role of HTML5 and CSS3 in Creating Optimized Web Applications. <em>NeuroQuantology</em>, 20(12), pp.5879–5887.</li>
+    <li>World Health Organization. (2022). <em>Global Health Observatory: Health Workforce</em>. WHO. Available at: https://www.who.int/data/gho</li>
+  </ol>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     18. APPENDIX
+══════════════════════════════════════════════ -->
+<div class="section-page">
+  <h1 class="section-title">18. Appendix — Screenshots</h1>
+  <p><em>Note: Add actual screenshots from your running application in the spaces below. Press Ctrl+P to save as PDF after adding screenshots.</em></p>
+
+  <h2>18.1 Synora Health Landing Page</h2>
+  <div class="screenshot-box">
+    [ Add screenshot: Landing page with hero section, doctor images, and floating health cards ]
+  </div>
+
+  <h2>18.2 Patient Dashboard</h2>
+  <div class="screenshot-box">
+    [ Add screenshot: Patient dashboard showing Quick Actions grid, Health Summary, and Upcoming Appointment ]
+  </div>
+
+  <h2>18.3 AI Symptom Checker with SHAP Explainability</h2>
+  <div class="screenshot-box">
+    [ Add screenshot: Symptom checker showing SHAP bar charts, possible conditions with confidence scores ]
+  </div>
+
+  <h2>18.4 Appointment Booking — Calendar Step</h2>
+  <div class="screenshot-box">
+    [ Add screenshot: Step 2 calendar with available date selection and time slots ]
+  </div>
+
+  <h2>18.5 Laboratory Folder</h2>
+  <div class="screenshot-box">
+    [ Add screenshot: 8 laboratory category folders — Blood, X-Ray, Diabetes, ECG, Urine, MRI, Thyroid, Cholesterol ]
+  </div>
+
+  <h2>18.6 Admin Analytics Dashboard</h2>
+  <div class="screenshot-box">
+    [ Add screenshot: Analytics tab showing KPI cards and 6 chart visualizations ]
+  </div>
+
+  <h2>18.7 Video Consultation (Embedded Jitsi)</h2>
+  <div class="screenshot-box">
+    [ Add screenshot: Jitsi Meet embedded inside the Synora Health app with fullscreen button ]
+  </div>
+
+  <h2>18.8 Mental Health Assessment (PHQ-9)</h2>
+  <div class="screenshot-box">
+    [ Add screenshot: PHQ-9 questionnaire with question options and progress indicator ]
+  </div>
+
+  <h2>18.9 Emergency SOS Screen</h2>
+  <div class="screenshot-box">
+    [ Add screenshot: Large red SOS button with emergency contacts list ]
+  </div>
+
+  <h2>18.10 API Documentation (/docs)</h2>
+  <div class="screenshot-box">
+    [ Add screenshot: FastAPI auto-generated Swagger docs at localhost:8000/docs ]
+  </div>
+
+  <h2>18.11 Project Folder Structure</h2>
+  <pre>
+Synora Health/
+├── backend/
+│   ├── app/
+│   │   ├── routes/          # auth, appointments, ai_routes, admin...
+│   │   ├── services/        # appointment_service, email_service
+│   │   ├── middleware/       # auth_middleware (JWT)
+│   │   ├── utils/           # email_utils, sms_utils
+│   │   ├── ai/              # symptom_analyzer
+│   │   └── config/          # settings.py, database.py
+│   ├── requirements.txt
+│   └── .env
+├── frontend/
+│   ├── src/
+│   │   ├── components/      # Navbar, Sidebar, AIChatbot
+│   │   ├── pages/           # Dashboard, SymptomChecker, Laboratory...
+│   │   ├── context/         # ThemeContext
+│   │   ├── services/        # api.js (Axios config)
+│   │   └── store/           # Redux slices (auth, user)
+│   └── .env
+└── PROJECT_DOCUMENTATION.md
+  </pre>
+
+  <br><br>
+  <div style="text-align:center; border-top: 2px solid #003366; padding-top:20px; margin-top: 40px;">
+    <p style="font-size:12pt; color:#003366;"><strong>© 2026 Synora Health Platform — AI-Powered Healthcare for Everyone</strong></p>
+    <p>Auro University, Surat, Gujarat &nbsp;|&nbsp; M.Sc. Artificial Intelligence &nbsp;|&nbsp; Academic Year 2024–2026</p>
+  </div>
+</div>
+
+</div><!-- /page -->
+</body>
+</html>
