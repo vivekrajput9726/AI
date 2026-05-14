@@ -1,49 +1,22 @@
-from app.config.settings import settings
 from loguru import logger
 
 
-def send_sms(to_phone: str, message: str):
-    if not all([settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN, settings.TWILIO_PHONE_NUMBER]):
-        logger.warning("Twilio not configured — skipping SMS send")
-        return False
-    if not to_phone or not to_phone.strip():
-        logger.warning("No phone number provided — skipping SMS")
-        return False
+def send_sms(to_phone: str, message: str) -> bool:
+    """Send SMS via Twilio or log if not configured."""
     try:
-        from twilio.rest import Client
-        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-        client.messages.create(body=message, from_=settings.TWILIO_PHONE_NUMBER, to=to_phone)
-        logger.info(f"SMS sent to {to_phone}")
-        return True
+        from app.config.settings import settings
+        account_sid = getattr(settings, "TWILIO_ACCOUNT_SID", None)
+        auth_token = getattr(settings, "TWILIO_AUTH_TOKEN", None)
+        from_phone = getattr(settings, "TWILIO_PHONE_NUMBER", None)
+
+        if account_sid and auth_token and from_phone:
+            from twilio.rest import Client
+            client = Client(account_sid, auth_token)
+            client.messages.create(body=message, from_=from_phone, to=to_phone)
+            logger.info(f"SMS sent to {to_phone}")
+            return True
     except Exception as e:
-        logger.error(f"Failed to send SMS to {to_phone}: {e}")
-        return False
+        logger.warning(f"SMS send failed to {to_phone}: {e}")
 
-
-def send_appointment_booked_sms(phone: str, patient_name: str, doctor_name: str, date: str, time: str):
-    send_sms(
-        to_phone=phone,
-        message=f"Hi {patient_name}! Your appointment with {doctor_name} is booked for {date} at {time}. - AI Healthcare"
-    )
-
-
-def send_appointment_confirmed_sms(phone: str, patient_name: str, doctor_name: str, date: str, time: str, meeting_link: str = None):
-    msg = f"Hi {patient_name}! Your appointment with {doctor_name} on {date} at {time} is confirmed."
-    if meeting_link:
-        msg += f" Join here: {meeting_link}"
-    msg += " - AI Healthcare"
-    send_sms(to_phone=phone, message=msg)
-
-
-def send_appointment_cancelled_sms(phone: str, patient_name: str, doctor_name: str, date: str):
-    send_sms(
-        to_phone=phone,
-        message=f"Hi {patient_name}, your appointment with {doctor_name} on {date} has been cancelled. Please rebook. - AI Healthcare"
-    )
-
-
-def send_appointment_reminder_sms(phone: str, patient_name: str, doctor_name: str, date: str, time: str):
-    send_sms(
-        to_phone=phone,
-        message=f"Reminder: Hi {patient_name}, you have an appointment with {doctor_name} tomorrow {date} at {time}. - AI Healthcare"
-    )
+    logger.info(f"[SMS stub] To: {to_phone} | Message: {message[:80]}...")
+    return False
