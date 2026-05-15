@@ -7,7 +7,8 @@ import {
   ChevronRight, X, Brain, TrendingUp, DollarSign,
   Printer, Pill, AlertCircle, Bell, BarChart2, FolderOpen,
   ArrowRight, RefreshCw, Send, Scale, Scan, Shield,
-  Stethoscope, ClipboardList, Download, Copy, Mail, Share2, Save, Mic
+  Stethoscope, ClipboardList, Download, Copy, Mail, Share2, Save, Mic,
+  CheckSquare, HelpCircle, Settings, CreditCard, UserPlus, Trash2
 } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import LoadingSpinner from '../components/common/LoadingSpinner'
@@ -17,6 +18,106 @@ import { formatDate } from '../utils/helpers'
 import toast from 'react-hot-toast'
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+
+// ── Task & Reminders component ──────────────────────────────────────────────
+function TaskRemindersSection({ appointments, navigate }) {
+  const [tasks, setTasks] = useState([
+    { id:1, text:'Review lab reports for today\'s patients', done:false, priority:'High',   time:'9:00 AM' },
+    { id:2, text:'Call Priya Patel for follow-up',           done:false, priority:'High',   time:'10:30 AM' },
+    { id:3, text:'Update prescription for Amit Verma',       done:true,  priority:'Medium', time:'11:00 AM' },
+    { id:4, text:'Check blood test results — Rohit Mehta',   done:false, priority:'Medium', time:'2:00 PM' },
+    { id:5, text:'Submit monthly earnings report',           done:false, priority:'Low',    time:'5:00 PM' },
+  ])
+  const [newTask, setNewTask] = useState('')
+
+  const toggle = id => setTasks(t => t.map(x => x.id===id ? {...x, done:!x.done} : x))
+  const del    = id => setTasks(t => t.filter(x => x.id!==id))
+  const add    = () => {
+    if (!newTask.trim()) return
+    setTasks(t => [...t, { id:Date.now(), text:newTask.trim(), done:false, priority:'Medium', time:'Now' }])
+    setNewTask('')
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label:'Total',     value:tasks.length,                color:'text-blue-600 bg-blue-50' },
+          { label:'Pending',   value:tasks.filter(t=>!t.done).length, color:'text-orange-600 bg-orange-50' },
+          { label:'Completed', value:tasks.filter(t=>t.done).length,  color:'text-green-600 bg-green-50' },
+        ].map((s,i)=>(
+          <div key={i} className={`${s.color.split(' ')[1]} rounded-2xl p-3 text-center border border-gray-100`}>
+            <p className={`text-2xl font-extrabold ${s.color.split(' ')[0]}`}>{s.value}</p>
+            <p className="text-xs text-gray-600 font-medium">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Add task */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+        <div className="flex gap-2">
+          <input value={newTask} onChange={e=>setNewTask(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&add()}
+            placeholder="Add new task... (press Enter)"
+            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-400"/>
+          <button onClick={add}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 flex items-center gap-1.5">
+            <Plus size={14}/> Add
+          </button>
+        </div>
+      </div>
+
+      {/* Task list */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100">
+          <p className="font-bold text-gray-800 text-sm">Today's Tasks</p>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {tasks.map(task=>(
+            <div key={task.id} className={`flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors ${task.done?'opacity-60':''}`}>
+              <button onClick={()=>toggle(task.id)}
+                className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${task.done?'bg-green-500 border-green-500':'border-gray-300 hover:border-green-400'}`}>
+                {task.done && <CheckCircle size={12} className="text-white"/>}
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium ${task.done?'line-through text-gray-400':'text-gray-800'}`}>{task.text}</p>
+                <p className="text-xs text-gray-400">{task.time}</p>
+              </div>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                task.priority==='High'?'bg-red-100 text-red-600':task.priority==='Medium'?'bg-yellow-100 text-yellow-600':'bg-gray-100 text-gray-500'
+              }`}>{task.priority}</span>
+              <button onClick={()=>del(task.id)}
+                className="p-1 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
+                <Trash2 size={13}/>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Appointment reminders */}
+      {appointments.filter(a=>a.status==='confirmed').length > 0 && (
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+          <p className="font-bold text-blue-800 text-sm mb-3 flex items-center gap-2"><Bell size={14}/>Appointment Reminders</p>
+          <div className="space-y-2">
+            {appointments.filter(a=>a.status==='confirmed').slice(0,3).map((apt,i)=>(
+              <div key={i} className="flex items-center gap-3 bg-white rounded-xl px-3 py-2.5">
+                <Bell size={13} className="text-blue-500 flex-shrink-0"/>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-800">{apt.patient_name}</p>
+                  <p className="text-xs text-gray-400">{apt.appointment_date} · {apt.appointment_time}</p>
+                </div>
+                <button onClick={()=>navigate('/doctor/dashboard?tab=appointments')}
+                  className="text-xs text-blue-600 font-semibold hover:underline flex-shrink-0">View</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function StatusBadge({ status }) {
   const s = { pending:'bg-yellow-100 text-yellow-700 border-yellow-200', confirmed:'bg-green-100 text-green-700 border-green-200', completed:'bg-blue-100 text-blue-700 border-blue-200', cancelled:'bg-red-100 text-red-700 border-red-200' }
@@ -1059,9 +1160,25 @@ export default function DoctorDashboard() {
   const todayApts  = appointments.filter(a => a.appointment_date === now.toISOString().split('T')[0])
   const filtered   = aptFilter==='all' ? appointments : appointments.filter(a=>a.status===aptFilter)
   const nextApt    = appointments.find(a=>a.status==='confirmed')
-  const [showCal,  setShowCal]  = useState(false)
-  const [calMonth, setCalMonth] = useState(now.getMonth())
-  const [calYear,  setCalYear]  = useState(now.getFullYear())
+  const [showCal,       setShowCal]       = useState(false)
+  const [calMonth,      setCalMonth]      = useState(now.getMonth())
+  const [calYear,       setCalYear]       = useState(now.getFullYear())
+  const [chartPeriod,   setChartPeriod]   = useState('This Week')
+  const [showChartDrop, setShowChartDrop] = useState(false)
+  const [diagPeriod,    setDiagPeriod]    = useState('This Month')
+  const [showDiagDrop,  setShowDiagDrop]  = useState(false)
+
+  // Chart data per period
+  const CHART_DATA = {
+    'This Week':  { pts:[[20,90],[80,70],[140,80],[200,45],[260,40],[320,20],[380,15]], labels:['May 9','May 10','May 11','May 12','May 13','May 14','May 15'] },
+    'This Month': { pts:[[20,85],[60,75],[100,65],[140,70],[180,55],[220,50],[260,45],[300,35],[340,30],[380,20]], labels:['May 1','May 5','May 8','May 11','May 13','May 15','May 17','May 20','May 25','May 30'] },
+    'This Year':  { pts:[[20,80],[60,70],[100,75],[140,60],[180,50],[220,55],[260,40],[300,35],[340,25],[380,15]], labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Dec'] },
+  }
+  const DIAG_DATA = {
+    'This Month': [{label:'Hypertension',pct:35,color:'#3b82f6'},{label:'Heart Disease',pct:25,color:'#8b5cf6'},{label:'Diabetes',pct:20,color:'#f59e0b'},{label:'Thyroid',pct:10,color:'#6b7280'},{label:'Other',pct:10,color:'#e5e7eb'}],
+    'Last Month': [{label:'Diabetes',pct:30,color:'#f59e0b'},{label:'Hypertension',pct:28,color:'#3b82f6'},{label:'Heart Disease',pct:22,color:'#8b5cf6'},{label:'Asthma',pct:12,color:'#10b981'},{label:'Other',pct:8,color:'#e5e7eb'}],
+    'This Year':  [{label:'Hypertension',pct:32,color:'#3b82f6'},{label:'Diabetes',pct:26,color:'#f59e0b'},{label:'Heart Disease',pct:20,color:'#8b5cf6'},{label:'Thyroid',pct:12,color:'#6b7280'},{label:'Other',pct:10,color:'#e5e7eb'}],
+  }
 
   return (
     <DashboardLayout>
@@ -1069,225 +1186,307 @@ export default function DoctorDashboard() {
 
         {/* ── DASHBOARD ── */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-5">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-green-700 to-teal-600 rounded-2xl p-5 text-white">
-              <div className="flex items-start justify-between gap-4">
-                {/* Left — Greeting */}
-                <div>
-                  <h1 className="text-xl font-extrabold">Good Morning, Dr. {firstName}! 👋</h1>
-                  <p className="text-green-100 text-sm mt-1">Here's what's happening with your practice today.</p>
-                </div>
-                {/* Right — Date + Calendar + Bell */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <div className="relative">
-                    <button onClick={()=>setShowCal(s=>!s)}
-                      className="flex items-center gap-2 bg-white/15 hover:bg-white/25 px-3 py-2 rounded-xl transition-all">
-                      <Calendar size={15} className="text-white"/>
-                      <div className="text-right">
-                        <p className="text-white text-xs font-bold leading-tight">{todayShort}</p>
-                        <p className="text-green-200 text-xs">{weekday}</p>
-                      </div>
-                    </button>
-                    {showCal && (
-                      <div className="absolute right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden" style={{minWidth:'280px'}}>
-                        <div className="flex items-center justify-between px-4 py-3 bg-teal-600 text-white">
-                          <button onClick={()=>setCalMonth(m=>m===0?(setCalYear(y=>y-1),11):m-1)} className="p-1 hover:bg-white/20 rounded-lg text-lg font-bold">‹</button>
-                          <p className="font-bold text-sm">{new Date(calYear,calMonth).toLocaleDateString('en-IN',{month:'long',year:'numeric'})}</p>
-                          <button onClick={()=>setCalMonth(m=>m===11?(setCalYear(y=>y+1),0):m+1)} className="p-1 hover:bg-white/20 rounded-lg text-lg font-bold">›</button>
-                        </div>
-                        <div className="grid grid-cols-7 px-3 pt-2">
-                          {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=><div key={d} className="text-center text-xs text-gray-400 font-semibold py-1">{d}</div>)}
-                        </div>
-                        <div className="grid grid-cols-7 px-3 pb-3 gap-0.5">
-                          {(()=>{
-                            const firstDay = new Date(calYear,calMonth,1).getDay()
-                            const daysInMonth = new Date(calYear,calMonth+1,0).getDate()
-                            const isCurrentMonth = calMonth===now.getMonth()&&calYear===now.getFullYear()
-                            const aptDays = new Set(appointments.map(a=>{ const d=new Date(a.appointment_date+'T12:00'); return d.getMonth()===calMonth&&d.getFullYear()===calYear?d.getDate():null}).filter(Boolean))
-                            const cells=[]
-                            for(let i=0;i<firstDay;i++) cells.push(<div key={`e${i}`}/>)
-                            for(let d=1;d<=daysInMonth;d++){
-                              const isToday=isCurrentMonth&&d===now.getDate()
-                              const hasApt=aptDays.has(d)
-                              cells.push(<div key={d} className={`relative text-center py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${isToday?'bg-teal-600 text-white font-extrabold':hasApt?'bg-teal-50 text-teal-700 hover:bg-teal-100':'text-gray-600 hover:bg-gray-100'}`}>
-                                {d}{hasApt&&!isToday&&<span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-teal-500 rounded-full"/>}
-                              </div>)
-                            }
-                            return cells
-                          })()}
-                        </div>
-                        <div className="px-4 py-2 border-t border-gray-100 flex items-center gap-2">
-                          <span className="w-2 h-2 bg-teal-500 rounded-full"/><span className="text-xs text-gray-400">Has appointments</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <button className="relative p-2.5 bg-white/15 hover:bg-white/25 rounded-xl">
-                    <Bell size={16} className="text-white"/>
-                    {stats.pending>0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{stats.pending}</span>}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="space-y-5 pb-6">
+            {/* ══════ STATS ROW ══════ */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label:"Today's Appointments", value:todayApts.length||12, icon:'📅', bg:'bg-blue-50', text:'text-blue-700' },
-                { label:'Pending Requests',     value:stats.pending||5,     icon:'⏳', bg:'bg-yellow-50', text:'text-yellow-700' },
-                { label:'Total Patients',       value:stats.total||145,     icon:'👥', bg:'bg-green-50', text:'text-green-700' },
-                { label:"Today's Earnings",     value:`₹${stats.completed*500||24850}`, icon:'💰', bg:'bg-purple-50', text:'text-purple-700' },
+                { label:"Today's Appointments", value: todayApts.length || 12,  sub:'4 Upcoming',         icon:'📅', iconBg:'bg-blue-100',   val:'text-gray-900' },
+                { label:'Total Patients',        value: stats.total || 1248,     sub:'+18 This Week',      icon:'👥', iconBg:'bg-teal-100',   val:'text-gray-900' },
+                { label:'Consultations',         value: stats.completed || 856,  sub:'+22 This Week',      icon:'🩺', iconBg:'bg-orange-100', val:'text-gray-900' },
+                { label:'Earnings This Month',   value:'₹2,48,500',              sub:'+16% vs Last Month', icon:'💰', iconBg:'bg-purple-100', val:'text-gray-900' },
               ].map((s,i)=>(
-                <div key={i} className={`${s.bg} rounded-2xl p-4 border border-gray-100 shadow-sm`}>
-                  <span className="text-2xl">{s.icon}</span>
-                  <p className={`text-2xl font-extrabold mt-2 ${s.text}`}>{s.value}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+                <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+                  <div className={`w-12 h-12 ${s.iconBg} rounded-2xl flex items-center justify-center text-2xl flex-shrink-0`}>{s.icon}</div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium">{s.label}</p>
+                    <p className={`text-2xl font-bold ${s.val} leading-tight mt-0.5`}>{s.value}</p>
+                    <p className="text-xs text-green-600 font-medium mt-0.5">{s.sub}</p>
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Pending banner */}
-            {stats.pending > 0 && (
-              <div className="bg-yellow-50 border-2 border-yellow-300 rounded-2xl p-4 flex items-center gap-4">
-                <div className="w-10 h-10 bg-yellow-400 rounded-xl flex items-center justify-center flex-shrink-0"><Clock size={20} className="text-white"/></div>
-                <div className="flex-1">
-                  <p className="font-bold text-yellow-800">{stats.pending} Appointment{stats.pending>1?'s':''} Awaiting Approval</p>
-                  <p className="text-sm text-yellow-600">Review and confirm or reject pending requests.</p>
-                </div>
-                <button onClick={()=>navigate('/doctor/dashboard?tab=appointments')}
-                  className="bg-yellow-400 hover:bg-yellow-500 text-white text-sm font-bold px-4 py-2 rounded-xl">Review Now</button>
-              </div>
-            )}
+            {/* ══════ MAIN 3-COLUMN ══════ */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-            <div className="grid lg:grid-cols-3 gap-5">
-              {/* Today's Appointments */}
-              <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-bold text-gray-900">Today's Appointments</h2>
-                  <button onClick={()=>navigate('/doctor/dashboard?tab=appointments')} className="text-xs text-teal-600 hover:underline flex items-center gap-1">View All <ChevronRight size={12}/></button>
-                </div>
-                {loading ? <div className="py-4 flex justify-center"><LoadingSpinner/></div>
-                : (todayApts.length === 0 ? [
-                    {name:'Riya Patel',  age:'24 Years, Female',time:'10:00 AM',type:'Follow Up',       status:'pending'},
-                    {name:'Aman Verma',  age:'29 Years, Male',  time:'11:30 AM',type:'Consultation',    status:'confirmed'},
-                    {name:'Neha Singh',  age:'32 Years, Female',time:'01:00 PM',type:'Report Discussion',status:'confirmed'},
-                    {name:'Rahul Mehta', age:'45 Years, Male',  time:'04:00 PM',type:'Follow Up',       status:'pending'},
-                  ] : todayApts).slice(0,4).map((apt,i)=>(
-                  <div key={i} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl border border-gray-50 transition-colors mb-2">
-                    <div className="w-9 h-9 bg-gradient-to-br from-teal-300 to-cyan-400 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">{(apt.patient_name||apt.name)?.charAt(0)}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-gray-900">{apt.patient_name||apt.name}</p>
-                      <p className="text-xs text-gray-400">{apt.age||''}</p>
-                    </div>
-                    <div className="text-right mr-2 flex-shrink-0">
-                      <p className="text-xs font-medium text-gray-700">{apt.appointment_time||apt.time}</p>
-                      <p className="text-xs text-gray-400">{apt.appointment_type||apt.type}</p>
-                    </div>
-                    <StatusBadge status={apt.status}/>
+              {/* ── Today's Schedule ── */}
+              <div className="lg:col-span-1 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                  <div>
+                    <p className="font-bold text-gray-900">Today's Schedule</p>
+                    <p className="text-xs text-green-600 font-semibold mt-0.5">{todayShort}</p>
                   </div>
-                ))}
+                  <button onClick={()=>navigate('/doctor/dashboard?tab=appointments')}
+                    className="text-xs text-blue-600 font-semibold hover:underline">View All</button>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {loading ? <div className="py-6 flex justify-center"><LoadingSpinner/></div>
+                  : (todayApts.length === 0 ? [
+                      {patient_name:'Priya Patel',  info:'34 · Female', appointment_time:'10:00 AM', symptoms:'Chest Pain',      appointment_type:'in-person'},
+                      {patient_name:'Amit Verma',   info:'45 · Male',   appointment_time:'10:30 AM', symptoms:'Regular Checkup', appointment_type:'video'},
+                      {patient_name:'Neha Singh',   info:'28 · Female', appointment_time:'11:00 AM', symptoms:'Follow-up',       appointment_type:'in-person'},
+                      {patient_name:'Rohit Mehta',  info:'52 · Male',   appointment_time:'11:30 AM', symptoms:'ECG Review',      appointment_type:'video'},
+                      {patient_name:'Kavita Joshi', info:'40 · Female', appointment_time:'12:00 PM', symptoms:'Blood Pressure',  appointment_type:'in-person'},
+                    ] : todayApts).slice(0,5).map((apt,i)=>(
+                    <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+                      <p className="text-xs font-semibold text-gray-500 w-16 flex-shrink-0">{apt.appointment_time||apt.time}</p>
+                      <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        {(apt.patient_name||apt.name||'P').charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{apt.patient_name||apt.name}</p>
+                        <p className="text-xs text-gray-400">{apt.info||''}</p>
+                      </div>
+                      <p className="text-xs text-gray-500 hidden sm:block flex-shrink-0 truncate max-w-20">{apt.symptoms||apt.appointment_type}</p>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${apt.appointment_type==='video'?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'}`}>
+                        {apt.appointment_type==='video'?'Video Call':'In Clinic'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-5 py-3 border-t border-gray-100">
+                  <button onClick={()=>navigate('/doctor/dashboard?tab=appointments')}
+                    className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-600 font-semibold hover:bg-gray-50 rounded-xl border border-gray-200 transition-colors">
+                    <Calendar size={14}/> View Full Schedule
+                  </button>
+                </div>
               </div>
 
-              {/* Quick Actions + AI Insights */}
-              <div className="space-y-4">
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                  <h3 className="font-bold text-gray-800 mb-3 text-sm">Quick Actions</h3>
-                  <div className="space-y-2">
+              {/* ── AI Assistant ── */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                  <p className="font-bold text-gray-900">AI Assistant</p>
+                  <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-bold">New</span>
+                </div>
+                <div className="p-5 flex flex-col items-center text-center gap-3">
+                  <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-teal-100 rounded-full flex items-center justify-center">
+                    <Brain size={32} className="text-green-600"/>
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900">Hello Dr. {firstName} 👋</p>
+                    <p className="text-xs text-gray-500 mt-0.5">How can I help you today?</p>
+                  </div>
+                  <div className="w-full space-y-2 mt-1">
                     {[
-                      { label:'Start Consultation', icon:<Video size={14}/>,    color:'bg-green-600', to:'consultation' },
-                      { label:'View All Patients',  icon:<Users size={14}/>,    color:'bg-blue-600',  to:'patients' },
-                      { label:'Add Availability',   icon:<Calendar size={14}/>, color:'bg-orange-500',to:'schedule' },
-                      { label:'View Schedule',      icon:<Clock size={14}/>,    color:'bg-purple-600',to:'schedule' },
+                      { icon:'🔍', label:'Suggest Diagnosis',      tab:'ai-assistant' },
+                      { icon:'💊', label:'Drug Interaction Check',  tab:'ai-assistant' },
+                      { icon:'📋', label:'Treatment Guidelines',    tab:'ai-assistant' },
+                      { icon:'📊', label:'Patient Risk Analysis',   tab:'patients'     },
                     ].map((a,i)=>(
-                      <button key={i} onClick={()=>navigate(`/doctor/dashboard?tab=${a.to}`)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 ${a.color} hover:opacity-90 text-white rounded-xl text-sm font-semibold transition-all`}>
-                        {a.icon}{a.label}
+                      <button key={i} onClick={()=>navigate(`/doctor/dashboard?tab=${a.tab}`)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 bg-gray-50 hover:bg-green-50 border border-gray-100 hover:border-green-200 rounded-xl text-sm font-medium text-gray-700 transition-all text-left">
+                        <span className="text-base">{a.icon}</span>{a.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={()=>navigate('/doctor/dashboard?tab=ai-assistant')}
+                    className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
+                    <Brain size={15}/> Ask AI Assistant
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Right Column ── */}
+              <div className="space-y-4">
+
+                {/* Upcoming Appointments */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="font-bold text-gray-900 text-sm">Upcoming Appointments</p>
+                    <button onClick={()=>navigate('/doctor/dashboard?tab=appointments')}
+                      className="text-xs text-blue-600 font-semibold hover:underline">View All</button>
+                  </div>
+                  <div className="space-y-3">
+                    {(appointments.filter(a=>a.status==='confirmed').length>0
+                      ? appointments.filter(a=>a.status==='confirmed')
+                      : [
+                          {patient_name:'Sanjay Kumar', appointment_time:'02:00 PM', symptoms:'Consultation'},
+                          {patient_name:'Meera Iyer',   appointment_time:'02:30 PM', symptoms:'Follow-up'},
+                          {patient_name:'Arjun Nair',   appointment_time:'03:00 PM', symptoms:'ECG Review'},
+                          {patient_name:'Pooja Sharma', appointment_time:'03:30 PM', symptoms:'Consultation'},
+                        ]
+                    ).slice(0,4).map((apt,i)=>(
+                      <div key={i} className="flex items-center gap-2.5">
+                        <p className="text-xs text-gray-500 font-medium w-14 flex-shrink-0">{apt.appointment_time}</p>
+                        <div className="w-7 h-7 bg-gradient-to-br from-teal-300 to-cyan-400 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          {(apt.patient_name||'P').charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-gray-800 truncate">{apt.patient_name}</p>
+                          <p className="text-xs text-gray-400 truncate">{apt.symptoms||apt.appointment_type}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent Activity */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="font-bold text-gray-900 text-sm">Recent Activity</p>
+                    <button onClick={()=>navigate('/doctor/dashboard?tab=appointments')}
+                      className="text-xs text-blue-600 font-semibold hover:underline">View All</button>
+                  </div>
+                  <div className="space-y-2.5">
+                    {[
+                      { icon:'💊', color:'bg-blue-100',   text:'Prescription created for Priya Patel',    time:'10:15 AM' },
+                      { icon:'🧪', color:'bg-green-100',  text:'Lab report uploaded by Amit Verma',       time:'09:45 AM' },
+                      { icon:'📅', color:'bg-orange-100', text:'Follow-up scheduled for Neha Singh',      time:'09:30 AM' },
+                      { icon:'📋', color:'bg-purple-100', text:'New appointment booked by Kavita Joshi',  time:'08:50 AM' },
+                    ].map((a,i)=>(
+                      <div key={i} className="flex items-start gap-2.5">
+                        <div className={`w-7 h-7 ${a.color} rounded-lg flex items-center justify-center flex-shrink-0 text-sm`}>{a.icon}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-700 leading-snug">{a.text}</p>
+                        </div>
+                        <span className="text-[10px] text-gray-400 flex-shrink-0">{a.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                  <p className="font-bold text-gray-900 text-sm mb-3">Quick Actions</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { icon:'💊', label:'New Prescription', tab:'prescription' },
+                      { icon:'👤', label:'Add Patient',      tab:'patients'     },
+                      { icon:'📅', label:'Book Appointment', tab:'appointments' },
+                      { icon:'📁', label:'Upload Report',    tab:'patients'     },
+                    ].map((a,i)=>(
+                      <button key={i} onClick={()=>navigate(`/doctor/dashboard?tab=${a.tab}`)}
+                        className="flex flex-col items-center gap-1.5 p-2 bg-gray-50 hover:bg-green-50 rounded-xl border border-gray-100 hover:border-green-200 transition-all">
+                        <span className="text-xl">{a.icon}</span>
+                        <p className="text-[10px] text-gray-600 font-medium text-center leading-tight">{a.label}</p>
                       </button>
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
 
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-4">
-                  <h3 className="font-bold text-indigo-800 mb-3 text-sm flex items-center gap-2"><Brain size={14}/>AI Health Insights</h3>
-                  <div className="space-y-2.5">
-                    {[
-                      {emoji:'⚠️', text:`${stats.pending||3} patients have high risk alerts`, link:'appointments', linkText:'View Details', color:'text-red-700'},
-                      {emoji:'📊', text:'5 new reports to review',   link:'patients',     linkText:'Review Now', color:'text-blue-700'},
-                      {emoji:'📅', text:'2 follow-ups due today',    link:'appointments', linkText:'Check Now',  color:'text-green-700'},
-                    ].map((ins,i)=>(
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="text-base flex-shrink-0">{ins.emoji}</span>
-                        <div>
-                          <p className={`text-xs font-bold ${ins.color}`}>{ins.text}</p>
-                          <button onClick={()=>navigate(`/doctor/dashboard?tab=${ins.link}`)} className={`text-xs hover:underline ${ins.color} opacity-70`}>{ins.linkText}</button>
-                        </div>
+            {/* ══════ CHARTS ROW ══════ */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+              {/* Patient Overview Chart */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="font-bold text-gray-900">Patient Overview</p>
+                  {/* Working dropdown */}
+                  <div className="relative">
+                    <button onClick={()=>{ setShowChartDrop(v=>!v); setShowDiagDrop(false) }}
+                      className="flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-medium transition-colors">
+                      {chartPeriod}
+                      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5L5 6.5L8 3.5" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>
+                    </button>
+                    {showChartDrop && (
+                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg z-20 overflow-hidden w-32">
+                        {['This Week','This Month','This Year'].map(opt=>(
+                          <button key={opt} onClick={()=>{ setChartPeriod(opt); setShowChartDrop(false) }}
+                            className={`w-full px-3 py-2 text-xs text-left transition-colors ${chartPeriod===opt?'bg-green-50 text-green-700 font-semibold':'text-gray-700 hover:bg-gray-50'}`}>
+                            {opt}
+                          </button>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
+                {/* Dynamic chart */}
+                {(()=>{
+                  const d = CHART_DATA[chartPeriod] || CHART_DATA['This Week']
+                  const pts = d.pts
+                  const minX=pts[0][0], maxX=pts[pts.length-1][0]
+                  const pathD = pts.map(([x,y],i)=>`${i===0?'M':'L'}${x},${y}`).join(' ')
+                  const areaD = pathD + ` L${maxX},100 L${minX},100 Z`
+                  return (
+                    <>
+                      <svg viewBox="0 0 400 110" className="w-full h-28">
+                        <defs>
+                          <linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#22c55e" stopOpacity="0.25"/>
+                            <stop offset="100%" stopColor="#22c55e" stopOpacity="0"/>
+                          </linearGradient>
+                        </defs>
+                        {[20,40,60,80].map(y=><line key={y} x1="10" y1={y} x2="395" y2={y} stroke="#f3f4f6" strokeWidth="1"/>)}
+                        {[{y:20,v:80},{y:40,v:60},{y:60,v:40},{y:80,v:20}].map(l=>(
+                          <text key={l.y} x="0" y={l.y+3} fontSize="7" fill="#d1d5db">{l.v}</text>
+                        ))}
+                        <path d={areaD} fill="url(#cg2)"/>
+                        <path d={pathD} fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        {pts.map(([x,y],i)=><circle key={i} cx={x} cy={y} r="3" fill="#22c55e"/>)}
+                      </svg>
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 px-1">
+                        {d.labels.map(l=><span key={l}>{l}</span>)}
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
-            </div>
 
-            {/* ═══ AI Alerts & Priorities ═══ */}
-            <div className="grid lg:grid-cols-3 gap-4">
-              {[
-                { emoji:'🔴', label:'High Priority',    sub:`${stats.pending||3} patients need immediate attention`, link:'appointments', color:'bg-red-50 border-red-200 text-red-700' },
-                { emoji:'📋', label:'Follow-ups Due',   sub:'7 follow-ups due today',    link:'ai-assistant', color:'bg-orange-50 border-orange-200 text-orange-700' },
-                { emoji:'📊', label:'New Reports',      sub:'5 new reports to review',   link:'patients',     color:'bg-blue-50 border-blue-200 text-blue-700' },
-              ].map((a,i)=>(
-                <div key={i} className={`flex items-start gap-3 p-4 rounded-2xl border ${a.color}`}>
-                  <span className="text-2xl flex-shrink-0">{a.emoji}</span>
-                  <div className="flex-1">
-                    <p className="font-bold text-sm">{a.label}</p>
-                    <p className="text-xs opacity-80 mt-0.5">{a.sub}</p>
-                    <button onClick={()=>navigate(`/doctor/dashboard?tab=${a.link}`)} className="text-xs font-bold mt-1 hover:underline opacity-70">View Details →</button>
+              {/* Top Diagnoses Donut */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="font-bold text-gray-900">Top Diagnoses</p>
+                  {/* Working dropdown */}
+                  <div className="relative">
+                    <button onClick={()=>{ setShowDiagDrop(v=>!v); setShowChartDrop(false) }}
+                      className="flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-medium transition-colors">
+                      {diagPeriod}
+                      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5L5 6.5L8 3.5" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>
+                    </button>
+                    {showDiagDrop && (
+                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg z-20 overflow-hidden w-32">
+                        {['This Month','Last Month','This Year'].map(opt=>(
+                          <button key={opt} onClick={()=>{ setDiagPeriod(opt); setShowDiagDrop(false) }}
+                            className={`w-full px-3 py-2 text-xs text-left transition-colors ${diagPeriod===opt?'bg-green-50 text-green-700 font-semibold':'text-gray-700 hover:bg-gray-50'}`}>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* ═══ Additional Smart Features Banner ═══ */}
-            <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-5">
-              <p className="font-bold text-white mb-3 text-sm">Additional Smart Features</p>
-              <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
-                {[
-                  { icon:'🤖', label:'AI Risk Alerts',    sub:'High risk patients' },
-                  { icon:'🎙️', label:'Voice-to-Notes',    sub:'Speech to notes' },
-                  { icon:'💊', label:'Drug Interaction',  sub:'Medicine check' },
-                  { icon:'📁', label:'Patient History',   sub:'Full records' },
-                  { icon:'🔍', label:'Smart Search',      sub:'Reports & notes' },
-                  { icon:'🔒', label:'Secure & HIPAA',    sub:'Compliant' },
-                  { icon:'⚡', label:'Real-time Sync',    sub:'Live updates' },
-                ].map((f,i)=>(
-                  <div key={i} className="flex flex-col items-center gap-1.5 text-center cursor-pointer" onClick={()=>navigate('/doctor/dashboard?tab=ai-assistant')}>
-                    <div className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center text-xl transition-all">{f.icon}</div>
-                    <p className="text-white text-xs font-bold leading-tight">{f.label}</p>
-                    <p className="text-gray-400 text-xs leading-tight hidden sm:block">{f.sub}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ═══ Feature 10 — Other Doctor Features ═══ */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <h3 className="font-bold text-gray-800 mb-4 text-sm">Other Doctor Features</h3>
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                {[
-                  { icon:'👥', label:'Patients',   sub:'Manage all patients',       tab:'patients',      color:'bg-blue-50 text-blue-600' },
-                  { icon:'📅', label:'Schedule',   sub:'Manage availability',       tab:'schedule',      color:'bg-green-50 text-green-600' },
-                  { icon:'💰', label:'Earnings',   sub:'View earnings & payouts',   tab:'earnings',      color:'bg-yellow-50 text-yellow-600' },
-                  { icon:'📊', label:'Analytics',  sub:'Practice performance',      tab:'analytics',     color:'bg-purple-50 text-purple-600' },
-                  { icon:'⭐', label:'Reviews',    sub:'Patient feedback',          tab:'analytics',     color:'bg-orange-50 text-orange-600' },
-                  { icon:'💬', label:'Messages',   sub:'Patient messages',          tab:'patients',      color:'bg-teal-50 text-teal-600' },
-                ].map((f,i)=>(
-                  <button key={i} onClick={()=>navigate(`/doctor/dashboard?tab=${f.tab}`)}
-                    className={`flex flex-col items-center gap-2 p-3 ${f.color.split(' ')[0]} rounded-2xl border border-gray-100 hover:shadow-md hover:scale-105 transition-all`}>
-                    <span className="text-2xl">{f.icon}</span>
-                    <p className={`text-xs font-bold ${f.color.split(' ')[1]}`}>{f.label}</p>
-                    <p className="text-xs text-gray-400 text-center leading-tight hidden sm:block">{f.sub}</p>
-                  </button>
-                ))}
+                {/* Dynamic donut */}
+                {(()=>{
+                  const diagItems = DIAG_DATA[diagPeriod] || DIAG_DATA['This Month']
+                  const circ = 2 * Math.PI * 48  // ~301.6
+                  let offset = 0
+                  return (
+                    <div className="flex items-center gap-6">
+                      <div className="relative flex-shrink-0">
+                        <svg viewBox="0 0 120 120" width="120" height="120">
+                          <circle cx="60" cy="60" r="48" fill="none" stroke="#f3f4f6" strokeWidth="18"/>
+                          {diagItems.map((d,i)=>{
+                            const dash = (d.pct/100)*circ
+                            const seg = (
+                              <circle key={i} cx="60" cy="60" r="48" fill="none"
+                                stroke={d.color} strokeWidth="18"
+                                strokeDasharray={`${dash} ${circ-dash}`}
+                                strokeDashoffset={-offset}
+                                transform="rotate(-90 60 60)"/>
+                            )
+                            offset += dash
+                            return seg
+                          })}
+                          <text x="60" y="56" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#111827">
+                            {stats.completed||856}
+                          </text>
+                          <text x="60" y="68" textAnchor="middle" fontSize="8" fill="#6b7280">Total</text>
+                        </svg>
+                      </div>
+                      <div className="space-y-2 flex-1">
+                        {diagItems.map((d,i)=>(
+                          <div key={i} className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor:d.color}}/>
+                            <span className="text-xs text-gray-600 flex-1">{d.label}</span>
+                            <span className="text-xs font-bold text-gray-800">{d.pct}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
 
@@ -1412,6 +1611,404 @@ export default function DoctorDashboard() {
 
         {/* ── AI ASSISTANT (Feature 7 + 12 + 13 + 14) ── */}
         {activeTab === 'ai-assistant' && <AIAssistantTab appointments={appointments} onReload={loadAppointments}/>}
+
+        {/* ── MESSAGES ── */}
+        {activeTab === 'messages' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-5 text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><MessageCircle size={20}/></div>
+              <div>
+                <h2 className="font-extrabold text-lg">Messages</h2>
+                <p className="text-blue-200 text-xs">Patient conversations & chats</p>
+              </div>
+            </div>
+
+            {appointments.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+                <MessageCircle size={40} className="mx-auto text-gray-200 mb-3"/>
+                <p className="text-gray-500 font-medium">No conversations yet</p>
+                <p className="text-gray-400 text-sm mt-1">Start a consultation to begin chatting with patients</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-5 py-3 border-b border-gray-100">
+                  <p className="font-bold text-gray-800 text-sm">Patient Conversations ({appointments.length})</p>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {appointments.slice(0, 8).map((apt, i) => (
+                    <div key={i} className="flex items-center gap-3 px-5 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                      onClick={() => { setChatRoom(`appointment_${apt.id || apt._id}`); setChatName(apt.patient_name); setChatOpen(true) }}>
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
+                        {apt.patient_name?.charAt(0) || 'P'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm">{apt.patient_name}</p>
+                        <p className="text-xs text-gray-400 truncate">{apt.symptoms || apt.appointment_type || 'Click to start chat'}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs text-gray-400">{apt.appointment_date}</p>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${apt.status === 'confirmed' ? 'bg-green-100 text-green-700' : apt.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {apt.status}
+                        </span>
+                      </div>
+                      <div className="w-8 h-8 bg-blue-50 hover:bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors">
+                        <MessageCircle size={15} className="text-blue-600"/>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
+              <MessageCircle size={15} className="text-blue-600 mt-0.5 flex-shrink-0"/>
+              <p className="text-xs text-blue-700">Click on any patient to open real-time chat. Chats are linked to their appointment for easy reference.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── FOLLOW-UPS ── */}
+        {activeTab === 'follow-ups' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-teal-600 to-green-600 rounded-2xl p-5 text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Activity size={20}/></div>
+              <div>
+                <h2 className="font-extrabold text-lg">Follow-Ups</h2>
+                <p className="text-teal-200 text-xs">Patient recovery & follow-up tracking</p>
+              </div>
+            </div>
+
+            {/* Summary cards */}
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: 'Due Today',     value: appointments.filter(a => a.status === 'confirmed').length || 2,  color: 'text-red-600 bg-red-50',    icon: '🔴' },
+                { label: 'This Week',     value: appointments.filter(a => a.status === 'pending').length || 5,    color: 'text-orange-600 bg-orange-50', icon: '⏰' },
+                { label: 'Completed',     value: appointments.filter(a => a.status === 'completed').length || 12, color: 'text-green-600 bg-green-50',  icon: '✅' },
+              ].map((s, i) => (
+                <div key={i} className={`${s.color.split(' ')[1]} rounded-2xl p-4 text-center border border-gray-100`}>
+                  <span className="text-2xl">{s.icon}</span>
+                  <p className={`text-2xl font-extrabold mt-1 ${s.color.split(' ')[0]}`}>{s.value}</p>
+                  <p className="text-xs text-gray-600 font-medium">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Follow-up list */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                <p className="font-bold text-gray-800 text-sm">Follow-Up Appointments</p>
+                <button onClick={() => navigate('/doctor/dashboard?tab=appointments')} className="text-xs text-teal-600 hover:underline font-semibold">View All</button>
+              </div>
+              {appointments.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Activity size={36} className="mx-auto text-gray-200 mb-3"/>
+                  <p className="text-gray-500 text-sm">No follow-ups scheduled</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {appointments.slice(0, 6).map((apt, i) => (
+                    <div key={i} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors">
+                      <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-green-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
+                        {apt.patient_name?.charAt(0) || 'P'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm">{apt.patient_name}</p>
+                        <p className="text-xs text-gray-400">{apt.appointment_date} · {apt.appointment_time}</p>
+                        {apt.symptoms && <p className="text-xs text-teal-600 mt-0.5 truncate">{apt.symptoms}</p>}
+                      </div>
+                      <StatusBadge status={apt.status}/>
+                      <div className="flex gap-2 flex-shrink-0">
+                        {apt.status === 'pending' && (
+                          <button onClick={() => handleStatusUpdate(apt.id, 'confirmed')}
+                            className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700">
+                            Confirm
+                          </button>
+                        )}
+                        <button onClick={() => handleStartChat(apt)}
+                          className="px-3 py-1.5 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-100 flex items-center gap-1">
+                          <MessageCircle size={11}/> Chat
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── MEDICAL RECORDS ── */}
+        {activeTab === 'medical-records' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl p-5 text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><FolderOpen size={20}/></div>
+              <div>
+                <h2 className="font-extrabold text-lg">Medical Records</h2>
+                <p className="text-orange-100 text-xs">Patient health records & reports</p>
+              </div>
+            </div>
+
+            {/* Records from patients */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100">
+                <p className="font-bold text-gray-800 text-sm">Patient Health Records</p>
+              </div>
+              {appointments.length === 0 ? (
+                <div className="py-12 text-center">
+                  <FolderOpen size={36} className="mx-auto text-gray-200 mb-3"/>
+                  <p className="text-gray-500 text-sm">No records available</p>
+                  <p className="text-gray-400 text-xs mt-1">Records will appear after consultations</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {appointments.filter(a => a.prescription || a.ai_analysis).slice(0, 6).concat(
+                    appointments.slice(0, 4)
+                  ).slice(0, 6).map((apt, i) => (
+                    <div key={i} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors">
+                      <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <FileText size={18} className="text-orange-500"/>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm">{apt.patient_name}</p>
+                        <p className="text-xs text-gray-400">{apt.appointment_type} · {apt.appointment_date}</p>
+                        {apt.symptoms && <p className="text-xs text-gray-500 mt-0.5 truncate">{apt.symptoms}</p>}
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        {apt.prescription && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">Rx</span>
+                        )}
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${apt.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {apt.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex gap-3">
+              <FolderOpen size={15} className="text-orange-600 mt-0.5 flex-shrink-0"/>
+              <p className="text-xs text-orange-700">Medical records are automatically saved after each consultation and prescription.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── PAYMENTS ── */}
+        {activeTab === 'payments' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-5 text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><DollarSign size={20}/></div>
+              <div><h2 className="font-extrabold text-lg">Payments</h2><p className="text-emerald-200 text-xs">View payment history of consultations and transactions</p></div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label:'Total Earned',   value:`₹${(stats.completed||12)*500}`,  color:'text-green-600 bg-green-50',   icon:'💰' },
+                { label:'This Month',     value:'₹2,48,500',                      color:'text-blue-600 bg-blue-50',     icon:'📅' },
+                { label:'Pending Payout', value:'₹12,000',                        color:'text-orange-600 bg-orange-50', icon:'⏳' },
+              ].map((s,i)=>(
+                <div key={i} className={`${s.color.split(' ')[1]} rounded-2xl p-4 text-center border border-gray-100`}>
+                  <span className="text-2xl">{s.icon}</span>
+                  <p className={`text-xl font-extrabold mt-1 ${s.color.split(' ')[0]}`}>{s.value}</p>
+                  <p className="text-xs text-gray-600 font-medium">{s.label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100"><p className="font-bold text-gray-800 text-sm">Transaction History</p></div>
+              <div className="divide-y divide-gray-50">
+                {(appointments.filter(a=>a.status==='completed').length>0 ? appointments.filter(a=>a.status==='completed') : [
+                  {patient_name:'Priya Patel',  appointment_date:'2026-05-15', consultation_fee:500, appointment_type:'video'},
+                  {patient_name:'Amit Verma',   appointment_date:'2026-05-14', consultation_fee:500, appointment_type:'in-person'},
+                  {patient_name:'Neha Singh',   appointment_date:'2026-05-13', consultation_fee:500, appointment_type:'video'},
+                  {patient_name:'Rohit Mehta',  appointment_date:'2026-05-12', consultation_fee:500, appointment_type:'in-person'},
+                ]).slice(0,8).map((apt,i)=>(
+                  <div key={i} className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50">
+                    <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <DollarSign size={16} className="text-green-600"/>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{apt.patient_name}</p>
+                      <p className="text-xs text-gray-400">{apt.appointment_type} · {apt.appointment_date}</p>
+                    </div>
+                    <span className="text-sm font-bold text-green-600">+₹{apt.consultation_fee||500}</span>
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">Paid</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── NOTIFICATIONS ── */}
+        {activeTab === 'notifications' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Bell size={20}/></div>
+                <div><h2 className="font-extrabold text-lg">Notifications</h2><p className="text-red-100 text-xs">All alerts, appointment updates and system notifications</p></div>
+              </div>
+              <span className="bg-white text-red-600 text-sm font-extrabold px-3 py-1 rounded-full">8 New</span>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              {[
+                { icon:'📅', color:'bg-blue-100',   title:'New Appointment Booked',          sub:'Priya Patel booked for 16 May · 10:00 AM', time:'2m ago',   unread:true },
+                { icon:'✅', color:'bg-green-100',  title:'Appointment Confirmed',            sub:'Amit Verma confirmed for today · 11:30 AM', time:'15m ago',  unread:true },
+                { icon:'💊', color:'bg-purple-100', title:'Prescription Acknowledged',        sub:'Neha Singh viewed her prescription',        time:'1h ago',   unread:true },
+                { icon:'🔴', color:'bg-red-100',    title:'High Risk Patient Alert',          sub:'Rohit Mehta — Blood pressure elevated',    time:'2h ago',   unread:true },
+                { icon:'📋', color:'bg-orange-100', title:'Lab Report Uploaded',              sub:'New blood test report from City Lab',       time:'3h ago',   unread:true },
+                { icon:'⭐', color:'bg-yellow-100', title:'New Patient Review',               sub:'4.8 ★ — Kavita Joshi left a review',        time:'5h ago',   unread:false },
+                { icon:'📹', color:'bg-teal-100',   title:'Video Consultation Reminder',      sub:'Consultation in 30 minutes with Raj Kumar', time:'Yesterday',unread:false },
+                { icon:'💬', color:'bg-indigo-100', title:'New Message',                      sub:'Sunita Sharma sent you a message',          time:'Yesterday',unread:false },
+              ].map((n,i)=>(
+                <div key={i} className={`flex items-start gap-3 px-5 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer ${n.unread?'bg-blue-50/30':''}`}>
+                  <div className={`w-10 h-10 ${n.color} rounded-xl flex items-center justify-center flex-shrink-0 text-lg`}>{n.icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold ${n.unread?'text-gray-900':'text-gray-600'}`}>{n.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{n.sub}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xs text-gray-400">{n.time}</p>
+                    {n.unread && <span className="w-2 h-2 bg-blue-500 rounded-full block ml-auto mt-1"/>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button className="w-full py-2.5 border border-gray-200 text-gray-500 text-sm font-medium rounded-xl hover:bg-gray-50">
+              Mark all as read
+            </button>
+          </div>
+        )}
+
+        {/* ── REFERRALS ── */}
+        {activeTab === 'referrals' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl p-5 text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Users size={20}/></div>
+              <div><h2 className="font-extrabold text-lg">Referrals</h2><p className="text-violet-200 text-xs">Refer patients to other specialists and manage referral requests</p></div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label:'Sent',     value:'12', color:'text-blue-600 bg-blue-50',   icon:'📤' },
+                { label:'Received', value:'5',  color:'text-green-600 bg-green-50', icon:'📥' },
+                { label:'Pending',  value:'3',  color:'text-orange-600 bg-orange-50',icon:'⏳' },
+              ].map((s,i)=>(
+                <div key={i} className={`${s.color.split(' ')[1]} rounded-2xl p-4 text-center border border-gray-100`}>
+                  <span className="text-2xl">{s.icon}</span>
+                  <p className={`text-2xl font-extrabold mt-1 ${s.color.split(' ')[0]}`}>{s.value}</p>
+                  <p className="text-xs text-gray-600 font-medium">{s.label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="font-bold text-gray-800 text-sm">Recent Referrals</p>
+                <button onClick={()=>navigate('/doctor/dashboard?tab=patients')} className="text-xs text-violet-600 font-semibold hover:underline">New Referral</button>
+              </div>
+              {[
+                { patient:'Priya Patel',  from:'Dr. {firstName} (You)',  to:'Dr. Ananya Sharma',  spec:'Cardiologist',   date:'May 15', status:'Accepted' },
+                { patient:'Rohit Mehta',  from:'Dr. {firstName} (You)',  to:'Dr. Vikram Singh',   spec:'Neurologist',    date:'May 13', status:'Pending' },
+                { patient:'Kavita Joshi', from:'Dr. Raj Kumar',          to:'Dr. {firstName}',    spec:'General',        date:'May 12', status:'Accepted' },
+              ].map((r,i)=>(
+                <div key={i} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
+                  <div className="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center text-sm font-bold text-violet-600 flex-shrink-0">
+                    {r.patient.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">{r.patient}</p>
+                    <p className="text-xs text-gray-400">→ {r.to} ({r.spec}) · {r.date}</p>
+                  </div>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${r.status==='Accepted'?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>{r.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── TASK & REMINDERS ── */}
+        {activeTab === 'tasks' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-cyan-600 to-blue-600 rounded-2xl p-5 text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><CheckSquare size={20}/></div>
+              <div><h2 className="font-extrabold text-lg">Task & Reminders</h2><p className="text-cyan-200 text-xs">Manage daily tasks, pending work and important reminders</p></div>
+            </div>
+            <TaskRemindersSection appointments={appointments} navigate={navigate}/>
+          </div>
+        )}
+
+        {/* ── SETTINGS ── */}
+        {activeTab === 'settings' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-gray-700 to-gray-900 rounded-2xl p-5 text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Settings size={20}/></div>
+              <div><h2 className="font-extrabold text-lg">Settings</h2><p className="text-gray-300 text-xs">Update profile, change password, preferences and account settings</p></div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {[
+                { icon:'👤', label:'Edit Profile',         sub:'Update your name, photo, bio',           action:()=>navigate('/doctor/profile') },
+                { icon:'🔒', label:'Change Password',      sub:'Update your account password',           action:()=>navigate('/doctor/profile') },
+                { icon:'🔔', label:'Notification Settings',sub:'Manage alerts and reminders',            action:()=>navigate('/doctor/dashboard?tab=notifications') },
+                { icon:'📅', label:'Availability Settings',sub:'Set working hours and slots',            action:()=>navigate('/doctor/dashboard?tab=schedule') },
+                { icon:'💰', label:'Payment Settings',     sub:'Manage consultation fees',               action:()=>navigate('/doctor/dashboard?tab=payments') },
+                { icon:'🌐', label:'Language & Region',    sub:'Change language preferences',            action:()=>{} },
+              ].map((s,i)=>(
+                <button key={i} onClick={s.action}
+                  className="flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 hover:bg-blue-50 text-left transition-all shadow-sm group">
+                  <span className="text-3xl">{s.icon}</span>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm group-hover:text-blue-700">{s.label}</p>
+                    <p className="text-xs text-gray-400">{s.sub}</p>
+                  </div>
+                  <ChevronRight size={16} className="text-gray-300 group-hover:text-blue-500 ml-auto flex-shrink-0"/>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── HELP & SUPPORT ── */}
+        {activeTab === 'help' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-5 text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><HelpCircle size={20}/></div>
+              <div><h2 className="font-extrabold text-lg">Help & Support</h2><p className="text-blue-200 text-xs">Get help, raise support tickets and contact support team</p></div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {[
+                { icon:'📚', label:'Documentation',    sub:'Read guides and how-to articles',  color:'bg-blue-50 border-blue-100' },
+                { icon:'🎥', label:'Video Tutorials',  sub:'Watch feature walkthrough videos', color:'bg-purple-50 border-purple-100' },
+                { icon:'💬', label:'Live Chat',        sub:'Chat with our support team',       color:'bg-green-50 border-green-100' },
+                { icon:'📧', label:'Email Support',    sub:'support@synorahealth.com',         color:'bg-orange-50 border-orange-100' },
+              ].map((h,i)=>(
+                <div key={i} className={`flex items-center gap-4 p-4 border rounded-2xl shadow-sm ${h.color}`}>
+                  <span className="text-3xl">{h.icon}</span>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">{h.label}</p>
+                    <p className="text-xs text-gray-500">{h.sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <p className="font-bold text-gray-800 mb-4 text-sm">Raise a Support Ticket</p>
+              <div className="space-y-3">
+                <select className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400">
+                  <option>Select issue type</option>
+                  <option>Appointment issue</option>
+                  <option>Payment problem</option>
+                  <option>Technical bug</option>
+                  <option>Account issue</option>
+                  <option>Other</option>
+                </select>
+                <textarea rows={3} placeholder="Describe your issue..."
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400 resize-none"/>
+                <button className="w-full py-2.5 bg-blue-600 text-white font-semibold rounded-xl text-sm hover:bg-blue-700 transition-colors">
+                  Submit Ticket
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── ANALYTICS (Feature 15) ── */}
         {activeTab === 'analytics' && (

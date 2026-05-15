@@ -482,7 +482,7 @@ function AppointmentBooking() {
               </button>
             </div>
             <p className="text-center text-xs text-gray-400">Simulated payment — no real money charged.</p>
-i          </div>
+          </div>
         )}
       </div>
     </DashboardLayout>

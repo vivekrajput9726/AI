@@ -58,12 +58,32 @@ export default function AIFollowUp() {
     ]
   })
 
-  // Step 5 — Medicine Adherence
-  const [medicines, setMedicines] = useState([
-    { name:'Paracetamol 500mg', dose:'BD / 5 Days', taken:[true,true,true,true,false], time:'08:00 AM' },
-    { name:'Vitamin C 500mg',   dose:'OD / 10 Days', taken:[true,true,true,false,false], time:'09:00 AM' },
-    { name:'Cetrizine 10mg',    dose:'OD / 5 Days', taken:[true,true,false,false,false], time:'10:00 PM' },
-  ])
+  // Step 5 — Medicine Adherence (loaded from API)
+  const [medicines, setMedicines] = useState([])
+
+  useEffect(() => {
+    api.get('/medicines/').then(r => {
+      const meds = (r.data || []).map(m => ({
+        id:   m.id || m._id,
+        name: m.name,
+        dose: `${m.dosage || ''} · ${m.frequency || ''}`.trim(),
+        time: m.time || '08:00',
+        taken_count:  m.taken_count  || 0,
+        missed_count: m.missed_count || 0,
+      }))
+      if (meds.length > 0) setMedicines(meds)
+      else setMedicines([
+        { name:'Paracetamol 500mg', dose:'BD / 5 Days', time:'08:00 AM', taken_count:4, missed_count:1 },
+        { name:'Vitamin C 500mg',   dose:'OD / 10 Days', time:'09:00 AM', taken_count:3, missed_count:2 },
+        { name:'Cetrizine 10mg',    dose:'OD / 5 Days',  time:'10:00 PM', taken_count:2, missed_count:3 },
+      ])
+    }).catch(() => {
+      setMedicines([
+        { name:'Paracetamol 500mg', dose:'BD / 5 Days', time:'08:00 AM', taken_count:4, missed_count:1 },
+        { name:'Vitamin C 500mg',   dose:'OD / 10 Days', time:'09:00 AM', taken_count:3, missed_count:2 },
+      ])
+    })
+  }, [])
 
   // Step 6 — Symptom Re-check
   const [currentSymptoms, setCurrentSymptoms] = useState('')
@@ -96,22 +116,31 @@ export default function AIFollowUp() {
     toast.success('AI Follow-Up Activated!')
   }
 
-  // ── Toggle medicine taken ─────────────────────────────────────
-  const toggleMedicine = (medIdx, dayIdx) => {
-    setMedicines(m => m.map((med, i) => i===medIdx
-      ? { ...med, taken: med.taken.map((t,j) => j===dayIdx ? !t : t) }
-      : med
-    ))
+  // ── Mark taken/missed from API ────────────────────────────────
+  const logDose = async (med, status) => {
+    if (!med.id) return
+    try {
+      await api.post('/medicines/log', { medicine_id: med.id, status })
+      const res = await api.get('/medicines/')
+      const updated = (res.data || []).map(m => ({
+        id: m.id || m._id, name: m.name,
+        dose: `${m.dosage || ''} · ${m.frequency || ''}`.trim(),
+        time: m.time || '08:00',
+        taken_count: m.taken_count || 0, missed_count: m.missed_count || 0,
+      }))
+      setMedicines(updated)
+      toast.success(status === 'taken' ? '✅ Marked taken' : '⚠️ Marked missed')
+    } catch { toast.error('Failed to log dose') }
   }
 
   const adherencePct = (med) => {
-    const taken = med.taken.filter(Boolean).length
-    return Math.round((taken / med.taken.length) * 100)
+    const total = (med.taken_count || 0) + (med.missed_count || 0)
+    return total > 0 ? Math.round(((med.taken_count || 0) / total) * 100) : 100
   }
 
-  const overallAdherence = Math.round(
-    medicines.reduce((sum, m) => sum + adherencePct(m), 0) / medicines.length
-  )
+  const overallAdherence = medicines.length > 0
+    ? Math.round(medicines.reduce((sum, m) => sum + adherencePct(m), 0) / medicines.length)
+    : 100
 
   // ── Step 6: Symptom Re-check ────────────────────────────────────
   const runRecheck = async () => {
@@ -381,8 +410,8 @@ export default function AIFollowUp() {
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   {[
                     { l:'Adherence', v:`${overallAdherence}%`, c:'text-green-600 bg-green-50' },
-                    { l:'Taken',     v:`${medicines.reduce((s,m)=>s+m.taken.filter(Boolean).length,0)}`, c:'text-blue-600 bg-blue-50' },
-                    { l:'Skipped',   v:`${medicines.reduce((s,m)=>s+m.taken.filter(t=>!t).length,0)}`, c:'text-red-600 bg-red-50' },
+                    { l:'Taken',     v:`${medicines.reduce((s,m)=>s+(m.taken_count||0),0)}`, c:'text-blue-600 bg-blue-50' },
+                    { l:'Missed',    v:`${medicines.reduce((s,m)=>s+(m.missed_count||0),0)}`, c:'text-red-600 bg-red-50' },
                   ].map((s,i)=>(
                     <div key={i} className={`${s.c} rounded-xl p-2.5 text-center border border-gray-100`}>
                       <p className="text-lg font-extrabold">{s.v}</p>
@@ -402,17 +431,28 @@ export default function AIFollowUp() {
                           {adherencePct(med)}%
                         </span>
                       </div>
-                      <div className="flex gap-1.5">
-                        {med.taken.map((t,di)=>(
-                          <button key={di} onClick={()=>toggleMedicine(mi,di)}
-                            className={`flex-1 h-6 rounded-lg text-xs font-bold transition-all ${t?'bg-green-500 text-white':'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}>
-                            {t?'✓':'×'}
+                      {/* Taken / Missed counts */}
+                      <div className="flex gap-2 mb-2">
+                        <div className="flex-1 bg-green-50 rounded-lg px-2 py-1 text-center">
+                          <p className="text-xs font-bold text-green-600">{med.taken_count || 0} Taken</p>
+                        </div>
+                        <div className="flex-1 bg-red-50 rounded-lg px-2 py-1 text-center">
+                          <p className="text-xs font-bold text-red-500">{med.missed_count || 0} Missed</p>
+                        </div>
+                      </div>
+                      {/* Log buttons */}
+                      {med.id && (
+                        <div className="flex gap-2">
+                          <button onClick={()=>logDose(med,'taken')}
+                            className="flex-1 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-lg hover:bg-green-200 transition-colors">
+                            ✓ Mark Taken
                           </button>
-                        ))}
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-300 mt-1">
-                        {['D1','D2','D3','D4','D5'].map(d=><span key={d}>{d}</span>)}
-                      </div>
+                          <button onClick={()=>logDose(med,'missed')}
+                            className="flex-1 py-1 bg-red-100 text-red-600 text-xs font-bold rounded-lg hover:bg-red-200 transition-colors">
+                            × Mark Missed
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

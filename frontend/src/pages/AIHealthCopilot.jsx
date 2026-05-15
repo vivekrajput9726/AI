@@ -63,7 +63,7 @@ export default function AIHealthCopilot() {
   const [symptoms,  setSymptoms]  = useState('')
   const [age,       setAge]       = useState('')
   const [gender,    setGender]    = useState('male')
-  const [vitals,    setVitals]    = useState({ bp:'120/80', sugar:'98', weight:'65', sleep:'7' })
+  const [vitals, setVitals] = useState({ bp: '', sugar: '', weight: '', sleep: '' })
   const [duration,  setDuration]  = useState('')
   const [severity,  setSeverity]  = useState('moderate')
 
@@ -456,6 +456,34 @@ export default function AIHealthCopilot() {
                       ))}
                     </div>
                   )}
+
+                  {/* ── Suggested Tests ── */}
+                  {analysis.suggested_tests?.length > 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                      <p className="text-xs font-bold text-blue-700 mb-2 flex items-center gap-1.5">
+                        🧪 Suggested Tests
+                      </p>
+                      <div className="space-y-2">
+                        {analysis.suggested_tests.slice(0,4).map((t,i)=>(
+                          <div key={i} className="flex items-start gap-2 bg-white/70 rounded-lg p-2">
+                            <span className="text-sm flex-shrink-0">
+                              {t.type==='Blood'?'🩸':t.type==='Imaging'?'🫁':t.type==='ECG'?'💓':t.type==='Urine'?'🔬':'🧪'}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-gray-800">{t.name}</p>
+                              <p className="text-xs text-gray-500 leading-tight">{t.reason}</p>
+                            </div>
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                              t.urgency==='Urgent' ? 'bg-red-100 text-red-700' :
+                              t.urgency==='Soon'   ? 'bg-orange-100 text-orange-700' :
+                                                     'bg-green-100 text-green-700'
+                            }`}>{t.urgency}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <button onClick={()=>navigate('/patient/doctors')}
                     className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-xl text-sm hover:opacity-90 shadow-md">
                     <Calendar size={15}/> Book Appointment <ArrowRight size={13}/>

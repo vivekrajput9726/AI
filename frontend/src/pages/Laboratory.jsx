@@ -294,46 +294,90 @@ function ReportsTab() {
 
       {result && (
         <div className="space-y-3">
-          {/* Score + Parameters */}
+
+          {/* ── Header: Score + Report Type + Severity ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <div className="flex gap-4 items-start">
               {score!==null && <ScoreCircle score={score} size={80}/>}
-              <div className="flex-1">
-                <p className="text-xs font-bold text-gray-500 mb-1">{result.report_type}</p>
-                {result.overall_summary && <p className="text-xs text-gray-600 leading-relaxed mb-2">{result.overall_summary}</p>}
-                <div className="grid grid-cols-2 gap-1.5">
-                  {result.parameters?.slice(0,4).map((p,i)=>{
-                    const s=STATUS_STYLE[p.status]||STATUS_STYLE.unknown
-                    return (
-                      <div key={i} className={`border rounded-xl p-2 ${s.cls}`}>
-                        <div className="flex items-center justify-between gap-1">
-                          <p className="font-semibold text-xs truncate">{p.name}</p>
-                          <span className="text-xs font-bold px-1 py-0.5 rounded bg-white/60 flex-shrink-0">{s.label}</span>
-                        </div>
-                        {p.value && <p className="font-extrabold text-sm">{p.value} <span className="text-xs font-normal opacity-60">{p.unit}</span></p>}
-                      </div>
-                    )
-                  })}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <p className="text-sm font-bold text-gray-800">{result.report_type}</p>
+                  {result.severity && (
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      result.severity.includes('Urgent')   ? 'bg-red-100 text-red-700' :
+                      result.severity.includes('Moderate') ? 'bg-orange-100 text-orange-700' :
+                      result.severity.includes('Mild')     ? 'bg-yellow-100 text-yellow-700' :
+                                                              'bg-green-100 text-green-700'
+                    }`}>{result.severity}</span>
+                  )}
                 </div>
+                {result.overall_summary && (
+                  <p className="text-xs text-gray-600 leading-relaxed">{result.overall_summary}</p>
+                )}
               </div>
             </div>
           </div>
 
-          {/* AI Insights */}
-          {(result.concerns?.length>0||result.recommendations?.length>0) && (
-            <div className="grid grid-cols-2 gap-2">
-              {result.concerns?.length>0 && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                  <p className="text-xs font-bold text-red-700 mb-1">⚠️ AI Insights</p>
-                  {result.concerns.slice(0,2).map((c,i)=><p key={i} className="text-xs text-red-600">• {c}</p>)}
-                </div>
-              )}
-              {result.recommendations?.length>0 && (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-                  <p className="text-xs font-bold text-green-700 mb-1">✓ Recommended</p>
-                  {result.recommendations.slice(0,2).map((r,i)=><p key={i} className="text-xs text-green-600">• {r}</p>)}
-                </div>
-              )}
+          {/* ── All Parameters ── */}
+          {result.parameters?.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <p className="text-xs font-bold text-gray-700 mb-3">📋 All Parameters ({result.parameters.length})</p>
+              <div className="grid grid-cols-2 gap-2">
+                {result.parameters.map((p,i)=>{
+                  const s=STATUS_STYLE[p.status]||STATUS_STYLE.unknown
+                  return (
+                    <div key={i} className={`border rounded-xl p-2.5 ${s.cls}`}>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <p className="font-semibold text-xs truncate">{p.name}</p>
+                        <span className="text-xs font-bold px-1 py-0.5 rounded bg-white/60 flex-shrink-0 flex items-center gap-0.5">
+                          {s.icon} {s.label}
+                        </span>
+                      </div>
+                      {p.value && (
+                        <p className="font-extrabold text-sm">{p.value}
+                          <span className="text-xs font-normal opacity-60 ml-1">{p.unit}</span>
+                        </p>
+                      )}
+                      {p.normal_range && (
+                        <p className="text-[10px] opacity-60 mt-0.5">Normal: {p.normal_range}</p>
+                      )}
+                      {p.interpretation && (
+                        <p className="text-[10px] text-gray-600 mt-0.5 leading-tight">{p.interpretation}</p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── AI Diagnosis: Concerns ── */}
+          {result.concerns?.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+              <p className="text-xs font-bold text-red-700 mb-2">⚠️ Abnormalities Detected ({result.concerns.length})</p>
+              <div className="space-y-1">
+                {result.concerns.map((c,i)=>(
+                  <div key={i} className="flex items-start gap-1.5">
+                    <span className="text-red-400 flex-shrink-0 mt-0.5">•</span>
+                    <p className="text-xs text-red-700">{c}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Risk Prediction + Health Recommendations ── */}
+          {result.recommendations?.length > 0 && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+              <p className="text-xs font-bold text-green-700 mb-2">✅ Health Recommendations</p>
+              <div className="space-y-1">
+                {result.recommendations.map((r,i)=>(
+                  <div key={i} className="flex items-start gap-1.5">
+                    <span className="text-green-500 flex-shrink-0 mt-0.5">✓</span>
+                    <p className="text-xs text-green-700">{r}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -397,37 +441,58 @@ Return ONLY valid JSON (no markdown):
 }`
 
 function SkinScanTab() {
-  const navigate  = useNavigate()
-  const [image,   setImage]   = useState(null)
-  const [preview, setPreview] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [result,  setResult]  = useState(null)
+  const navigate       = useNavigate()
+  const [image,        setImage]        = useState(null)
+  const [preview,      setPreview]      = useState(null)
+  const [loading,      setLoading]      = useState(false)
+  const [result,       setResult]       = useState(null)
+  const [matchedDocs,  setMatchedDocs]  = useState([])
+  const [docsLoading,  setDocsLoading]  = useState(false)
 
   const handleFile = e => {
     const f = e.target.files[0]; if (!f) return
     const reader = new FileReader()
-    reader.onload = ev => { setImage(ev.target.result); setPreview(ev.target.result); setResult(null) }
+    reader.onload = ev => { setImage(ev.target.result); setPreview(ev.target.result); setResult(null); setMatchedDocs([]) }
     reader.readAsDataURL(f)
+  }
+
+  const fetchMatchedDoctors = async (specialization) => {
+    setDocsLoading(true)
+    try {
+      const res = await api.get(`/doctors?specialization=${encodeURIComponent(specialization)}`)
+      const all = res.data.doctors || res.data || []
+      // Filter by specialization match (case-insensitive), show up to 3
+      const filtered = all.filter(d =>
+        d.specialization?.toLowerCase().includes(specialization.toLowerCase()) ||
+        specialization.toLowerCase().includes(d.specialization?.toLowerCase() || '')
+      ).slice(0, 3)
+      // If no match found, take first 3 available doctors
+      setMatchedDocs(filtered.length > 0 ? filtered : all.slice(0, 3))
+    } catch { setMatchedDocs([]) }
+    finally { setDocsLoading(false) }
   }
 
   const analyze = async () => {
     if (!image) { toast.error('Upload a skin image'); return }
-    setLoading(true); setResult(null)
+    setLoading(true); setResult(null); setMatchedDocs([])
     try {
       const comp = await compressImage(image, 1024, 0.88)
       const res = await api.post('/ai/analyze-report', { image_base64: comp }, { timeout: 60000 })
       if (res.data.success) {
         const d = res.data.data
-        setResult({
-          condition: d.report_type || 'Skin Condition',
-          confidence: d.parameters?.[0]?.value || 88,
-          risk_level: d.severity?.includes('Urgent')?'High':d.severity?.includes('Moderate')?'Medium':'Low',
-          description: d.overall_summary || '',
-          recommendations: d.recommendations || [],
+        const analysis = {
+          condition:        d.report_type || 'Skin Condition',
+          confidence:       d.parameters?.[0]?.value || 88,
+          risk_level:       d.severity?.includes('Urgent')?'High':d.severity?.includes('Moderate')?'Medium':'Low',
+          description:      d.overall_summary || '',
+          recommendations:  d.recommendations || [],
           doctor_to_consult: d.doctor_to_consult || 'Dermatologist',
-          urgency: d.severity?.includes('Urgent')?'Urgent':'Routine',
-        })
+          urgency:          d.severity?.includes('Urgent')?'Urgent':'Routine',
+        }
+        setResult(analysis)
         toast.success('Skin analysis complete!')
+        // Fetch matched doctors for the suggested specialist
+        fetchMatchedDoctors(analysis.doctor_to_consult)
       } else toast.error(res.data.error||'Analysis failed')
     } catch { toast.error('Analysis failed') }
     finally { setLoading(false) }
@@ -493,13 +558,58 @@ function SkinScanTab() {
             </div>
           )}
 
-          <div className="flex gap-2">
-            <span className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold border ${riskColor[result.urgency==='Urgent'?'High':result.urgency==='Soon'?'Medium':'Low']}`}>
-              {result.urgency === 'Urgent' ? '🚨' : result.urgency === 'Soon' ? '⚠️' : '✅'} {result.urgency}
-            </span>
-            <button onClick={()=>navigate('/patient/doctors')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-purple-600 text-white rounded-xl text-xs font-bold">
-              <Stethoscope size={13}/> Consult {result.doctor_to_consult}
-            </button>
+          {/* Urgency badge */}
+          <div className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border ${riskColor[result.urgency==='Urgent'?'High':result.urgency==='Soon'?'Medium':'Low']}`}>
+            {result.urgency === 'Urgent' ? '🚨' : result.urgency === 'Soon' ? '⚠️' : '✅'}
+            {result.urgency} — Consult a <strong>{result.doctor_to_consult}</strong>
+          </div>
+
+          {/* ── Matched Doctors ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p className="text-xs font-bold text-gray-700 mb-3 flex items-center gap-1.5">
+              <Stethoscope size={13} className="text-purple-600"/>
+              Recommended {result.doctor_to_consult}s
+            </p>
+            {docsLoading ? (
+              <div className="flex items-center justify-center gap-2 py-4 text-xs text-purple-500">
+                <Loader size={14} className="animate-spin"/> Finding matched doctors...
+              </div>
+            ) : matchedDocs.length === 0 ? (
+              <div className="text-center py-3">
+                <p className="text-xs text-gray-400 mb-2">No {result.doctor_to_consult}s found</p>
+                <button onClick={() => navigate('/patient/doctors')}
+                  className="text-xs text-purple-600 font-semibold hover:underline">
+                  View all doctors →
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {matchedDocs.map(doc => (
+                  <div key={doc.id || doc._id} className="flex items-center gap-3 p-2.5 bg-purple-50 border border-purple-100 rounded-xl">
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-violet-600 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {(doc.name || doc.full_name || 'D').charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-900 truncate">{doc.name || doc.full_name}</p>
+                      <p className="text-xs text-purple-600">{doc.specialization}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {doc.rating && <span className="text-[10px] text-yellow-600">⭐ {doc.rating}</span>}
+                        {doc.experience_years && <span className="text-[10px] text-gray-400">{doc.experience_years} yrs</span>}
+                        {doc.consultation_fee && <span className="text-[10px] text-gray-400">₹{doc.consultation_fee}</span>}
+                      </div>
+                    </div>
+                    <button onClick={() => navigate(`/patient/book/${doc.id || doc._id}`)}
+                      className="flex-shrink-0 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-colors">
+                      Book
+                    </button>
+                  </div>
+                ))}
+                <button onClick={() => navigate('/patient/doctors')}
+                  className="w-full text-xs text-purple-600 font-medium hover:underline pt-1">
+                  View all {result.doctor_to_consult}s →
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -508,30 +618,96 @@ function SkinScanTab() {
 }
 
 // ═══════════════════════════════════════════════════
-// TAB 4 — BMI & METRICS
+// TAB 4 — BMI & DIET INSTRUCTIONS
 // ═══════════════════════════════════════════════════
 function BMITab() {
   const [w, setW] = useState(''), [h, setH] = useState(''), [age, setAge] = useState(''), [gender, setGender] = useState('male')
-  const [result, setResult] = useState(null)
-  const [advice, setAdvice] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [result,   setResult]   = useState(null)
+  const [advice,   setAdvice]   = useState(null)
+  const [loading,  setLoading]  = useState(false)
+  const [dietPlan, setDietPlan] = useState(null)
+  const [dietLoad, setDietLoad] = useState(false)
 
   const calculate = async () => {
     if (!w||!h) { toast.error('Enter weight and height'); return }
     const data = calcBMI(parseFloat(w), parseFloat(h), parseInt(age)||25, gender)
-    setResult(data); setAdvice(null); setLoading(true)
+    setResult(data); setAdvice(null); setDietPlan(null); setLoading(true)
     try {
       const res = await api.post('/extras/bmi-advice', { bmi:parseFloat(data.bmi), category:data.range.label, bmr:data.bmr, age:parseInt(age)||25, gender, weight_kg:parseFloat(w), height_cm:parseFloat(h) })
       if (res.data.success) setAdvice(res.data.data)
     } catch {} finally { setLoading(false) }
   }
 
+  const generateDietPlan = async () => {
+    if (!result) return
+    setDietLoad(true)
+    try {
+      const prompt = `Create a daily diet plan for: BMI ${result.bmi} (${result.range.label}), ${age||25}yr ${gender}, weight ${w}kg, BMR ${result.bmr} kcal.
+
+Reply ONLY with raw JSON (no markdown, no code blocks). Use this exact structure:
+{"daily_calories":1800,"water_intake":"2.5 litres (8-10 glasses)","goal":"Lose weight gradually by reducing 300 kcal/day","meals":[{"meal":"Early Morning","time":"6:30 AM","items":[{"food":"Warm lemon water","quantity":"1 glass","calories":5}]},{"meal":"Breakfast","time":"8:00 AM","items":[{"food":"Oats porridge","quantity":"1 bowl 150g","calories":150},{"food":"Boiled eggs","quantity":"2","calories":70}]},{"meal":"Mid-Morning","time":"10:30 AM","items":[{"food":"Seasonal fruit","quantity":"1 medium","calories":80}]},{"meal":"Lunch","time":"1:00 PM","items":[{"food":"Brown rice","quantity":"1 cup","calories":200},{"food":"Dal","quantity":"1 bowl","calories":120},{"food":"Vegetables","quantity":"1 bowl","calories":80}]},{"meal":"Evening Snack","time":"4:00 PM","items":[{"food":"Green tea + nuts","quantity":"1 cup + 10 nuts","calories":90}]},{"meal":"Dinner","time":"7:30 PM","items":[{"food":"Chapati whole wheat","quantity":"2 nos","calories":150},{"food":"Sabzi/curry","quantity":"1 bowl","calories":120}]}],"avoid":["Fried foods","Sugary drinks","White bread","Late night eating"],"tips":["Eat slowly","Don't skip breakfast","Walk 30 min daily","Drink water before meals"]}`
+
+      const res = await api.post('/ai/chat', { message: prompt, history: [] })
+      const text = res.data?.response || ''
+
+      // Try multiple JSON extraction methods
+      let parsed = null
+
+      // Method 1: direct parse
+      try { parsed = JSON.parse(text.trim()) } catch {}
+
+      // Method 2: extract from code block ```json ... ```
+      if (!parsed) {
+        const cb = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+        if (cb) try { parsed = JSON.parse(cb[1].trim()) } catch {}
+      }
+
+      // Method 3: find first { ... }
+      if (!parsed) {
+        const m = text.match(/\{[\s\S]*\}/)
+        if (m) try { parsed = JSON.parse(m[0]) } catch {}
+      }
+
+      if (parsed) {
+        setDietPlan(parsed)
+        toast.success('Diet plan ready!')
+      } else {
+        // Fallback: build a default plan based on BMI
+        const cal = result.range.label === 'Underweight' ? 2200
+                  : result.range.label === 'Normal'      ? 1800
+                  : result.range.label === 'Overweight'  ? 1600 : 1400
+        setDietPlan({
+          daily_calories: cal,
+          water_intake: '2.5–3 litres per day (8–10 glasses)',
+          goal: result.range.label === 'Underweight' ? 'Gain weight with nutrient-dense foods'
+              : result.range.label === 'Normal'      ? 'Maintain healthy weight and balanced nutrition'
+              : result.range.label === 'Overweight'  ? 'Lose weight gradually — reduce 300 kcal/day'
+              :                                         'Reduce weight significantly with low-calorie diet',
+          meals: [
+            { meal:'Early Morning', time:'6:30 AM', items:[{food:'Warm lemon water',quantity:'1 glass (250ml)',calories:5},{food:'Soaked almonds',quantity:'5 nos',calories:35}]},
+            { meal:'Breakfast',     time:'8:00 AM', items:[{food:'Oats / Upma',quantity:'1 bowl (150g)',calories:180},{food:'Boiled egg / Paneer',quantity:'1–2 nos / 50g',calories:80},{food:'Green tea',quantity:'1 cup',calories:2}]},
+            { meal:'Mid-Morning',   time:'10:30 AM',items:[{food:'Seasonal fruit (apple/guava/papaya)',quantity:'1 medium',calories:75}]},
+            { meal:'Lunch',         time:'1:00 PM', items:[{food:'Brown rice / 2 chapati',quantity:'1 cup / 2 nos',calories:200},{food:'Dal / Rajma',quantity:'1 bowl',calories:120},{food:'Sabzi (vegetables)',quantity:'1 bowl',calories:80},{food:'Salad',quantity:'1 plate',calories:25}]},
+            { meal:'Evening Snack', time:'4:00 PM', items:[{food:'Roasted chana / sprouts',quantity:'1 small bowl (50g)',calories:100},{food:'Buttermilk / green tea',quantity:'1 glass',calories:30}]},
+            { meal:'Dinner',        time:'7:30 PM', items:[{food:'Whole wheat chapati',quantity:'2 nos',calories:150},{food:'Curry / sabzi',quantity:'1 bowl',calories:130},{food:'Vegetable soup',quantity:'1 bowl',calories:50}]},
+          ],
+          avoid: ['Deep fried foods','Sugary drinks & soda','White bread & maida','Processed snacks','Late night eating after 9 PM'],
+          tips: ['Eat slowly and chew 20–30 times','Never skip breakfast','Walk 30 min after lunch/dinner','Drink a glass of water before each meal','Sleep 7–8 hours for better metabolism'],
+        })
+        toast.success('Diet plan ready (default template)!')
+      }
+    } catch (e) {
+      toast.error('Failed to connect. Using default plan.')
+    } finally { setDietLoad(false) }
+  }
+
   const bmiPct = result ? Math.min(100, Math.max(0, ((parseFloat(result.bmi)-10)/30)*100)) : 0
 
   return (
     <div className="space-y-4">
+      {/* Input form */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-        <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2"><Scale size={15} className="text-green-600"/>BMI & Health Calculator</h3>
+        <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2"><Scale size={15} className="text-green-600"/>BMI & Diet Calculator</h3>
         <div className="grid grid-cols-2 gap-3">
           {[{label:'Height (cm)',val:h,set:setH,ph:'165'},{label:'Weight (kg)',val:w,set:setW,ph:'68'},{label:'Age',val:age,set:setAge,ph:'24'}].map((f,i)=>(
             <div key={i} className={i===2?'col-span-2':''}><label className="text-xs text-gray-500 mb-1 block">{f.label}</label><input type="number" value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph} className="input-field"/></div>
@@ -542,12 +718,13 @@ function BMITab() {
         </div>
         <button onClick={calculate} disabled={!w||!h}
           className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-500 text-white font-bold rounded-xl disabled:opacity-40 flex items-center justify-center gap-2 text-sm">
-          <Scale size={15}/> Calculate
+          <Scale size={15}/> Calculate BMI + Get Diet Plan
         </button>
       </div>
 
       {result && (
         <div className="space-y-3">
+          {/* BMI Result */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <div className="flex items-center gap-4 mb-3">
               <div className="text-center">
@@ -565,7 +742,7 @@ function BMITab() {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2">
-              {[{l:'BMR',v:`${result.bmr}`,u:'kcal'},{l:'Ideal',v:result.idealRange,u:'kg'},{l:'Body Fat',v:`${result.bodyFat}%`,u:'est.'}].map((m,i)=>(
+              {[{l:'BMR',v:`${result.bmr}`,u:'kcal'},{l:'Ideal Weight',v:result.idealRange,u:'kg'},{l:'Body Fat',v:`${result.bodyFat}%`,u:'est.'}].map((m,i)=>(
                 <div key={i} className="bg-gray-50 rounded-xl p-2.5 text-center">
                   <p className="text-xs text-gray-400">{m.l}</p>
                   <p className="font-bold text-gray-800 text-sm">{m.v} <span className="text-xs font-normal text-gray-400">{m.u}</span></p>
@@ -574,16 +751,116 @@ function BMITab() {
             </div>
           </div>
 
-          {loading && <div className="flex items-center justify-center gap-2 py-4 text-sm text-purple-600"><Loader size={15} className="animate-spin"/>Getting AI advice...</div>}
+          {loading && <div className="flex items-center justify-center gap-2 py-4 text-sm text-green-600"><Loader size={15} className="animate-spin"/>Getting AI advice...</div>}
 
           {advice && (
             <div className="space-y-2">
               {advice.goal && <div className="bg-purple-50 border border-purple-200 rounded-xl p-3"><p className="text-xs font-bold text-purple-600 mb-0.5">🎯 Goal</p><p className="text-sm text-purple-900">{advice.goal}</p></div>}
               <div className="grid grid-cols-2 gap-2">
-                {advice.diet?.length>0 && <div className="bg-green-50 border border-green-200 rounded-xl p-3"><p className="text-xs font-bold text-green-700 mb-1">🥗 Diet</p>{advice.diet.slice(0,3).map((t,i)=><p key={i} className="text-xs text-green-600">• {t}</p>)}</div>}
                 {advice.exercise?.length>0 && <div className="bg-blue-50 border border-blue-200 rounded-xl p-3"><p className="text-xs font-bold text-blue-700 mb-1">🏃 Exercise</p>{advice.exercise.map((t,i)=><p key={i} className="text-xs text-blue-600">• {t}</p>)}</div>}
+                {advice.motivational && <div className="bg-teal-50 border border-teal-200 rounded-xl p-3"><p className="text-xs font-bold text-teal-700 mb-1">💬 Motivation</p><p className="text-xs text-teal-700 italic">"{advice.motivational}"</p></div>}
               </div>
-              {advice.motivational && <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-center"><p className="text-sm font-semibold text-teal-700 italic">"{advice.motivational}"</p></div>}
+            </div>
+          )}
+
+          {/* ── Diet Instructions Button ── */}
+          {!dietPlan && (
+            <button onClick={generateDietPlan} disabled={dietLoad}
+              className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 text-sm hover:opacity-90 disabled:opacity-50">
+              {dietLoad
+                ? <><Loader size={15} className="animate-spin"/>Generating Diet Plan...</>
+                : <>🥗 Get Full Diet Instructions (What · Quantity · Time)</>}
+            </button>
+          )}
+
+          {/* ── Full Diet Plan ── */}
+          {dietPlan && (
+            <div className="space-y-3">
+
+              {/* Header */}
+              <div className="bg-gradient-to-r from-green-600 to-emerald-500 rounded-2xl p-4 text-white">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-extrabold text-base">🥗 Your Personalized Diet Plan</p>
+                  <button onClick={() => setDietPlan(null)} className="text-white/70 hover:text-white text-xs">✕ Clear</button>
+                </div>
+                <div className="flex gap-4 text-sm">
+                  <span>🔥 {dietPlan.daily_calories} kcal/day</span>
+                  <span>💧 {dietPlan.water_intake}</span>
+                </div>
+                {dietPlan.goal && <p className="text-green-100 text-xs mt-1">{dietPlan.goal}</p>}
+              </div>
+
+              {/* Meal Schedule */}
+              {dietPlan.meals?.map((meal, mi) => (
+                <div key={mi} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">
+                        {meal.meal.includes('Morning') && !meal.meal.includes('Mid') ? '🌅' :
+                         meal.meal.includes('Breakfast') ? '🍳' :
+                         meal.meal.includes('Mid') ? '🍎' :
+                         meal.meal.includes('Lunch') ? '🍱' :
+                         meal.meal.includes('Evening') ? '☕' :
+                         meal.meal.includes('Dinner') ? '🌙' : '🥘'}
+                      </span>
+                      <p className="text-sm font-bold text-gray-800">{meal.meal}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-green-700 font-semibold bg-green-100 px-2 py-0.5 rounded-full">
+                      🕐 {meal.time}
+                    </div>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    {meal.items?.map((item, ii) => (
+                      <div key={ii} className="flex items-center gap-3 py-1.5 border-b border-gray-50 last:border-0">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800">{item.food}</p>
+                          <p className="text-xs text-green-600 font-medium">📏 {item.quantity}</p>
+                        </div>
+                        {item.calories > 0 && (
+                          <span className="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded-full flex-shrink-0">
+                            🔥 {item.calories} cal
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Foods to Avoid */}
+              {dietPlan.avoid?.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                  <p className="text-sm font-bold text-red-700 mb-3">🚫 Foods to Avoid</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {dietPlan.avoid.map((item, i) => (
+                      <div key={i} className="flex items-center gap-2 bg-white/80 rounded-xl px-3 py-2">
+                        <span className="text-red-400 flex-shrink-0">✗</span>
+                        <p className="text-xs text-red-700 font-medium">{item}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tips */}
+              {dietPlan.tips?.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                  <p className="text-sm font-bold text-blue-700 mb-3">💡 Diet Tips</p>
+                  <div className="space-y-1.5">
+                    {dietPlan.tips.map((tip, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="text-blue-400 flex-shrink-0 mt-0.5">•</span>
+                        <p className="text-xs text-blue-700">{tip}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button onClick={generateDietPlan} disabled={dietLoad}
+                className="w-full py-2.5 border border-green-300 text-green-700 text-xs font-semibold rounded-xl hover:bg-green-50 flex items-center justify-center gap-2">
+                {dietLoad ? <><Loader size={13} className="animate-spin"/>Regenerating...</> : '🔄 Regenerate Diet Plan'}
+              </button>
             </div>
           )}
         </div>

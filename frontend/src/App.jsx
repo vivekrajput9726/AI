@@ -27,6 +27,7 @@ import HealthGoals from './pages/HealthGoals'
 import FamilyHealth from './pages/FamilyHealth'
 import PatientJourney from './pages/PatientJourney'
 import SmartReport from './pages/SmartReport'
+import Insurance from './pages/Insurance'
 import AIChatbot from './components/common/AIChatbot'
 import ProtectedRoute from './routes/ProtectedRoute'
 
@@ -68,6 +69,7 @@ function App() {
         <Route path="/patient/family"    element={<ProtectedRoute roles={['patient']}><FamilyHealth /></ProtectedRoute>} />
         <Route path="/patient/journey"      element={<ProtectedRoute roles={['patient']}><PatientJourney /></ProtectedRoute>} />
         <Route path="/patient/smart-report" element={<ProtectedRoute roles={['patient']}><SmartReport /></ProtectedRoute>} />
+        <Route path="/patient/insurance"   element={<ProtectedRoute roles={['patient']}><Insurance /></ProtectedRoute>} />
 
         <Route path="/doctor/dashboard"  element={<ProtectedRoute roles={['doctor']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/profile"    element={<ProtectedRoute roles={['doctor']}><Profile /></ProtectedRoute>} />

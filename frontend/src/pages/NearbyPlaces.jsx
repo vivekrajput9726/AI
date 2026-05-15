@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { MapPin, Navigation, Loader, RefreshCw, Phone, Star } from 'lucide-react'
+import { MapPin, Navigation, Loader, RefreshCw, Phone, ExternalLink } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import toast from 'react-hot-toast'
 
@@ -261,9 +261,9 @@ function NearbyPlaces() {
                       <p className="font-semibold text-gray-900 text-sm">{place.name}</p>
                       <p className="text-gray-400 text-xs mt-1">{place.address}</p>
                       {place.phone && (
-                        <p className="text-blue-600 text-xs mt-1 flex items-center gap-1">
+                        <a href={`tel:${place.phone}`} className="text-green-600 text-xs mt-1 flex items-center gap-1 hover:underline">
                           <Phone size={10} /> {place.phone}
-                        </p>
+                        </a>
                       )}
                     </div>
                     <span className="text-2xl">{activeTypeData?.icon}</span>
@@ -271,12 +271,21 @@ function NearbyPlaces() {
                   <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full inline-flex items-center gap-1 mb-3">
                     <MapPin size={10} /> {getDistance(place.lat, place.lng)}
                   </span>
-                  <button
-                    onClick={() => openDirections(place.lat, place.lng)}
-                    className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium py-2 rounded-xl transition-colors"
-                  >
-                    <Navigation size={12} /> Get Directions
-                  </button>
+                  <div className="flex gap-2">
+                    {/* Call button — only if phone exists */}
+                    {place.phone && (
+                      <a href={`tel:${place.phone}`}
+                        className="flex-1 flex items-center justify-center gap-1.5 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-semibold py-2 rounded-xl transition-colors">
+                        <Phone size={12} /> Call
+                      </a>
+                    )}
+                    {/* Directions button — always shown */}
+                    <button
+                      onClick={() => openDirections(place.lat, place.lng)}
+                      className={`flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold py-2 rounded-xl transition-colors ${place.phone ? 'flex-1' : 'w-full'}`}>
+                      <Navigation size={12} /> Navigate
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

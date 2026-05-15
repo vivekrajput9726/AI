@@ -85,25 +85,54 @@ function Profile() {
 
         {/* Avatar Section */}
         <div className="card text-center">
-          <div className="relative w-24 h-24 mx-auto mb-4">
-            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-3xl font-bold overflow-hidden">
-              {user?.profile_image ? (
-                <img src={user.profile_image} alt="" className="w-full h-full object-cover" />
-              ) : (
-                getInitials(user?.full_name)
-              )}
+          {/* Photo upload area */}
+          <div className="flex flex-col items-center gap-3 mb-4">
+            <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+              <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-4xl font-bold overflow-hidden border-4 border-blue-100 shadow-lg">
+                {user?.profile_image ? (
+                  <img src={user.profile_image} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  getInitials(user?.full_name)
+                )}
+              </div>
+              {/* Hover overlay */}
+              <div className="absolute inset-0 rounded-full bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                {photoUploading
+                  ? <LoadingSpinner size="sm" />
+                  : <>
+                      <Camera size={20} className="text-white"/>
+                      <p className="text-white text-[10px] font-bold mt-1">Change Photo</p>
+                    </>
+                }
+              </div>
+              {/* Camera badge */}
+              <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center border-2 border-white shadow">
+                <Camera size={14} className="text-white"/>
+              </div>
             </div>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={photoUploading}
-              className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center shadow-md transition-colors"
-            >
-              {photoUploading ? <LoadingSpinner size="sm" /> : <Camera size={14} />}
-            </button>
+
+            {/* Upload buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={photoUploading}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50">
+                {photoUploading ? <LoadingSpinner size="sm"/> : <Camera size={14}/>}
+                {photoUploading ? 'Uploading...' : 'Upload Photo'}
+              </button>
+              {/* Camera capture for mobile */}
+              <label className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 cursor-pointer transition-colors">
+                <Camera size={14}/> Take Photo
+                <input type="file" accept="image/*" capture="user" onChange={handlePhotoUpload} className="hidden"/>
+              </label>
+            </div>
+            <p className="text-xs text-gray-400">JPG, PNG · Max 2MB · Click photo or use buttons above</p>
+
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
           </div>
+
           <h2 className="font-bold text-xl text-gray-900">{user?.full_name}</h2>
-          <p className="text-gray-500 text-sm capitalize">{user?.role} Account</p>
+          <p className="text-gray-500 text-sm capitalize">{user?.specialization || user?.role} Account</p>
           <div className="flex items-center justify-center gap-2 mt-2">
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${user?.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
               {user?.is_active ? 'Active' : 'Inactive'}

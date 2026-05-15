@@ -74,15 +74,17 @@ export default function FamilyHealth() {
     api.get('/family/').then(r => setMembers(r.data)).catch(()=>{}).finally(()=>setLoading(false))
   }, [])
 
-  // load vitals & meds from localStorage when member changes
+  // Load vitals & medicines from API when member changes
   useEffect(() => {
     if (!selected) return
-    const v = localStorage.getItem(`family_vitals_${selected.id}`)
-    if (v) setVitals(JSON.parse(v))
-    else   setVitals(VITALS_EMPTY)
-    const m = localStorage.getItem(`family_meds_${selected.id}`)
-    if (m) setMeds(JSON.parse(m))
-    else   setMeds([])
+    setVitals(VITALS_EMPTY)
+    setMeds([])
+    api.get(`/family/${selected.id}/vitals`)
+      .then(r => { if (r.data && Object.keys(r.data).length) setVitals(r.data) })
+      .catch(() => {})
+    api.get(`/family/${selected.id}/medicines`)
+      .then(r => setMeds(r.data || []))
+      .catch(() => {})
   }, [selected])
 
   // ── Member CRUD ──────────────────────────────────────────────────────────
@@ -117,10 +119,12 @@ export default function FamilyHealth() {
   const selectMember = m => { setSelected(m); setStep(2); setBooked(false); setAiInsights('') }
 
   // ── Vitals ───────────────────────────────────────────────────────────────
-  const saveVitals = () => {
-    localStorage.setItem(`family_vitals_${selected.id}`, JSON.stringify(vitals))
-    setEditVitals(false)
-    toast.success('Vitals saved!')
+  const saveVitals = async () => {
+    try {
+      await api.put(`/family/${selected.id}/vitals`, vitals)
+      setEditVitals(false)
+      toast.success('Vitals saved!')
+    } catch { toast.error('Failed to save vitals') }
   }
 
   // ── Consultation ─────────────────────────────────────────────────────────
@@ -148,33 +152,35 @@ export default function FamilyHealth() {
   }
 
   // ── Medicines ────────────────────────────────────────────────────────────
-  const addMed = () => {
+  const reloadMeds = () =>
+    api.get(`/family/${selected.id}/medicines`).then(r => setMeds(r.data || [])).catch(() => {})
+
+  const addMed = async () => {
     if (!medForm.name) { toast.error('Medicine name required'); return }
-    const updated = [...meds, { ...medForm, id: Date.now(), taken: [] }]
-    setMeds(updated)
-    localStorage.setItem(`family_meds_${selected.id}`, JSON.stringify(updated))
-    setMedForm({ name:'',dosage:'',frequency:'Morning',notes:'' })
-    setShowMedForm(false)
-    toast.success('Medicine added!')
+    try {
+      await api.post(`/family/${selected.id}/medicines`, medForm)
+      setMedForm({ name:'', dosage:'', frequency:'Morning', notes:'' })
+      setShowMedForm(false)
+      toast.success('Medicine added!')
+      reloadMeds()
+    } catch { toast.error('Failed to add medicine') }
   }
-  const removeMed = id => {
-    const updated = meds.filter(m => m.id!==id)
-    setMeds(updated)
-    localStorage.setItem(`family_meds_${selected.id}`, JSON.stringify(updated))
+  const removeMed = async id => {
+    try {
+      await api.delete(`/family/${selected.id}/medicines/${id}`)
+      reloadMeds()
+    } catch { toast.error('Failed to remove') }
   }
-  const toggleTaken = id => {
-    const today = new Date().toDateString()
-    const updated = meds.map(m => {
-      if (m.id!==id) return m
-      const taken = m.taken?.includes(today)
-        ? m.taken.filter(d => d!==today)
-        : [...(m.taken||[]), today]
-      return { ...m, taken }
-    })
-    setMeds(updated)
-    localStorage.setItem(`family_meds_${selected.id}`, JSON.stringify(updated))
+  const toggleTaken = async id => {
+    try {
+      await api.patch(`/family/${selected.id}/medicines/${id}/toggle`)
+      reloadMeds()
+    } catch { toast.error('Failed to update') }
   }
-  const isTakenToday = med => med.taken?.includes(new Date().toDateString())
+  const isTakenToday = med => {
+    const today = new Date().toISOString().split('T')[0]
+    return med.taken_dates?.includes(today)
+  }
 
   // ── AI Monitoring ────────────────────────────────────────────────────────
   const runAIMonitoring = async () => {
