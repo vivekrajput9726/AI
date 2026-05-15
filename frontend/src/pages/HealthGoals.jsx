@@ -136,53 +136,60 @@ export default function HealthGoals() {
   const [insights,   setInsights]   = useState([])
   const [insLoading, setInsLoading] = useState(false)
 
-  // Load goals from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem(`health_goals_${user?.id}`)
-    if (saved) {
-      const g = JSON.parse(saved)
+  // Load goals from API
+  const loadGoals = async () => {
+    try {
+      const res = await api.get('/goals/')
+      const g = res.data || []
       setGoals(g)
       if (g.length > 0) setStep(2)
-    }
-  }, [user?.id])
-
-  const saveGoals = (g) => {
-    localStorage.setItem(`health_goals_${user?.id}`, JSON.stringify(g))
-    setGoals(g)
+    } catch { /* silent */ }
   }
 
+  useEffect(() => { loadGoals() }, [])
+
   // ── Add Goal ──────────────────────────────────────────────────────
-  const addGoal = () => {
+  const addGoal = async () => {
     const tmpl = GOAL_TEMPLATES.find(t => t.id === newGoal.id) || GOAL_TEMPLATES[0]
-    const goal = {
-      id:      newGoal.id + '_' + Date.now(),
-      baseId:  newGoal.id,
+    const payload = {
+      id:      newGoal.id,
       label:   newGoal.label || tmpl.label,
       target:  parseFloat(newGoal.target) || tmpl.target,
       current: parseFloat(newGoal.current) || 0,
       unit:    newGoal.unit || tmpl.unit,
-      created: new Date().toISOString().split('T')[0],
+      icon:    tmpl.icon,
     }
-    const updated = [...goals, goal]
-    saveGoals(updated)
-    setShowAdd(false)
-    setNewGoal({ id:'weight', label:'', target:'', current:'0', unit:'' })
-    setStep(2)
-    toast.success('Goal added!')
+    try {
+      await api.post('/goals/', payload)
+      setShowAdd(false)
+      setNewGoal({ id:'weight', label:'', target:'', current:'0', unit:'' })
+      setStep(2)
+      toast.success('Goal added!')
+      loadGoals()
+    } catch { toast.error('Failed to add goal') }
   }
 
   // ── Update Goal ───────────────────────────────────────────────────
-  const updateGoal = (id, newValue) => {
-    const updated = goals.map(g => g.id===id ? {...g, current: Math.min(g.target, Math.max(0, newValue))} : g)
-    saveGoals(updated)
-    const g = updated.find(g=>g.id===id)
-    if (g && g.current >= g.target) toast.success(`🏆 Goal achieved: ${g.label}!`)
+  const updateGoal = async (id, newValue) => {
+    const g = goals.find(g => g.id === id || g._id === id)
+    if (!g) return
+    const docId = g._id || g.id
+    const clamped = Math.min(g.target, Math.max(0, newValue))
+    try {
+      await api.put(`/goals/${docId}/progress`, { current: clamped })
+      if (clamped >= g.target) toast.success(`🏆 Goal achieved: ${g.label}!`)
+      loadGoals()
+    } catch { toast.error('Failed to update') }
   }
 
-  const deleteGoal = (id) => {
-    const updated = goals.filter(g => g.id !== id)
-    saveGoals(updated)
-    toast.success('Goal removed')
+  const deleteGoal = async (id) => {
+    const g = goals.find(g => g.id === id || g._id === id)
+    const docId = g?._id || id
+    try {
+      await api.delete(`/goals/${docId}`)
+      loadGoals()
+      toast.success('Goal removed')
+    } catch { toast.error('Failed to delete') }
   }
 
   // ── Get AI Suggestions ────────────────────────────────────────────

@@ -85,6 +85,25 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
+  // Chart dropdowns
+  const [growthPeriod,    setGrowthPeriod]    = useState('This Week')
+  const [showGrowthDrop,  setShowGrowthDrop]  = useState(false)
+  const [distPeriod,      setDistPeriod]      = useState('This Month')
+  const [showDistDrop,    setShowDistDrop]    = useState(false)
+
+  // Chart data per period
+  const GROWTH_DATA = {
+    'This Week':  { pts:[[20,90],[80,75],[140,68],[200,58],[260,45],[320,32],[380,18]], labels:['May 9','May 10','May 11','May 12','May 13','May 14','May 15'] },
+    'This Month': { pts:[[20,88],[60,78],[100,70],[140,65],[180,55],[220,48],[260,40],[300,32],[340,25],[380,18]], labels:['May 1','May 5','May 8','May 11','May 13','May 15','May 17','May 20','May 25','May 30'] },
+    'This Year':  { pts:[[20,85],[60,75],[100,70],[140,62],[180,55],[220,48],[260,40],[300,32],[340,25],[380,15]], labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Dec'] },
+  }
+
+  const DIST_DATA = {
+    'This Month':  [{label:'Patients',pct:82,color:'#3b82f6'},{label:'Doctors',pct:15,color:'#22c55e'},{label:'Admins',pct:3,color:'#8b5cf6'}],
+    'Last Month':  [{label:'Patients',pct:80,color:'#3b82f6'},{label:'Doctors',pct:17,color:'#22c55e'},{label:'Admins',pct:3,color:'#8b5cf6'}],
+    'This Year':   [{label:'Patients',pct:79,color:'#3b82f6'},{label:'Doctors',pct:18,color:'#22c55e'},{label:'Admins',pct:3,color:'#8b5cf6'}],
+  }
+
   const now     = new Date()
   const dateStr = now.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric',weekday:'long'})
 
@@ -242,11 +261,17 @@ export default function AdminDashboard() {
             <input placeholder="Search anything..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-teal-400"/>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <button className="relative p-2.5 hover:bg-gray-100 rounded-xl">
+            <button
+              onClick={() => setActiveTab('notifications')}
+              className="relative p-2.5 hover:bg-gray-100 rounded-xl transition-colors" title="Notifications">
               <Bell size={18} className="text-gray-500"/>
               <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">3</span>
             </button>
-            <button className="p-2.5 hover:bg-gray-100 rounded-xl"><Settings size={18} className="text-gray-500"/></button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="p-2.5 hover:bg-gray-100 rounded-xl transition-colors" title="Settings">
+              <Settings size={18} className="text-gray-500"/>
+            </button>
           </div>
         </header>
 
@@ -261,352 +286,339 @@ export default function AdminDashboard() {
 
             {/* ══ DASHBOARD TAB ══ */}
             {activeTab === 'dashboard' && (
-              <div className="space-y-5">
+              <div className="space-y-5 pb-6">
 
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h1 className="text-xl font-extrabold text-gray-900">Dashboard Overview</h1>
-                    <p className="text-sm text-gray-400 mt-0.5">Welcome back, Admin! Here's what's happening on Synora Health.</p>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-500 flex-shrink-0">
-                    <span>{dateStr}</span>
-                    <Calendar size={16} className="text-teal-600"/>
-                  </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Good Morning, Admin 👋</h1>
+                  <p className="text-sm text-gray-500 mt-0.5">Here's your Synora Health platform overview for today.</p>
                 </div>
 
-                {/* KPI Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-                  <StatCard icon={<Users size={18} className="text-blue-600"/>}    label="Total Users"           value={totalUsers.toLocaleString('en-IN')}    growth="18.6%" color="text-blue-700"   bg="bg-blue-50"/>
-                  <StatCard icon={<Stethoscope size={18} className="text-teal-600"/>} label="Total Doctors"      value={totalDocs.toLocaleString('en-IN')}    growth="12.4%" color="text-teal-700"   bg="bg-teal-50"/>
-                  <StatCard icon={<Calendar size={18} className="text-orange-600"/>}  label="Appointments"       value={totalApts.toLocaleString('en-IN')}    growth="15.3%" color="text-orange-700" bg="bg-orange-50"/>
-                  <StatCard icon={<IndianRupee size={18} className="text-green-600"/>}label="Revenue This Month" value={`₹${(revenue/100000).toFixed(2)}L`}  growth="26.4%" color="text-green-700"  bg="bg-green-50"/>
-                  <StatCard icon={<Activity size={18} className="text-purple-600"/>}  label="Active Consultations"value="156"                                growth="11.2%" color="text-purple-700" bg="bg-purple-50"/>
-                  <StatCard icon={<Bot size={18} className="text-indigo-600"/>}       label="AI Analyses"        value="1,850"                               growth="19.8%" color="text-indigo-700" bg="bg-indigo-50"/>
-                </div>
-
-                {/* Row 2 — Charts + Status */}
-                <div className="grid lg:grid-cols-4 gap-4">
-                  {/* Appointments Overview Chart */}
-                  <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-gray-800">Appointments Overview</h3>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-medium">This Week</span>
-                    </div>
-                    {/* Chart Legend */}
-                    <div className="flex gap-4 mb-3">
-                      {[{l:'Total',c:'#3b82f6'},{l:'Completed',c:'#22c55e'},{l:'Pending',c:'#f97316'},{l:'Cancelled',c:'#ef4444'}].map(i=>(
-                        <div key={i.l} className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{background:i.c}}/><span className="text-xs text-gray-500">{i.l}</span></div>
-                      ))}
-                    </div>
-                    {/* SVG Mini Charts stacked */}
-                    <div className="space-y-2">
-                      {[
-                        {d:[2100,2400,2800,3100,3300,3200,3500],c:'#3b82f6'},
-                        {d:[1200,1400,1600,1800,1900,1850,2000],c:'#22c55e'},
-                        {d:[600,700,800,900,1000,950,1100],c:'#f97316'},
-                        {d:[200,250,300,280,320,310,350],c:'#ef4444'},
-                      ].map((s,i)=>(
-                        <div key={i} className="relative h-8"><MiniChart data={s.d} color={s.c}/></div>
-                      ))}
-                      <div className="flex justify-between text-xs text-gray-400 mt-1">
-                        {['May 08','May 09','May 10','May 11','May 12','May 13','May 14'].map(d=><span key={d}>{d.slice(4)}</span>)}
+                {/* ── Stats Row (4 cards) ── */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { icon:'👥', label:'Total Users',         value: totalUsers.toLocaleString('en-IN'), sub:'+18.6% this month', iconBg:'bg-blue-100' },
+                    { icon:'🩺', label:'Total Doctors',       value: totalDocs.toLocaleString('en-IN'),  sub:'+12.4% this month', iconBg:'bg-teal-100' },
+                    { icon:'📅', label:'Total Appointments',  value: totalApts.toLocaleString('en-IN'),  sub:'+15.3% this month', iconBg:'bg-orange-100' },
+                    { icon:'💰', label:'Revenue This Month',  value:`₹${(revenue/100000).toFixed(1)}L`, sub:'+26.4% vs last month', iconBg:'bg-green-100' },
+                  ].map((s,i)=>(
+                    <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+                      <div className={`w-12 h-12 ${s.iconBg} rounded-2xl flex items-center justify-center text-2xl flex-shrink-0`}>{s.icon}</div>
+                      <div>
+                        <p className="text-xs text-gray-500 font-medium">{s.label}</p>
+                        <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">{s.value}</p>
+                        <p className="text-xs text-green-600 font-medium mt-0.5">{s.sub}</p>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Appointments Status */}
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <h3 className="font-bold text-gray-800 mb-4">Appointments Status</h3>
-                    <div className="space-y-3">
-                      {[
-                        {l:'Total Appointments', v:totalApts,      icon:<Calendar size={16} className="text-blue-500"/>,   c:'bg-blue-50'},
-                        {l:'Completed',          v:completedApts||1987, icon:<CheckCircle size={16} className="text-green-500"/>,  c:'bg-green-50'},
-                        {l:'Pending',            v:pendingApts||644,    icon:<Clock size={16} className="text-orange-500"/>, c:'bg-orange-50'},
-                        {l:'Cancelled',          v:cancelledApts||223,  icon:<XCircle size={16} className="text-red-500"/>,  c:'bg-red-50'},
-                      ].map((s,i)=>(
-                        <div key={i} className={`flex items-center gap-3 p-3 ${s.c} rounded-xl`}>
-                          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">{s.icon}</div>
-                          <span className="flex-1 text-sm font-medium text-gray-700">{s.l}</span>
-                          <span className="font-extrabold text-gray-900">{s.v.toLocaleString('en-IN')}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Users Overview Donut */}
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <h3 className="font-bold text-gray-800 mb-4">Users Overview</h3>
-                    <div className="flex items-center justify-center mb-4">
-                      <div className="relative w-28 h-28">
-                        <svg viewBox="0 0 100 100" className="-rotate-90 w-full h-full">
-                          <circle cx="50" cy="50" r="38" fill="none" stroke="#e5e7eb" strokeWidth="14"/>
-                          <circle cx="50" cy="50" r="38" fill="none" stroke="#3b82f6" strokeWidth="14" strokeDasharray="211 239" strokeLinecap="round"/>
-                          <circle cx="50" cy="50" r="38" fill="none" stroke="#22c55e" strokeWidth="14" strokeDasharray="36 239" strokeDashoffset="-211" strokeLinecap="round"/>
-                          <circle cx="50" cy="50" r="38" fill="none" stroke="#8b5cf6" strokeWidth="14" strokeDasharray="7 239" strokeDashoffset="-247" strokeLinecap="round"/>
-                        </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <p className="text-lg font-extrabold text-gray-900">{(totalUsers/1000).toFixed(1)}K</p>
-                          <p className="text-xs text-gray-400">Total</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      {[
-                        {l:'Patients', v:`${patients.toLocaleString('en-IN')}`, pct:'82%', c:'bg-blue-500'},
-                        {l:'Doctors',  v:`${totalDocs}`,      pct:'15%', c:'bg-green-500'},
-                        {l:'Admins',   v:'373',               pct:'3%',  c:'bg-purple-500'},
-                      ].map((s,i)=>(
-                        <div key={i} className="flex items-center gap-2">
-                          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${s.c}`}/>
-                          <span className="text-xs text-gray-600 flex-1">{s.l}</span>
-                          <span className="text-xs font-bold text-gray-700">{s.v}</span>
-                          <span className="text-xs text-gray-400">({s.pct})</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
-                {/* Row 3 */}
-                <div className="grid lg:grid-cols-4 gap-4">
-                  {/* Recent Appointments */}
-                  <div className="lg:col-span-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-gray-800 text-sm">Recent Appointments</h3>
-                      <button onClick={()=>setActiveTab('appointments')} className="text-xs text-teal-600 hover:underline">View All</button>
+                {/* ── MAIN 3-COLUMN ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+                  {/* Today's Appointments */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                      <div>
+                        <p className="font-bold text-gray-900">Today's Appointments</p>
+                        <p className="text-xs text-teal-600 font-semibold mt-0.5">{new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</p>
+                      </div>
+                      <button onClick={()=>setActiveTab('appointments')} className="text-xs text-blue-600 font-semibold hover:underline">View All</button>
                     </div>
-                    <div className="space-y-3">
+                    <div className="divide-y divide-gray-50">
                       {(recentApts.length>0?recentApts:[
-                        {patient_name:'Riya Patel',    appointment_time:'10:00 AM',appointment_type:'General Consultation',status:'pending'},
-                        {patient_name:'Aman Verma',    appointment_time:'11:30 AM',appointment_type:'Follow Up',           status:'confirmed'},
-                        {patient_name:'Neha Singh',    appointment_time:'01:00 PM',appointment_type:'Report Discussion',   status:'confirmed'},
-                        {patient_name:'Rahul Mehta',   appointment_time:'04:00 PM',appointment_type:'General Consultation',status:'pending'},
-                      ]).map((a,i)=>(
-                        <div key={i} className="flex items-center gap-3">
-                          <div className="w-9 h-9 bg-gradient-to-br from-teal-300 to-cyan-400 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                        {patient_name:'Riya Patel',   appointment_time:'10:00 AM', symptoms:'Chest Pain',       appointment_type:'in-person', status:'pending'},
+                        {patient_name:'Aman Verma',   appointment_time:'11:30 AM', symptoms:'Regular Checkup',  appointment_type:'video',     status:'confirmed'},
+                        {patient_name:'Neha Singh',   appointment_time:'01:00 PM', symptoms:'Follow-up',        appointment_type:'in-person', status:'confirmed'},
+                        {patient_name:'Rahul Mehta',  appointment_time:'04:00 PM', symptoms:'ECG Review',       appointment_type:'video',     status:'pending'},
+                        {patient_name:'Kavita Joshi', appointment_time:'05:00 PM', symptoms:'Blood Pressure',   appointment_type:'in-person', status:'confirmed'},
+                      ]).slice(0,5).map((a,i)=>(
+                        <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+                          <p className="text-xs font-semibold text-gray-400 w-16 flex-shrink-0">{a.appointment_time}</p>
+                          <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                             {(a.patient_name||'P').charAt(0)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 truncate">{a.patient_name}</p>
-                            <p className="text-xs text-gray-400">{a.appointment_time} · {a.appointment_type?.slice(0,14)}</p>
+                            <p className="text-sm font-semibold text-gray-900 truncate">{a.patient_name}</p>
+                            <p className="text-xs text-gray-400 truncate">{a.symptoms||a.appointment_type}</p>
                           </div>
-                          <Badge status={a.status}/>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${a.appointment_type==='video'?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'}`}>
+                            {a.appointment_type==='video'?'Video':'Clinic'}
+                          </span>
                         </div>
                       ))}
+                    </div>
+                    <div className="px-5 py-3 border-t border-gray-100">
+                      <button onClick={()=>setActiveTab('appointments')}
+                        className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-600 font-semibold hover:bg-gray-50 rounded-xl border border-gray-200">
+                        <Calendar size={14}/> View Full Schedule
+                      </button>
                     </div>
                   </div>
 
-                  {/* Doctors Verification */}
-                  <div className="lg:col-span-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-gray-800 text-sm">Doctors Verification</h3>
-                      <button onClick={()=>setActiveTab('doctors')} className="text-xs text-teal-600 hover:underline">View All</button>
+                  {/* Platform Overview */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                      <p className="font-bold text-gray-900">Platform Overview</p>
+                      <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-bold">Live</span>
                     </div>
-                    <div className="space-y-3">
-                      {(doctors.slice(0,4).length>0?doctors.slice(0,4):[
-                        {name:'Dr. Priya Sharma',qualification:'MBBS, MD',is_verified:true},
-                        {name:'Dr. Rohit Verma', qualification:'MBBS, DNB',is_verified:false},
-                        {name:'Dr. Anjali Mehta',qualification:'MBBS, Dermatologist',is_verified:true},
-                        {name:'Dr. Mohit Singh', qualification:'MBBS, Neurologist',is_verified:null},
-                      ]).map((d,i)=>(
-                        <div key={i} className="flex items-center gap-3">
-                          <div className="w-9 h-9 bg-gradient-to-br from-indigo-300 to-purple-400 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                            {(d.name||'D').split(' ').pop()?.charAt(0)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 truncate">{d.name}</p>
-                            <p className="text-xs text-gray-400 truncate">{d.qualification||'MBBS'}</p>
-                          </div>
-                          <Badge status={d.is_verified===true?'verified':d.is_verified===false?'rejected':'pending'}/>
+                    <div className="p-5">
+                      <div className="flex flex-col items-center gap-3 mb-4">
+                        <div className="w-16 h-16 bg-gradient-to-br from-teal-100 to-blue-100 rounded-full flex items-center justify-center">
+                          <Shield size={30} className="text-teal-600"/>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* AI Lab Analytics */}
-                  <div className="lg:col-span-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-gray-800 text-sm">AI Lab Analytics</h3>
-                      <button onClick={()=>setActiveTab('ai-analytics')} className="text-xs text-teal-600 hover:underline">View All</button>
-                    </div>
-                    <div className="space-y-2.5">
-                      {[
-                        {l:'Symptom Checker', v:738, g:'16.7%', icon:'🩺'},
-                        {l:'Report Analyzer', v:458, g:'14.2%', icon:'📋'},
-                        {l:'Skin Scan (CNN)', v:314, g:'12.9%', icon:'🔬'},
-                        {l:'BMI & Metrics',   v:238, g:'18.3%', icon:'⚖️'},
-                        {l:'AI Chatbot',      v:102, g:'20.1%', icon:'🤖'},
-                      ].map((s,i)=>(
-                        <div key={i} className="flex items-center gap-2">
-                          <span className="text-base flex-shrink-0">{s.icon}</span>
-                          <span className="text-xs text-gray-600 flex-1">{s.l}</span>
-                          <span className="text-sm font-bold text-gray-800">{s.v}</span>
-                          <span className="text-xs text-green-500 font-semibold">↑{s.g}</span>
+                        <div className="text-center">
+                          <p className="font-bold text-gray-900">Synora Health 🏥</p>
+                          <p className="text-xs text-gray-500 mt-0.5">All systems operational</p>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* System Health */}
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <h3 className="font-bold text-gray-800 mb-4 text-sm">System Health</h3>
-                    <div className="space-y-2.5">
-                      {[
-                        {l:'AI Services',    status:'Operational', c:'text-green-600 bg-green-100', icon:<Bot size={13}/>},
-                        {l:'Database',       status:'Healthy',     c:'text-green-600 bg-green-100', icon:<Database size={13}/>},
-                        {l:'Server Status',  status:'Operational', c:'text-green-600 bg-green-100', icon:<Server size={13}/>},
-                        {l:'Storage',        status:'72% Used',    c:'text-orange-600 bg-orange-100',icon:<HardDrive size={13}/>},
-                        {l:'Backup Status',  status:'Up to date',  c:'text-blue-600 bg-blue-100',   icon:<Cloud size={13}/>},
-                      ].map((s,i)=>(
-                        <div key={i} className="flex items-center gap-2">
-                          <div className={`w-6 h-6 ${s.c} rounded-lg flex items-center justify-center flex-shrink-0`}>{s.icon}</div>
-                          <span className="text-xs text-gray-600 flex-1">{s.l}</span>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.c}`}>{s.status}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Row 4 */}
-                <div className="grid lg:grid-cols-4 gap-4">
-                  {/* Revenue Overview */}
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-bold text-gray-800 text-sm">Revenue Overview</h3>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">This Month</span>
-                    </div>
-                    <div className="mb-3">
-                      <p className="text-2xl font-extrabold text-gray-900">₹{(revenue/100000).toFixed(2)}L</p>
-                      <p className="text-xs text-green-500 font-semibold">↑ 26.4% vs last month</p>
-                    </div>
-                    <MiniChart data={[60,75,65,80,90,85,95,100]} color="#0d9488"/>
-                    <div className="mt-3 space-y-2 pt-3 border-t border-gray-100">
-                      {[
-                        {l:'Consultation Fees',  v:'₹5,45,230'},
-                        {l:'Subscription Plans', v:'₹2,15,450'},
-                        {l:'Lab & Reports',      v:'₹84,550'},
-                      ].map((r,i)=>(
-                        <div key={i} className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500">{r.l}</span>
-                          <span className="text-xs font-bold text-gray-700">{r.v}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Reports & System Monitoring */}
-                  <div className="lg:col-span-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-gray-800 text-sm">Reports & Monitoring</h3>
-                      <button className="text-xs text-teal-600 hover:underline">View All</button>
-                    </div>
-                    <div className="space-y-2.5">
-                      {[
-                        {l:'AI Service Started',     time:'14 May, 10:30 AM', s:'Info',    c:'bg-blue-100 text-blue-700'},
-                        {l:'New User Registered',    time:'14 May, 10:28 AM', s:'Info',    c:'bg-blue-100 text-blue-700'},
-                        {l:'Payment Received',       time:'14 May, 10:25 AM', s:'Success', c:'bg-green-100 text-green-700'},
-                        {l:'Appointment Cancelled',  time:'14 May, 10:20 AM', s:'Warning', c:'bg-yellow-100 text-yellow-700'},
-                        {l:'High Risk Alert',        time:'14 May, 10:15 AM', s:'Error',   c:'bg-red-100 text-red-700'},
-                      ].map((r,i)=>(
-                        <div key={i} className="flex items-start gap-2">
-                          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5 ${r.c}`}>{r.s}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-gray-700 truncate">{r.l}</p>
-                            <p className="text-xs text-gray-400">{r.time}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Support Tickets */}
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-gray-800 text-sm">Support Tickets</h3>
-                      <button className="text-xs text-teal-600 hover:underline">View All</button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      {[
-                        {l:'Open',        v:32,  c:'text-red-600 bg-red-50 border-red-200'},
-                        {l:'In Progress', v:18,  c:'text-orange-600 bg-orange-50 border-orange-200'},
-                        {l:'Resolved',    v:215, c:'text-green-600 bg-green-50 border-green-200'},
-                        {l:'Closed',      v:456, c:'text-gray-600 bg-gray-50 border-gray-200'},
-                      ].map((t,i)=>(
-                        <div key={i} className={`p-3 rounded-xl border text-center ${t.c}`}>
-                          <p className="text-lg font-extrabold">{t.v}</p>
-                          <p className="text-xs">{t.l}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="space-y-2">
-                      {[
-                        {l:'App not working', id:'#TK1025', s:'Open'},
-                        {l:'Payment failed',  id:'#TK1024', s:'In Progress'},
-                        {l:'Report not show', id:'#TK1023', s:'Open'},
-                      ].map((t,i)=>(
-                        <div key={i} className="flex items-center gap-2 p-2 bg-gray-50 rounded-xl">
-                          <p className="text-xs text-gray-700 flex-1 truncate">{t.l}</p>
-                          <span className="text-xs text-gray-400">{t.id}</span>
-                          <Badge status={t.s}/>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Emergency Alerts */}
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-gray-800 text-sm">Emergency Alerts</h3>
-                      <button className="text-xs text-teal-600 hover:underline">View All</button>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 mb-4">
-                      {[
-                        {l:'High Risk',   v:24, c:'text-red-600 bg-red-50 border-red-200'},
-                        {l:'Medium Risk', v:56, c:'text-orange-600 bg-orange-50 border-orange-200'},
-                        {l:'Low Risk',    v:128,c:'text-blue-600 bg-blue-50 border-blue-200'},
-                      ].map((e,i)=>(
-                        <div key={i} className={`p-2 rounded-xl border text-center ${e.c}`}>
-                          <p className="text-xl font-extrabold">{e.v}</p>
-                          <p className="text-xs font-medium">{e.l}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs font-bold text-gray-600 mb-2">Recent High Risk Alerts</p>
-                    {[
-                      {l:'Chest Pain Detected', who:'Riya Patel',  time:'2m ago'},
-                      {l:'High Fever (104°F)',  who:'Aman Verma',  time:'15m ago'},
-                      {l:'Breathing Difficulty',who:'Neha Singh',  time:'25m ago'},
-                    ].map((a,i)=>(
-                      <div key={i} className="flex items-center gap-2 mb-2">
-                        <AlertTriangle size={12} className="text-red-500 flex-shrink-0"/>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-gray-800 truncate">{a.l}</p>
-                          <p className="text-xs text-gray-400">{a.who}</p>
-                        </div>
-                        <span className="text-xs text-gray-400 flex-shrink-0">{a.time}</span>
                       </div>
-                    ))}
+                      <div className="space-y-2 mb-4">
+                        {[
+                          { icon:'🤖', label:'AI Services',    status:'Operational', color:'text-green-600 bg-green-50' },
+                          { icon:'🗄️', label:'Database',       status:'Healthy',     color:'text-green-600 bg-green-50' },
+                          { icon:'🖥️', label:'Server',         status:'Running',     color:'text-green-600 bg-green-50' },
+                          { icon:'💾', label:'Storage',        status:'72% Used',    color:'text-orange-600 bg-orange-50' },
+                        ].map((s,i)=>(
+                          <div key={i} className="flex items-center gap-2.5 px-3 py-2 bg-gray-50 rounded-xl">
+                            <span className="text-base flex-shrink-0">{s.icon}</span>
+                            <span className="text-xs font-medium text-gray-700 flex-1">{s.label}</span>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.color}`}>{s.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { icon:'👥', label:'Manage Users',    tab:'users' },
+                          { icon:'🩺', label:'Verify Doctors',  tab:'doctors' },
+                          { icon:'📊', label:'Analytics',       tab:'ai-analytics' },
+                          { icon:'🎫', label:'Support Tickets', tab:'tickets' },
+                        ].map((a,i)=>(
+                          <button key={i} onClick={()=>setActiveTab(a.tab)}
+                            className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 hover:bg-teal-50 border border-gray-100 hover:border-teal-200 rounded-xl text-sm font-medium text-gray-700 transition-all">
+                            <span className="text-base">{a.icon}</span>{a.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right column */}
+                  <div className="space-y-4">
+
+                    {/* Doctor Verifications */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="font-bold text-gray-900 text-sm">Doctor Verifications</p>
+                        <button onClick={()=>setActiveTab('doctors')} className="text-xs text-blue-600 font-semibold hover:underline">View All</button>
+                      </div>
+                      <div className="space-y-2.5">
+                        {(pendingDocs.length>0?pendingDocs:[
+                          {name:'Dr. Rohit Verma', qualification:'MBBS, DNB',is_verified:null},
+                          {name:'Dr. Mohit Singh', qualification:'MBBS, Neuro',is_verified:null},
+                          {name:'Dr. Priya Mehta', qualification:'MBBS, MD',is_verified:true},
+                        ]).slice(0,3).map((d,i)=>(
+                          <div key={i} className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 bg-gradient-to-br from-indigo-300 to-purple-400 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                              {(d.name||'D').split(' ').pop()?.charAt(0)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-gray-800 truncate">{d.name}</p>
+                              <p className="text-xs text-gray-400 truncate">{d.qualification||'MBBS'}</p>
+                            </div>
+                            <Badge status={d.is_verified===true?'verified':d.is_verified===false?'rejected':'pending'}/>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Recent Activity */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="font-bold text-gray-900 text-sm">Recent Activity</p>
+                        <button onClick={()=>setActiveTab('activity')} className="text-xs text-blue-600 font-semibold hover:underline">View All</button>
+                      </div>
+                      <div className="space-y-2.5">
+                        {[
+                          { icon:'👤', color:'bg-blue-100',   text:'New user registered',              time:'2m ago' },
+                          { icon:'✅', color:'bg-green-100',  text:'Doctor Priya Sharma verified',     time:'10m ago' },
+                          { icon:'💰', color:'bg-teal-100',   text:'Payment ₹500 received',            time:'25m ago' },
+                          { icon:'🚨', color:'bg-red-100',    text:'Emergency SOS triggered',          time:'1h ago' },
+                        ].map((a,i)=>(
+                          <div key={i} className="flex items-start gap-2.5">
+                            <div className={`w-7 h-7 ${a.color} rounded-lg flex items-center justify-center flex-shrink-0 text-sm`}>{a.icon}</div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-700 leading-snug">{a.text}</p>
+                            </div>
+                            <span className="text-[10px] text-gray-400 flex-shrink-0">{a.time}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                      <p className="font-bold text-gray-900 text-sm mb-3">Quick Actions</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[
+                          { icon:'🩺', label:'Add Doctor',   tab:'doctors' },
+                          { icon:'👥', label:'Add User',     tab:'users' },
+                          { icon:'📊', label:'Reports',      tab:'reports' },
+                          { icon:'⚙️', label:'Settings',     tab:'settings' },
+                        ].map((a,i)=>(
+                          <button key={i} onClick={()=>setActiveTab(a.tab)}
+                            className="flex flex-col items-center gap-1.5 p-2 bg-gray-50 hover:bg-teal-50 rounded-xl border border-gray-100 hover:border-teal-200 transition-all">
+                            <span className="text-xl">{a.icon}</span>
+                            <p className="text-[10px] text-gray-600 font-medium text-center leading-tight">{a.label}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Row 5 — System Management */}
+                {/* ── CHARTS ROW ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+                  {/* Platform Growth Chart */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="font-bold text-gray-900">Platform Growth</p>
+                      <div className="relative">
+                        <button onClick={()=>{ setShowGrowthDrop(v=>!v); setShowDistDrop(false) }}
+                          className="flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-medium transition-colors">
+                          {growthPeriod}
+                          <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5L5 6.5L8 3.5" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>
+                        </button>
+                        {showGrowthDrop && (
+                          <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg z-20 overflow-hidden w-32">
+                            {['This Week','This Month','This Year'].map(opt=>(
+                              <button key={opt} onClick={()=>{ setGrowthPeriod(opt); setShowGrowthDrop(false) }}
+                                className={`w-full px-3 py-2 text-xs text-left transition-colors ${growthPeriod===opt?'bg-teal-50 text-teal-700 font-semibold':'text-gray-700 hover:bg-gray-50'}`}>
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {(()=>{
+                      const d = GROWTH_DATA[growthPeriod] || GROWTH_DATA['This Week']
+                      const pts = d.pts
+                      const minX = pts[0][0], maxX = pts[pts.length-1][0]
+                      const pathD = pts.map(([x,y],i)=>`${i===0?'M':'L'}${x},${y}`).join(' ')
+                      const areaD = pathD + ` L${maxX},100 L${minX},100 Z`
+                      return (
+                        <>
+                          <svg viewBox="0 0 400 110" className="w-full h-28">
+                            <defs>
+                              <linearGradient id="adminGrad2" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#0d9488" stopOpacity="0.25"/>
+                                <stop offset="100%" stopColor="#0d9488" stopOpacity="0"/>
+                              </linearGradient>
+                            </defs>
+                            {[20,40,60,80].map(y=><line key={y} x1="10" y1={y} x2="395" y2={y} stroke="#f3f4f6" strokeWidth="1"/>)}
+                            <path d={areaD} fill="url(#adminGrad2)"/>
+                            <path d={pathD} fill="none" stroke="#0d9488" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            {pts.map(([x,y],i)=><circle key={i} cx={x} cy={y} r="3" fill="#0d9488"/>)}
+                          </svg>
+                          <div className="flex justify-between text-[10px] text-gray-400 mt-1 px-1">
+                            {d.labels.map(l=><span key={l}>{l}</span>)}
+                          </div>
+                        </>
+                      )
+                    })()}
+                  </div>
+
+                  {/* User Distribution Donut */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="font-bold text-gray-900">User Distribution</p>
+                      <div className="relative">
+                        <button onClick={()=>{ setShowDistDrop(v=>!v); setShowGrowthDrop(false) }}
+                          className="flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-medium transition-colors">
+                          {distPeriod}
+                          <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5L5 6.5L8 3.5" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>
+                        </button>
+                        {showDistDrop && (
+                          <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg z-20 overflow-hidden w-32">
+                            {['This Month','Last Month','This Year'].map(opt=>(
+                              <button key={opt} onClick={()=>{ setDistPeriod(opt); setShowDistDrop(false) }}
+                                className={`w-full px-3 py-2 text-xs text-left transition-colors ${distPeriod===opt?'bg-teal-50 text-teal-700 font-semibold':'text-gray-700 hover:bg-gray-50'}`}>
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {(()=>{
+                      const distItems = DIST_DATA[distPeriod] || DIST_DATA['This Month']
+                      const circ = 2 * Math.PI * 48
+                      let offset = 0
+                      return (
+                        <div className="flex items-center gap-6">
+                          <div className="relative flex-shrink-0">
+                            <svg viewBox="0 0 120 120" width="120" height="120">
+                              <circle cx="60" cy="60" r="48" fill="none" stroke="#f3f4f6" strokeWidth="18"/>
+                              {distItems.map((d,i)=>{
+                                const dash = (d.pct/100)*circ
+                                const seg = (
+                                  <circle key={i} cx="60" cy="60" r="48" fill="none"
+                                    stroke={d.color} strokeWidth="18"
+                                    strokeDasharray={`${dash} ${circ-dash}`}
+                                    strokeDashoffset={-offset}
+                                    transform="rotate(-90 60 60)"/>
+                                )
+                                offset += dash
+                                return seg
+                              })}
+                              <text x="60" y="56" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#111827">{(totalUsers/1000).toFixed(1)}K</text>
+                              <text x="60" y="68" textAnchor="middle" fontSize="8" fill="#6b7280">Users</text>
+                            </svg>
+                          </div>
+                          <div className="space-y-2.5 flex-1">
+                            {distItems.map((d,i)=>(
+                              <div key={i} className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor:d.color}}/>
+                                <span className="text-xs text-gray-600 flex-1">{d.label}</span>
+                                <span className="text-xs font-bold text-gray-800">{d.pct}%</span>
+                              </div>
+                            ))}
+                            <div className="pt-2 border-t border-gray-100 space-y-1.5">
+                              {[
+                                { label:'Total Appointments', value: totalApts.toLocaleString('en-IN'), color:'text-orange-600' },
+                                { label:'Revenue This Month', value:`₹${(revenue/100000).toFixed(1)}L`, color:'text-green-600' },
+                              ].map((s,i)=>(
+                                <div key={i} className="flex items-center justify-between">
+                                  <span className="text-xs text-gray-500">{s.label}</span>
+                                  <span className={`text-xs font-bold ${s.color}`}>{s.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </div>
+
+                {/* ── QUICK MANAGEMENT TILES ── */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <h3 className="font-bold text-gray-800 mb-4">System Management</h3>
+                  <p className="font-bold text-gray-800 mb-4 text-sm">System Management</p>
                   <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
                     {[
-                      {icon:<Database size={20}/>,   label:'Database\nBackup',    c:'text-blue-600 bg-blue-50'},
-                      {icon:<Lock size={20}/>,        label:'Security\nSettings',  c:'text-red-600 bg-red-50'},
-                      {icon:<UserCheck size={20}/>,   label:'User Roles\n& Perms', c:'text-purple-600 bg-purple-50'},
-                      {icon:<Server size={20}/>,      label:'Service\nManagement', c:'text-teal-600 bg-teal-50'},
-                      {icon:<Zap size={20}/>,         label:'API\nManagement',     c:'text-orange-600 bg-orange-50'},
-                      {icon:<Mail size={20}/>,        label:'Email\nTemplates',    c:'text-green-600 bg-green-50'},
-                      {icon:<List size={20}/>,        label:'System\nLogs',        c:'text-indigo-600 bg-indigo-50'},
-                      {icon:<Settings size={20}/>,    label:'Maintenance\nMode',   c:'text-gray-600 bg-gray-50'},
+                      { icon:'🗄️', label:'Database\nBackup',    tab:'system' },
+                      { icon:'🔒', label:'Security\nSettings',   tab:'settings' },
+                      { icon:'👤', label:'User Roles\n& Perms',  tab:'users' },
+                      { icon:'🖥️', label:'Service\nManagement', tab:'system' },
+                      { icon:'⚡', label:'API\nManagement',      tab:'system' },
+                      { icon:'📧', label:'Email\nTemplates',     tab:'settings' },
+                      { icon:'📋', label:'System\nLogs',         tab:'activity' },
+                      { icon:'⚙️', label:'Maintenance\nMode',   tab:'settings' },
                     ].map((m,i)=>(
-                      <button key={i} className={`flex flex-col items-center gap-2 p-3 ${m.c.split(' ')[1]} rounded-2xl hover:shadow-md hover:scale-105 transition-all border border-gray-100`}>
-                        <div className={`w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm ${m.c.split(' ')[0]}`}>{m.icon}</div>
+                      <button key={i} onClick={()=>setActiveTab(m.tab)}
+                        className="flex flex-col items-center gap-2 p-3 bg-gray-50 hover:bg-teal-50 rounded-2xl hover:shadow-md hover:scale-105 transition-all border border-gray-100 hover:border-teal-200">
+                        <span className="text-2xl">{m.icon}</span>
                         <p className="text-xs font-bold text-gray-700 text-center leading-tight whitespace-pre-line">{m.label}</p>
                       </button>
                     ))}
@@ -804,6 +816,314 @@ export default function AdminDashboard() {
                       <span className="text-sm font-bold text-gray-700 w-28 text-right">{r.v}</span>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* ══ REPORTS & MONITORING ══ */}
+            {activeTab === 'reports' && (
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-5 text-white flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><BarChart2 size={20}/></div>
+                  <div><h2 className="font-extrabold text-lg">Reports & Monitoring</h2><p className="text-blue-200 text-xs">Platform analytics, system logs and performance monitoring</p></div>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    {icon:'📊',label:'Total Reports Generated',value:'12,458',color:'text-blue-600 bg-blue-50'},
+                    {icon:'✅',label:'Successful Analyses',    value:'11,890',color:'text-green-600 bg-green-50'},
+                    {icon:'⚠️',label:'Warnings Triggered',     value:'324',  color:'text-orange-600 bg-orange-50'},
+                    {icon:'🔴',label:'Critical Errors',        value:'12',   color:'text-red-600 bg-red-50'},
+                  ].map((s,i)=>(
+                    <div key={i} className={`${s.color.split(' ')[1]} rounded-2xl p-4 text-center border border-gray-100`}>
+                      <span className="text-2xl">{s.icon}</span>
+                      <p className={`text-2xl font-extrabold mt-1 ${s.color.split(' ')[0]}`}>{s.value}</p>
+                      <p className="text-xs text-gray-600 font-medium mt-0.5">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <p className="font-bold text-gray-800 text-sm">System Log — Real Time</p>
+                    <button onClick={loadData} className="flex items-center gap-1 text-xs text-blue-600 font-semibold hover:underline"><RefreshCw size={11}/> Refresh</button>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {[
+                      {time:'10:30 AM',level:'INFO',   msg:'AI Service started successfully',        source:'AI Engine',  color:'bg-blue-100 text-blue-700'},
+                      {time:'10:28 AM',level:'INFO',   msg:'New user registered — Priya Patel',      source:'Auth',       color:'bg-blue-100 text-blue-700'},
+                      {time:'10:25 AM',level:'SUCCESS',msg:'Payment ₹500 received — Appointment #123',source:'Payment',   color:'bg-green-100 text-green-700'},
+                      {time:'10:20 AM',level:'WARNING',msg:'Appointment cancelled by Aman Verma',    source:'Booking',    color:'bg-yellow-100 text-yellow-700'},
+                      {time:'10:15 AM',level:'ERROR',  msg:'High risk patient alert — Riya Patel',  source:'AI Monitor', color:'bg-red-100 text-red-700'},
+                      {time:'10:10 AM',level:'INFO',   msg:'Database backup completed successfully', source:'System',     color:'bg-blue-100 text-blue-700'},
+                      {time:'10:05 AM',level:'INFO',   msg:'Doctor Rohit Verma verification pending',source:'Admin',     color:'bg-blue-100 text-blue-700'},
+                      {time:'10:00 AM',level:'SUCCESS',msg:'Server health check passed',             source:'Monitor',    color:'bg-green-100 text-green-700'},
+                    ].map((log,i)=>(
+                      <div key={i} className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 font-mono text-xs">
+                        <span className="text-gray-400 w-16 flex-shrink-0">{log.time}</span>
+                        <span className={`px-2 py-0.5 rounded font-bold flex-shrink-0 ${log.color}`}>{log.level}</span>
+                        <span className="text-gray-700 flex-1 truncate">{log.msg}</span>
+                        <span className="text-gray-400 flex-shrink-0">[{log.source}]</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ══ NOTIFICATIONS ══ */}
+            {activeTab === 'notifications' && (
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-5 text-white flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Bell size={20}/></div>
+                    <div><h2 className="font-extrabold text-lg">Notifications</h2><p className="text-red-100 text-xs">All platform alerts, system and admin notifications</p></div>
+                  </div>
+                  <span className="bg-white text-red-600 text-sm font-extrabold px-3 py-1 rounded-full">3 New</span>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  {[
+                    {icon:'🆘',color:'bg-red-100',    title:'Emergency SOS Triggered',         sub:'Patient Riya Patel sent SOS — 192.168.0.x',      time:'2m ago',  unread:true,  priority:'High'},
+                    {icon:'🩺',color:'bg-orange-100', title:'New Doctor Verification Request',  sub:'Dr. Mohit Singh submitted documents for review',  time:'15m ago', unread:true,  priority:'Medium'},
+                    {icon:'💰',color:'bg-green-100',  title:'Payment Gateway Alert',            sub:'High volume payments detected — ₹45,000 in 1hr',  time:'1h ago',  unread:true,  priority:'Medium'},
+                    {icon:'👤',color:'bg-blue-100',   title:'New User Spike',                   sub:'150 new registrations in last 24 hours',          time:'2h ago',  unread:false, priority:'Low'},
+                    {icon:'🖥️',color:'bg-purple-100', title:'Server Load Warning',             sub:'CPU usage at 78% — monitoring required',          time:'3h ago',  unread:false, priority:'Medium'},
+                    {icon:'🤖',color:'bg-teal-100',   title:'AI Service Restarted',             sub:'AI analysis engine auto-restarted after update',  time:'5h ago',  unread:false, priority:'Low'},
+                    {icon:'📋',color:'bg-yellow-100', title:'Monthly Report Ready',             sub:'May 2026 platform report is ready to download',   time:'Yesterday',unread:false,priority:'Low'},
+                    {icon:'🔒',color:'bg-gray-100',   title:'Security Scan Completed',          sub:'No vulnerabilities detected — system secure',     time:'Yesterday',unread:false,priority:'Low'},
+                  ].map((n,i)=>(
+                    <div key={i} className={`flex items-start gap-3 px-5 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 ${n.unread?'bg-blue-50/20':''}`}>
+                      <div className={`w-10 h-10 ${n.color} rounded-xl flex items-center justify-center flex-shrink-0 text-lg`}>{n.icon}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold ${n.unread?'text-gray-900':'text-gray-600'}`}>{n.title}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{n.sub}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0 space-y-1">
+                        <p className="text-xs text-gray-400">{n.time}</p>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${n.priority==='High'?'bg-red-100 text-red-700':n.priority==='Medium'?'bg-orange-100 text-orange-700':'bg-gray-100 text-gray-500'}`}>{n.priority}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button className="w-full py-2.5 border border-gray-200 text-gray-500 text-sm font-medium rounded-xl hover:bg-gray-50">Mark all as read</button>
+              </div>
+            )}
+
+            {/* ══ ACTIVITY LOG ══ */}
+            {activeTab === 'activity' && (
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-gray-700 to-gray-900 rounded-2xl p-5 text-white flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><List size={20}/></div>
+                  <div><h2 className="font-extrabold text-lg">Activity Log</h2><p className="text-gray-300 text-xs">Complete audit trail of all platform actions</p></div>
+                </div>
+                <div className="grid grid-cols-4 gap-4">
+                  {[
+                    {icon:'👤',label:'User Actions',  value:'3,241', color:'text-blue-600 bg-blue-50'},
+                    {icon:'🩺',label:'Doctor Actions', value:'856',   color:'text-teal-600 bg-teal-50'},
+                    {icon:'⚙️',label:'System Events', value:'1,204', color:'text-purple-600 bg-purple-50'},
+                    {icon:'🔒',label:'Security Events',value:'43',   color:'text-red-600 bg-red-50'},
+                  ].map((s,i)=>(
+                    <div key={i} className={`${s.color.split(' ')[1]} rounded-2xl p-4 text-center border border-gray-100`}>
+                      <span className="text-2xl">{s.icon}</span>
+                      <p className={`text-2xl font-extrabold mt-1 ${s.color.split(' ')[0]}`}>{s.value}</p>
+                      <p className="text-xs text-gray-600 font-medium">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-5 py-3 border-b border-gray-100">
+                    <p className="font-bold text-gray-800 text-sm">Recent Activity</p>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {[
+                      {who:'Admin',    action:'Verified Dr. Priya Sharma',           type:'Admin',   time:'10:30 AM', icon:'✅', color:'bg-green-100'},
+                      {who:'Patient',  action:'Riya Patel registered account',        type:'User',    time:'10:25 AM', icon:'👤', color:'bg-blue-100'},
+                      {who:'Doctor',   action:'Dr. Amit created prescription #P456',  type:'Doctor',  time:'10:20 AM', icon:'💊', color:'bg-purple-100'},
+                      {who:'System',   action:'Auto-backup completed successfully',   type:'System',  time:'10:15 AM', icon:'🗄️', color:'bg-gray-100'},
+                      {who:'Patient',  action:'Aman Verma booked appointment',        type:'User',    time:'10:10 AM', icon:'📅', color:'bg-blue-100'},
+                      {who:'Admin',    action:'Rejected Dr. Rohit Verma documents',   type:'Admin',   time:'10:05 AM', icon:'❌', color:'bg-red-100'},
+                      {who:'System',   action:'AI analysis completed — 45 reports',   type:'System',  time:'10:00 AM', icon:'🤖', color:'bg-teal-100'},
+                      {who:'Patient',  action:'Neha Singh uploaded lab report',       type:'User',    time:'09:55 AM', icon:'📋', color:'bg-orange-100'},
+                    ].map((log,i)=>(
+                      <div key={i} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                        <div className={`w-8 h-8 ${log.color} rounded-lg flex items-center justify-center flex-shrink-0 text-sm`}>{log.icon}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-800 truncate">{log.action}</p>
+                          <p className="text-xs text-gray-400">By: {log.who}</p>
+                        </div>
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium flex-shrink-0">{log.type}</span>
+                        <span className="text-xs text-gray-400 flex-shrink-0">{log.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ══ SUPPORT TICKETS ══ */}
+            {activeTab === 'tickets' && (
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl p-5 text-white flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><TicketCheck size={20}/></div>
+                  <div><h2 className="font-extrabold text-lg">Support Tickets</h2><p className="text-violet-200 text-xs">Manage customer support requests and issues</p></div>
+                </div>
+                <div className="grid grid-cols-4 gap-4">
+                  {[
+                    {icon:'🔴',label:'Open',       value:32,  color:'text-red-600 bg-red-50'},
+                    {icon:'🟡',label:'In Progress', value:18,  color:'text-orange-600 bg-orange-50'},
+                    {icon:'✅',label:'Resolved',    value:215, color:'text-green-600 bg-green-50'},
+                    {icon:'⬛',label:'Closed',      value:456, color:'text-gray-600 bg-gray-50'},
+                  ].map((s,i)=>(
+                    <div key={i} className={`${s.color.split(' ')[1]} rounded-2xl p-4 text-center border border-gray-100`}>
+                      <span className="text-2xl">{s.icon}</span>
+                      <p className={`text-2xl font-extrabold mt-1 ${s.color.split(' ')[0]}`}>{s.value}</p>
+                      <p className="text-xs text-gray-600 font-medium">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <p className="font-bold text-gray-800 text-sm">All Tickets</p>
+                    <div className="flex gap-2">
+                      {['All','Open','In Progress','Resolved'].map(f=>(
+                        <button key={f} className="text-xs px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:bg-violet-50 hover:border-violet-300 hover:text-violet-700 transition-colors">{f}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {[
+                      {id:'#TK1025',title:'App not loading on mobile',    user:'Riya Patel',   category:'Technical', status:'Open',        priority:'High',   time:'10 min ago'},
+                      {id:'#TK1024',title:'Payment failed during booking', user:'Aman Verma',   category:'Payment',   status:'In Progress', priority:'High',   time:'25 min ago'},
+                      {id:'#TK1023',title:'Report not showing correctly',  user:'Neha Singh',   category:'Reports',   status:'Open',        priority:'Medium', time:'1h ago'},
+                      {id:'#TK1022',title:'Cannot reschedule appointment', user:'Rahul Mehta',  category:'Booking',   status:'Resolved',    priority:'Low',    time:'2h ago'},
+                      {id:'#TK1021',title:'AI analysis taking too long',   user:'Priya Sharma', category:'AI',        status:'In Progress', priority:'Medium', time:'3h ago'},
+                      {id:'#TK1020',title:'Profile photo not updating',    user:'Kavita Joshi', category:'Account',   status:'Resolved',    priority:'Low',    time:'5h ago'},
+                    ].map((t,i)=>(
+                      <div key={i} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-xs text-gray-400 font-mono">{t.id}</span>
+                            <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">{t.category}</span>
+                          </div>
+                          <p className="text-sm font-semibold text-gray-900 truncate">{t.title}</p>
+                          <p className="text-xs text-gray-400">By: {t.user} · {t.time}</p>
+                        </div>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${t.priority==='High'?'bg-red-100 text-red-700':t.priority==='Medium'?'bg-orange-100 text-orange-700':'bg-gray-100 text-gray-500'}`}>{t.priority}</span>
+                        <Badge status={t.status.toLowerCase().replace(' ','-')}/>
+                        <button className="text-xs bg-violet-50 text-violet-700 hover:bg-violet-100 px-3 py-1.5 rounded-lg font-semibold flex-shrink-0">View</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ══ SYSTEM MANAGEMENT ══ */}
+            {activeTab === 'system' && (
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-2xl p-5 text-white flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Server size={20}/></div>
+                  <div><h2 className="font-extrabold text-lg">System Management</h2><p className="text-gray-300 text-xs">Server health, database, services and infrastructure</p></div>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    {icon:'🖥️',label:'Server Status', value:'Operational', sub:'CPU: 45% · RAM: 62%', color:'text-green-600 bg-green-50'},
+                    {icon:'🗄️',label:'Database',      value:'Healthy',     sub:'Response: 12ms',     color:'text-blue-600 bg-blue-50'},
+                    {icon:'💾',label:'Storage',       value:'72% Used',    sub:'1.4TB / 2TB',         color:'text-orange-600 bg-orange-50'},
+                    {icon:'🤖',label:'AI Services',   value:'Running',     sub:'Model: GPT-4o-mini',  color:'text-teal-600 bg-teal-50'},
+                  ].map((s,i)=>(
+                    <div key={i} className={`${s.color.split(' ')[1]} rounded-2xl p-4 border border-gray-100`}>
+                      <span className="text-2xl">{s.icon}</span>
+                      <p className={`text-base font-extrabold mt-1 ${s.color.split(' ')[0]}`}>{s.value}</p>
+                      <p className="text-xs text-gray-600 font-medium">{s.label}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid lg:grid-cols-2 gap-4">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <p className="font-bold text-gray-800 mb-4 text-sm">System Controls</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        {icon:'🗄️',label:'Database Backup',      action:'Run Backup',     color:'bg-blue-50 border-blue-100 text-blue-700'},
+                        {icon:'🔒',label:'Security Scan',         action:'Run Scan',       color:'bg-red-50 border-red-100 text-red-700'},
+                        {icon:'🔄',label:'Restart Services',      action:'Restart',        color:'bg-orange-50 border-orange-100 text-orange-700'},
+                        {icon:'🧹',label:'Clear Cache',           action:'Clear',          color:'bg-purple-50 border-purple-100 text-purple-700'},
+                        {icon:'📧',label:'Test Email Service',    action:'Send Test',      color:'bg-green-50 border-green-100 text-green-700'},
+                        {icon:'⚡',label:'Flush API Cache',       action:'Flush',          color:'bg-yellow-50 border-yellow-100 text-yellow-700'},
+                      ].map((c,i)=>(
+                        <button key={i} onClick={()=>toast.success(`${c.label} triggered!`)}
+                          className={`flex items-center gap-2 p-3 border rounded-xl ${c.color} hover:opacity-80 transition-all text-left`}>
+                          <span className="text-xl flex-shrink-0">{c.icon}</span>
+                          <div>
+                            <p className="text-xs font-bold">{c.label}</p>
+                            <p className="text-[10px] opacity-70">{c.action}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <p className="font-bold text-gray-800 mb-4 text-sm">Service Status</p>
+                    <div className="space-y-3">
+                      {[
+                        {name:'Authentication Service', status:'Running',  uptime:'99.9%'},
+                        {name:'Payment Gateway',        status:'Running',  uptime:'99.7%'},
+                        {name:'AI Analysis Engine',     status:'Running',  uptime:'98.5%'},
+                        {name:'SMS/Email Service',      status:'Running',  uptime:'99.2%'},
+                        {name:'File Storage Service',   status:'Running',  uptime:'100%'},
+                        {name:'WebSocket Server',       status:'Running',  uptime:'99.8%'},
+                      ].map((s,i)=>(
+                        <div key={i} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                          <span className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"/>
+                          <p className="text-sm text-gray-700 flex-1">{s.name}</p>
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">{s.status}</span>
+                          <span className="text-xs text-gray-400">{s.uptime}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ══ SETTINGS ══ */}
+            {activeTab === 'settings' && (
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-gray-700 to-gray-900 rounded-2xl p-5 text-white flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Settings size={20}/></div>
+                  <div><h2 className="font-extrabold text-lg">Settings</h2><p className="text-gray-300 text-xs">Platform configuration, preferences and account settings</p></div>
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[
+                    {icon:'👤',label:'Admin Profile',       sub:'Update your name, email and photo',   action:()=>toast.success('Go to profile page'),         color:'bg-blue-50 border-blue-100'},
+                    {icon:'🔒',label:'Security Settings',   sub:'Change password and 2FA settings',    action:()=>toast.success('Security settings opened'),    color:'bg-red-50 border-red-100'},
+                    {icon:'🔔',label:'Notification Settings',sub:'Manage alert preferences',           action:()=>setActiveTab('notifications'),                  color:'bg-orange-50 border-orange-100'},
+                    {icon:'💰',label:'Payment Settings',    sub:'Payment gateway configuration',       action:()=>setActiveTab('finance'),                       color:'bg-green-50 border-green-100'},
+                    {icon:'🤖',label:'AI Configuration',    sub:'API keys, model settings',            action:()=>setActiveTab('ai-analytics'),                  color:'bg-teal-50 border-teal-100'},
+                    {icon:'📧',label:'Email / SMS Settings',sub:'Configure SMTP and Twilio',           action:()=>setActiveTab('system'),                        color:'bg-purple-50 border-purple-100'},
+                    {icon:'🌐',label:'Language & Region',   sub:'Platform language and timezone',      action:()=>toast.success('Language settings opened'),     color:'bg-indigo-50 border-indigo-100'},
+                    {icon:'🎨',label:'Branding Settings',   sub:'Logo, colors and platform name',      action:()=>toast.success('Branding settings opened'),     color:'bg-pink-50 border-pink-100'},
+                    {icon:'⚙️',label:'System Settings',    sub:'Server config and maintenance mode',   action:()=>setActiveTab('system'),                        color:'bg-gray-50 border-gray-200'},
+                  ].map((s,i)=>(
+                    <button key={i} onClick={s.action}
+                      className={`flex items-center gap-4 p-4 border rounded-2xl hover:shadow-md transition-all text-left group ${s.color}`}>
+                      <span className="text-3xl">{s.icon}</span>
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900 text-sm group-hover:text-teal-700">{s.label}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
+                      </div>
+                      <ChevronRight size={16} className="text-gray-300 group-hover:text-teal-500 flex-shrink-0"/>
+                    </button>
+                  ))}
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-red-700 text-sm">Danger Zone</p>
+                    <p className="text-xs text-red-500 mt-0.5">These actions are irreversible. Proceed with caution.</p>
+                  </div>
+                  <button onClick={()=>toast.error('This action requires super admin confirmation')}
+                    className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700">
+                    Reset Platform Data
+                  </button>
                 </div>
               </div>
             )}

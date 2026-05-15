@@ -1,161 +1,276 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
-import { Heart, Eye, EyeOff, Mail, Lock, User, Phone, Stethoscope } from 'lucide-react'
-import { registerUser } from '../redux/slices/authSlice'
-import LoadingSpinner from '../components/common/LoadingSpinner'
+import { useDispatch } from 'react-redux'
+import { Heart, Eye, EyeOff, Mail, Lock, User, Phone, Stethoscope, ShieldCheck, RefreshCw } from 'lucide-react'
+import { loginUser } from '../redux/slices/authSlice'
+import api from '../services/api'
+import toast from 'react-hot-toast'
 
-function Register() {
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
-  const { loading } = useSelector(s => s.auth)
+export default function Register() {
+  const dispatch  = useDispatch()
+  const navigate  = useNavigate()
+
+  const [step,    setStep]    = useState(1)   // 1 = form, 2 = OTP
+  const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ full_name: '', email: '', password: '', phone: '', role: 'patient' })
-  const [showPassword, setShowPassword] = useState(false)
+  const [showPassword,   setShowPassword]   = useState(false)
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
 
-  const handleSubmit = async (e) => {
+  // OTP state
+  const [otp,      setOtp]      = useState(['', '', '', '', '', ''])
+  const [demoOtp,  setDemoOtp]  = useState(null)
+  const [resending,setResending] = useState(false)
+  const otpRefs = useRef([])
+
+  // ── Step 1: Send OTP ──────────────────────────────────────────────
+  const handleSendOtp = async (e) => {
     e.preventDefault()
     setError('')
-    if (form.password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
+    if (form.password !== confirmPassword) { setError('Passwords do not match'); return }
+    if (form.password.length < 8)         { setError('Password must be at least 8 characters'); return }
+    setLoading(true)
+    try {
+      const res = await api.post('/auth/send-otp', form)
+      if (res.data.demo_otp) {
+        setDemoOtp(res.data.demo_otp)
+        toast.success(`OTP: ${res.data.demo_otp} (demo mode — SMS not configured)`, { duration: 15000 })
+      } else {
+        toast.success(`OTP sent to ${form.phone || form.email}`)
+      }
+      setStep(2)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to send OTP')
+    } finally {
+      setLoading(false)
     }
-    if (form.password.length < 8) {
-      setError('Password must be at least 8 characters')
-      return
+  }
+
+  // ── Step 2: Verify OTP ────────────────────────────────────────────
+  const handleVerify = async () => {
+    const code = otp.join('')
+    if (code.length < 6) { setError('Enter the 6-digit OTP'); return }
+    setError('')
+    setLoading(true)
+    try {
+      const res = await api.post('/auth/verify-otp', { email: form.email, otp: code })
+      // Auto-login after successful registration
+      const loginRes = await dispatch(loginUser({ email: form.email, password: form.password }))
+      if (loginRes.meta.requestStatus === 'fulfilled') {
+        toast.success('Account created successfully!')
+        const role = loginRes.payload.user.role
+        navigate(role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Invalid OTP. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    const result = await dispatch(registerUser(form))
-    if (result.meta.requestStatus === 'fulfilled') {
-      const role = result.payload.user.role
-      if (role === 'doctor') navigate('/doctor/dashboard')
-      else navigate('/patient/dashboard')
-    }
+  }
+
+  const handleOtpChange = (i, val) => {
+    if (!/^\d*$/.test(val)) return
+    const next = [...otp]
+    next[i] = val.slice(-1)
+    setOtp(next)
+    if (val && i < 5) otpRefs.current[i + 1]?.focus()
+    if (!val && i > 0) otpRefs.current[i - 1]?.focus()
+  }
+
+  const handleOtpKeyDown = (i, e) => {
+    if (e.key === 'Backspace' && !otp[i] && i > 0) otpRefs.current[i - 1]?.focus()
+    if (e.key === 'Enter') handleVerify()
+  }
+
+  const resendOtp = async () => {
+    setResending(true)
+    setOtp(['', '', '', '', '', ''])
+    setError('')
+    try {
+      const res = await api.post('/auth/send-otp', form)
+      if (res.data.demo_otp) {
+        setDemoOtp(res.data.demo_otp)
+        toast.success(`New OTP: ${res.data.demo_otp}`, { duration: 15000 })
+      } else {
+        toast.success('New OTP sent!')
+      }
+    } catch { toast.error('Failed to resend OTP') }
+    finally { setResending(false) }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+
+        {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 mb-6">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-400 rounded-xl flex items-center justify-center">
               <Heart size={20} className="text-white" />
             </div>
-            <span className="font-bold text-xl text-gray-900">AI Healthcare</span>
+            <span className="font-bold text-xl text-gray-900">Synora Health</span>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
-          <p className="text-gray-500 mt-1">Join thousands of users managing their health smarter</p>
+          {step === 1 ? (
+            <>
+              <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
+              <p className="text-gray-500 mt-1">Join thousands managing their health smarter</p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold text-gray-900">Verify your OTP</h1>
+              <p className="text-gray-500 mt-1">Enter the 6-digit code sent to <strong>{form.phone || form.email}</strong></p>
+            </>
+          )}
+        </div>
+
+        {/* Step indicator */}
+        <div className="flex items-center justify-center gap-3 mb-6">
+          {[1, 2].map(s => (
+            <div key={s} className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                step > s ? 'bg-green-500 text-white' : step === s ? 'bg-blue-600 text-white ring-4 ring-blue-100' : 'bg-gray-200 text-gray-500'
+              }`}>
+                {step > s ? '✓' : s}
+              </div>
+              <span className={`text-xs font-medium ${step === s ? 'text-blue-600' : 'text-gray-400'}`}>
+                {s === 1 ? 'Details' : 'Verify OTP'}
+              </span>
+              {s < 2 && <div className={`w-8 h-0.5 ${step > s ? 'bg-green-400' : 'bg-gray-200'}`} />}
+            </div>
+          ))}
         </div>
 
         <div className="card">
-          {/* Role Selector */}
-          <div className="flex gap-2 p-1 bg-gray-100 rounded-xl mb-6">
-            <button
-              type="button"
-              onClick={() => setForm({ ...form, role: 'patient' })}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
-                ${form.role === 'patient' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <User size={15} /> Patient
-            </button>
-            <button
-              type="button"
-              onClick={() => setForm({ ...form, role: 'doctor' })}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
-                ${form.role === 'doctor' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <Stethoscope size={15} /> Doctor
-            </button>
-          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="label">Full Name</label>
-              <div className="relative">
-                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={form.full_name}
-                  onChange={e => setForm({ ...form, full_name: e.target.value })}
-                  placeholder="Dr. John Doe"
-                  className="input-field pl-10"
-                  required
-                />
+          {/* ── STEP 1: Registration Form ── */}
+          {step === 1 && (
+            <>
+              {/* Role Selector */}
+              <div className="flex gap-2 p-1 bg-gray-100 rounded-xl mb-6">
+                {['patient', 'doctor'].map(r => (
+                  <button key={r} type="button" onClick={() => setForm({ ...form, role: r })}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
+                      ${form.role === r ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                    {r === 'patient' ? <User size={15}/> : <Stethoscope size={15}/>}
+                    {r.charAt(0).toUpperCase() + r.slice(1)}
+                  </button>
+                ))}
               </div>
-            </div>
 
-            <div>
-              <label className="label">Email Address</label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={e => setForm({ ...form, email: e.target.value })}
-                  placeholder="you@example.com"
-                  className="input-field pl-10"
-                  required
-                />
+              <form onSubmit={handleSendOtp} className="space-y-4">
+                <div>
+                  <label className="label">Full Name</label>
+                  <div className="relative">
+                    <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                    <input type="text" value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})}
+                      placeholder="Your full name" className="input-field pl-10" required/>
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Email Address</label>
+                  <div className="relative">
+                    <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                    <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})}
+                      placeholder="you@example.com" className="input-field pl-10" required/>
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Mobile Number <span className="text-xs text-gray-400">(OTP will be sent here)</span></label>
+                  <div className="relative">
+                    <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                    <input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
+                      placeholder="+91 9876543210" className="input-field pl-10"/>
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Password</label>
+                  <div className="relative">
+                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                    <input type={showPassword ? 'text' : 'password'} value={form.password}
+                      onChange={e => setForm({...form, password: e.target.value})}
+                      placeholder="Min. 8 characters" className="input-field pl-10 pr-10" required/>
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      {showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Confirm Password</label>
+                  <div className="relative">
+                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                    <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                      placeholder="Repeat password" className="input-field pl-10" required/>
+                  </div>
+                </div>
+
+                {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+
+                <button type="submit" disabled={loading}
+                  className="btn-primary w-full flex items-center justify-center gap-2 mt-2">
+                  {loading ? 'Sending OTP...' : `Send OTP & Continue`}
+                </button>
+              </form>
+            </>
+          )}
+
+          {/* ── STEP 2: OTP Verification ── */}
+          {step === 2 && (
+            <div className="space-y-6">
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+                <ShieldCheck size={18} className="text-blue-600 flex-shrink-0 mt-0.5"/>
+                <div>
+                  <p className="text-sm font-semibold text-blue-800">OTP Sent</p>
+                  <p className="text-xs text-blue-600 mt-0.5">
+                    {form.phone ? `SMS sent to ${form.phone}` : `Check ${form.email}`}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="label">Phone (optional)</label>
-              <div className="relative">
-                <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="tel"
-                  value={form.phone}
-                  onChange={e => setForm({ ...form, phone: e.target.value })}
-                  placeholder="+91 9876543210"
-                  className="input-field pl-10"
-                />
+              {/* Demo OTP display */}
+              {demoOtp && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                  <p className="text-xs text-amber-600 font-medium mb-1">Demo Mode — OTP (SMS not configured)</p>
+                  <p className="text-2xl font-extrabold text-amber-700 tracking-widest">{demoOtp}</p>
+                </div>
+              )}
+
+              {/* 6-digit OTP input */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 block mb-3 text-center">Enter 6-digit OTP</label>
+                <div className="flex justify-center gap-2">
+                  {otp.map((digit, i) => (
+                    <input key={i} ref={el => otpRefs.current[i] = el}
+                      type="text" inputMode="numeric" maxLength={1} value={digit}
+                      onChange={e => handleOtpChange(i, e.target.value)}
+                      onKeyDown={e => handleOtpKeyDown(i, e)}
+                      className={`w-11 h-12 text-center text-xl font-bold border-2 rounded-xl outline-none transition-all
+                        ${digit ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-900'}
+                        focus:border-blue-500 focus:ring-2 focus:ring-blue-100`}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="label">Password</label>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={form.password}
-                  onChange={e => setForm({ ...form, password: e.target.value })}
-                  placeholder="Min. 8 characters"
-                  className="input-field pl-10 pr-10"
-                  required
-                />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg text-center">{error}</p>}
+
+              <button onClick={handleVerify} disabled={loading || otp.join('').length < 6}
+                className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-50">
+                {loading ? 'Verifying...' : <><ShieldCheck size={16}/> Verify & Create Account</>}
+              </button>
+
+              <div className="flex items-center justify-between text-sm">
+                <button onClick={() => { setStep(1); setError(''); setOtp(['','','','','','']) }}
+                  className="text-gray-500 hover:text-gray-700 font-medium">
+                  ← Change Details
+                </button>
+                <button onClick={resendOtp} disabled={resending}
+                  className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
+                  {resending ? <><RefreshCw size={13} className="animate-spin"/> Resending...</> : 'Resend OTP'}
                 </button>
               </div>
             </div>
+          )}
 
-            <div>
-              <label className="label">Confirm Password</label>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  placeholder="Repeat password"
-                  className="input-field pl-10"
-                  required
-                />
-              </div>
-            </div>
-
-            {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full flex items-center justify-center gap-2 mt-2"
-            >
-              {loading ? <LoadingSpinner size="sm" /> : `Create ${form.role === 'doctor' ? 'Doctor' : 'Patient'} Account`}
-            </button>
-          </form>
         </div>
 
         <p className="text-center text-gray-500 text-sm mt-6">
@@ -166,5 +281,3 @@ function Register() {
     </div>
   )
 }
-
-export default Register

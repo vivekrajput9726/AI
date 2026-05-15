@@ -5,9 +5,9 @@ import {
   FolderOpen, Plus, Trash2, Download, X, Upload,
   ClipboardList, Brain, Calendar, FlaskConical,
   FileText, Clock, CheckCircle, AlertTriangle,
-  Stethoscope, ChevronRight, Eye, Star,
+  Stethoscope, ChevronRight, Eye, Star, Search,
   Video, Phone, MapPin, Mail, BarChart2, Shield,
-  TrendingUp, Heart, Droplets, Weight, Zap, Printer
+  TrendingUp, Heart, Droplets, Weight, Zap, Printer, Share2, Copy
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -107,7 +107,10 @@ export default function MyRecords() {
   const [records, setRecords] = useState([])
   const [recLoading, setRecLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
+  const [showShare, setShowShare] = useState(null)  // record to share
+  const [doctors, setDoctors]     = useState([])
   const [form, setForm] = useState({ title:'', record_type:'prescription', description:'', doctor_name:'', date:'', file_data:'' })
   const [saving, setSaving] = useState(false)
   const fileRef = useRef(null)
@@ -123,7 +126,26 @@ export default function MyRecords() {
       .then(([a, ai]) => { setAppointments(a.data || []); setAiHistory(ai.data || []) })
       .catch(() => {})
       .finally(() => setHistLoading(false))
+    api.get('/doctors').then(r => setDoctors((r.data.doctors || r.data).slice(0, 10))).catch(() => {})
   }, [])
+
+  const shareRecord = async (record, doctorId) => {
+    const doc = doctors.find(d => (d.id || d._id) === doctorId)
+    if (!doc) return
+    const msg = `📋 Health Record Shared\nTitle: ${record.title}\nType: ${record.record_type}\nDate: ${record.date || 'N/A'}\nDoctor: ${record.doctor_name || 'N/A'}\nNotes: ${record.description || 'N/A'}`
+    try {
+      await navigator.clipboard.writeText(msg)
+      toast.success(`Record details copied — share with ${doc.name || doc.full_name}!`)
+      setShowShare(null)
+    } catch {
+      toast.error('Could not copy to clipboard')
+    }
+  }
+
+  const copyRecord = (record) => {
+    const text = `📋 ${record.title}\nType: ${record.record_type}\nDate: ${record.date || 'N/A'}\nDoctor: ${record.doctor_name || 'N/A'}\n${record.description || ''}`
+    navigator.clipboard.writeText(text).then(() => toast.success('Record copied!')).catch(() => toast.error('Copy failed'))
+  }
 
   const handleFileChange = (e) => {
     const file = e.target.files[0]; if (!file) return
@@ -148,7 +170,9 @@ export default function MyRecords() {
     catch { toast.error('Failed to delete') }
   }
 
-  const filtered = filter === 'all' ? records : records.filter(r => r.record_type === filter)
+  const filtered = records
+    .filter(r => filter === 'all' || r.record_type === filter)
+    .filter(r => !search || r.title?.toLowerCase().includes(search.toLowerCase()) || r.doctor_name?.toLowerCase().includes(search.toLowerCase()) || r.description?.toLowerCase().includes(search.toLowerCase()))
   const getType  = t => RECORD_TYPES.find(x => x.value === t) || RECORD_TYPES[3]
   const labReports    = records.filter(r => r.record_type === 'lab_report')
   const prescriptions = records.filter(r => r.record_type === 'prescription')
@@ -209,9 +233,18 @@ export default function MyRecords() {
         ════════════════════════════════════════════════════════ */}
         {tab === 'records' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">{records.length} total records</p>
-              <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Search bar */}
+              <div className="relative flex-1 min-w-48">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text" value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Search records, doctor, description..."
+                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-blue-400 bg-gray-50"
+                />
+                {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={13}/></button>}
+              </div>
+              <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2 text-sm whitespace-nowrap">
                 <Plus size={15} /> Add Record
               </button>
             </div>
@@ -254,11 +287,22 @@ export default function MyRecords() {
                       {record.doctor_name && <p className="text-xs text-gray-500">Dr. {record.doctor_name}</p>}
                       {record.date && <p className="text-xs text-gray-400">{record.date}</p>}
                       {record.description && <p className="text-xs text-gray-600 mt-1.5 line-clamp-2">{record.description}</p>}
-                      {record.file_data && (
-                        <a href={record.file_data} download={record.title} className="mt-2 flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline">
-                          <Download size={11} /> Download
-                        </a>
-                      )}
+                      <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-100/50">
+                        {record.file_data && (
+                          <a href={record.file_data} download={record.title}
+                            className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline">
+                            <Download size={11} /> Download
+                          </a>
+                        )}
+                        <button onClick={() => copyRecord(record)}
+                          className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 font-medium ml-auto">
+                          <Copy size={11} /> Copy
+                        </button>
+                        <button onClick={() => setShowShare(record)}
+                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold">
+                          <Share2 size={11} /> Share
+                        </button>
+                      </div>
                     </div>
                   )
                 })}
@@ -489,6 +533,47 @@ export default function MyRecords() {
           </div>
         )}
       </div>
+
+      {/* ── Share Record Modal ── */}
+      {showShare && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-900">Share Record</h3>
+              <button onClick={() => setShowShare(null)} className="p-2 hover:bg-gray-100 rounded-xl"><X size={16}/></button>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3 mb-4">
+              <p className="text-sm font-semibold text-gray-800">{showShare.title}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{showShare.record_type} · {showShare.date || 'No date'}</p>
+            </div>
+            <p className="text-xs font-bold text-gray-600 mb-3">Share with Doctor:</p>
+            {doctors.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">No doctors found</p>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {doctors.map(doc => (
+                  <button key={doc.id || doc._id}
+                    onClick={() => shareRecord(showShare, doc.id || doc._id)}
+                    className="w-full flex items-center gap-3 p-2.5 bg-gray-50 hover:bg-blue-50 border border-gray-100 hover:border-blue-200 rounded-xl transition-colors text-left">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-teal-400 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {(doc.name || doc.full_name || 'D').charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate">{doc.name || doc.full_name}</p>
+                      <p className="text-xs text-gray-400">{doc.specialization}</p>
+                    </div>
+                    <Share2 size={13} className="text-blue-400 flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+            <button onClick={() => { copyRecord(showShare); setShowShare(null) }}
+              className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50">
+              <Copy size={14} /> Copy Record Details
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Add Record Modal ── */}
       {showModal && (

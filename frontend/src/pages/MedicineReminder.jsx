@@ -1,32 +1,42 @@
 import { useState, useEffect } from 'react'
-import { Plus, Bell, Trash2, X, Pill, Clock, Check } from 'lucide-react'
+import { Plus, Bell, Trash2, X, Pill, Clock, Check, CheckCircle, XCircle, Activity } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
+import api from '../services/api'
 import toast from 'react-hot-toast'
 
 const FREQUENCIES = ['Once daily', 'Twice daily', 'Three times daily', 'Every 6 hours', 'Every 8 hours', 'Weekly']
-const MEAL_TIMES = ['Before meal', 'After meal', 'With meal', 'Empty stomach']
+const MEAL_TIMES  = ['Before meal', 'After meal', 'With meal', 'Empty stomach']
 
 function MedicineReminder() {
-  const [reminders, setReminders] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('medicine_reminders') || '[]') } catch { return [] }
-  })
-  const [showModal, setShowModal] = useState(false)
+  const [reminders,  setReminders]  = useState([])
+  const [adherence,  setAdherence]  = useState({ adherence_pct: 100, taken: 0, missed: 0 })
+  const [loading,    setLoading]    = useState(true)
+  const [showModal,  setShowModal]  = useState(false)
   const [form, setForm] = useState({ name: '', dosage: '', frequency: 'Once daily', time: '08:00', meal: 'After meal', notes: '', active: true })
 
-  useEffect(() => {
-    localStorage.setItem('medicine_reminders', JSON.stringify(reminders))
-  }, [reminders])
+  const load = async () => {
+    try {
+      const [medsRes, adhRes] = await Promise.all([
+        api.get('/medicines/'),
+        api.get('/medicines/adherence'),
+      ])
+      setReminders(medsRes.data || [])
+      setAdherence(adhRes.data || { adherence_pct: 100, taken: 0, missed: 0 })
+    } catch { toast.error('Failed to load medicines') }
+    finally { setLoading(false) }
+  }
 
-  // Check reminders every minute
+  useEffect(() => { load() }, [])
+
+  // Browser reminder alerts every minute
   useEffect(() => {
     const check = () => {
       const now = new Date()
-      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      const currentTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
       reminders.filter(r => r.active && r.time === currentTime).forEach(r => {
         toast(`💊 Time to take ${r.name} - ${r.dosage}`, { duration: 10000, icon: '⏰' })
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(`Medicine Reminder`, { body: `Time to take ${r.name} - ${r.dosage}` })
-        }
+        if ('Notification' in window && Notification.permission === 'granted')
+          new Notification('Medicine Reminder', { body: `Time to take ${r.name} - ${r.dosage}` })
       })
     }
     const interval = setInterval(check, 60000)
@@ -36,31 +46,46 @@ function MedicineReminder() {
   const requestNotificationPermission = () => {
     if ('Notification' in window) {
       Notification.requestPermission().then(perm => {
-        if (perm === 'granted') toast.success('Notifications enabled!')
-        else toast.error('Please allow notifications for reminders')
+        perm === 'granted' ? toast.success('Notifications enabled!') : toast.error('Please allow notifications')
       })
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Please enter medicine name'); return }
-    const newReminder = { ...form, id: Date.now().toString() }
-    setReminders(prev => [...prev, newReminder])
-    setShowModal(false)
-    setForm({ name: '', dosage: '', frequency: 'Once daily', time: '08:00', meal: 'After meal', notes: '', active: true })
-    toast.success('Reminder added!')
+    try {
+      await api.post('/medicines/', form)
+      toast.success('Medicine added!')
+      setShowModal(false)
+      setForm({ name: '', dosage: '', frequency: 'Once daily', time: '08:00', meal: 'After meal', notes: '', active: true })
+      load()
+    } catch { toast.error('Failed to add medicine') }
   }
 
-  const toggleActive = (id) => {
-    setReminders(prev => prev.map(r => r.id === id ? { ...r, active: !r.active } : r))
+  const toggleActive = async (med) => {
+    try {
+      await api.put(`/medicines/${med.id}`, { ...med, active: !med.active })
+      load()
+    } catch { toast.error('Failed to update') }
   }
 
-  const deleteReminder = (id) => {
-    setReminders(prev => prev.filter(r => r.id !== id))
-    toast.success('Reminder deleted')
+  const deleteReminder = async (id) => {
+    try {
+      await api.delete(`/medicines/${id}`)
+      toast.success('Deleted')
+      load()
+    } catch { toast.error('Failed to delete') }
   }
 
-  const active = reminders.filter(r => r.active)
+  const logDose = async (id, status) => {
+    try {
+      await api.post('/medicines/log', { medicine_id: id, status })
+      toast.success(status === 'taken' ? '✅ Marked as taken!' : '⚠️ Marked as missed')
+      load()
+    } catch { toast.error('Failed to log') }
+  }
+
+  const active   = reminders.filter(r => r.active)
   const inactive = reminders.filter(r => !r.active)
 
   return (
@@ -83,7 +108,7 @@ function MedicineReminder() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="card text-center">
             <p className="text-2xl font-bold text-blue-600">{reminders.length}</p>
             <p className="text-xs text-gray-500 mt-1">Total Medicines</p>
@@ -93,8 +118,12 @@ function MedicineReminder() {
             <p className="text-xs text-gray-500 mt-1">Active</p>
           </div>
           <div className="card text-center">
-            <p className="text-2xl font-bold text-gray-400">{inactive.length}</p>
-            <p className="text-xs text-gray-500 mt-1">Inactive</p>
+            <p className="text-2xl font-bold text-teal-600">{adherence.adherence_pct}%</p>
+            <p className="text-xs text-gray-500 mt-1">Adherence</p>
+          </div>
+          <div className="card text-center">
+            <p className="text-2xl font-bold text-red-400">{adherence.missed}</p>
+            <p className="text-xs text-gray-500 mt-1">Missed</p>
           </div>
         </div>
 
@@ -130,11 +159,17 @@ function MedicineReminder() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => toggleActive(reminder.id)}
-                      className={`p-2 rounded-xl transition-colors ${reminder.active ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                      title={reminder.active ? 'Deactivate' : 'Activate'}
-                    >
+                    <button onClick={() => logDose(reminder.id, 'taken')}
+                      className="p-2 bg-green-50 text-green-600 hover:bg-green-100 rounded-xl transition-colors" title="Mark Taken">
+                      <CheckCircle size={16} />
+                    </button>
+                    <button onClick={() => logDose(reminder.id, 'missed')}
+                      className="p-2 bg-red-50 text-red-400 hover:bg-red-100 rounded-xl transition-colors" title="Mark Missed">
+                      <XCircle size={16} />
+                    </button>
+                    <button onClick={() => toggleActive(reminder)}
+                      className={`p-2 rounded-xl transition-colors ${reminder.active ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                      title={reminder.active ? 'Deactivate' : 'Activate'}>
                       <Check size={16} />
                     </button>
                     <button onClick={() => deleteReminder(reminder.id)} className="p-2 bg-red-50 text-red-400 hover:bg-red-100 rounded-xl transition-colors">
