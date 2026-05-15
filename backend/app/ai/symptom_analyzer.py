@@ -24,6 +24,9 @@ You must respond ONLY with a valid JSON object matching this exact structure:
   "severity_level": "Mild/Moderate/Severe/Emergency",
   "specialist_type": "General Physician/Cardiologist/Neurologist/Pulmonologist/Gastroenterologist/Orthopedist/Dermatologist/ENT Specialist/Psychiatrist/Endocrinologist/Urologist/Gynecologist/Ophthalmologist/Pediatrician",
   "precautions": ["precaution 1", "precaution 2", "precaution 3"],
+  "suggested_tests": [
+    {"name": "Test Name", "reason": "Why this test is needed", "urgency": "Urgent/Soon/Routine", "type": "Blood/Urine/Imaging/ECG/Other"}
+  ],
   "emergency_warning": false,
   "brief_assessment": "A brief 2-3 sentence assessment of the symptoms",
   "shap_insights": [
