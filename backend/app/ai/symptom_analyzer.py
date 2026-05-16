@@ -16,6 +16,41 @@ IMPORTANT RULES:
 5. Recommend appropriate specialist types based on symptoms
 6. Include SHAP-style explainability: for each symptom, assign an importance score (0-100) showing how much it contributed to the top diagnosis
 
+=====================================
+AGE-BASED ANALYSIS — MANDATORY RULES
+Apply these BEFORE anything else. They override general severity defaults.
+=====================================
+
+CHILD (Age < 15) — STRICT RULES:
+- specialist_type MUST be "Pediatrician" — no exceptions, regardless of the symptom
+- severity_level MUST be at least "Moderate" — NEVER return "Mild" for a child patient
+  Rationale: Children have immature immune systems, cannot accurately self-report pain, and minor-seeming symptoms can escalate rapidly
+- Prioritize pediatric-specific conditions: RSV, croup, febrile seizures, strep throat, ear infections, Kawasaki disease, intussusception, childhood asthma, rotavirus
+- Any red-flag symptom in a child (fever >102°F, rash + fever, difficulty breathing, unusual lethargy, refusal to eat) → severity = "Emergency", emergency_warning = true
+- risk_factors must include: "Developing/immature immune system", "Rapid symptom escalation risk in children", "Cannot accurately self-report pain level"
+- brief_assessment must explicitly mention the child's age and recommend seeing a Pediatrician promptly
+
+ELDERLY (Age 60+) — STRICT RULES:
+- Escalate severity by at least ONE level compared to a younger adult with identical symptoms:
+    Mild → Moderate | Moderate → Severe | Severe → Emergency
+- Chest pain, dizziness, confusion, shortness of breath, or sudden weakness at age 60+ → ALWAYS Emergency, emergency_warning = true
+- Assume high probability of comorbidities: hypertension, diabetes, COPD, cardiac disease, reduced kidney/liver function
+- Always add "Advanced age (60+)" as the FIRST entry in risk_factors
+- risk_factors must also include: "Likely comorbidities", "Polypharmacy interaction risk", "Reduced physiological reserve"
+- Recommend the primary specialist AND suggest geriatric evaluation for overall health review
+- brief_assessment must clearly state that at their age this situation warrants prompt medical attention
+
+ALL OTHER AGES (15–59):
+- Age 15–18: Consider adolescent/growth-related issues, mental health, sports injuries, eating disorders
+- Age 19–35: Infections, anxiety, IBS, migraines common; low cardiac risk unless symptoms are severe
+- Age 36–59: Increase suspicion for hypertension, diabetes, thyroid issues, metabolic syndrome; elevate severity accordingly
+
+Always cross-reference the patient's age with the reported symptoms to adjust:
+  a) Probability scores of each condition
+  b) Severity level (child or elderly rules above take priority)
+  c) Specialist recommendation (Pediatrician mandatory for age < 15)
+  d) Risk factors listed
+
 You must respond ONLY with a valid JSON object matching this exact structure:
 {
   "possible_conditions": [
@@ -104,8 +139,17 @@ RULE_BASED_CONDITIONS = {
 }
 
 
-def rule_based_analysis(symptoms_text: str) -> dict:
-    """Fallback rule-based analysis when OpenAI is not available."""
+_SEVERITY_ORDER = ["Mild", "Moderate", "Severe", "Emergency"]
+
+
+def _escalate_severity(level: str) -> str:
+    """Bump severity up one step (capped at Emergency)."""
+    idx = _SEVERITY_ORDER.index(level) if level in _SEVERITY_ORDER else 0
+    return _SEVERITY_ORDER[min(idx + 1, len(_SEVERITY_ORDER) - 1)]
+
+
+def rule_based_analysis(symptoms_text: str, patient_age: Optional[int] = None) -> dict:
+    """Fallback rule-based analysis when AI APIs are not available."""
     symptoms_lower = symptoms_text.lower()
     matched = None
 
@@ -124,9 +168,40 @@ def rule_based_analysis(symptoms_text: str) -> dict:
             "severity": "Mild"
         }
 
-    emergency = matched["severity"] == "Emergency" or any(
+    severity = matched["severity"]
+    specialist = matched["specialist"]
+    risk_factors = ["Environmental factors", "Lifestyle factors"]
+    age_note = ""
+
+    # --- Child logic (age < 15) ---
+    if patient_age is not None and patient_age < 15:
+        specialist = "Pediatrician"
+        # Minimum severity for children is Moderate
+        if severity == "Mild":
+            severity = "Moderate"
+        risk_factors = [
+            "Developing/immature immune system",
+            "Rapid symptom escalation risk in children",
+            "Cannot accurately self-report pain level"
+        ] + risk_factors
+        age_note = f" As your child is {patient_age} years old, it is important to consult a Pediatrician promptly — children's symptoms can worsen quickly."
+
+    # --- Elderly logic (age >= 60) ---
+    elif patient_age is not None and patient_age >= 60:
+        severity = _escalate_severity(severity)
+        risk_factors = [
+            f"Advanced age ({patient_age}+)",
+            "Likely comorbidities (hypertension, diabetes, cardiac disease)",
+            "Polypharmacy interaction risk",
+            "Reduced physiological reserve"
+        ] + risk_factors
+        age_note = f" At age {patient_age}, even seemingly moderate symptoms can indicate a serious underlying condition — please seek medical attention promptly."
+
+    emergency = severity == "Emergency" or any(
         word in symptoms_lower for word in ["chest pain", "can't breathe", "unconscious", "stroke", "severe bleeding"]
     )
+    if emergency:
+        severity = "Emergency"
 
     precautions = [
         "Rest and stay hydrated",
@@ -136,7 +211,6 @@ def rule_based_analysis(symptoms_text: str) -> dict:
         "Maintain a healthy diet and sleep schedule"
     ]
 
-    # Generate basic SHAP insights from symptom keywords
     words = [w.strip() for w in symptoms_text.lower().split() if len(w) > 3]
     shap_insights = []
     for i, word in enumerate(words[:5]):
@@ -149,13 +223,17 @@ def rule_based_analysis(symptoms_text: str) -> dict:
 
     return {
         "possible_conditions": matched["conditions"],
-        "severity_level": matched["severity"],
-        "specialist_type": matched["specialist"],
+        "severity_level": severity,
+        "specialist_type": specialist,
         "precautions": precautions,
         "emergency_warning": emergency,
-        "brief_assessment": f"Based on your symptoms, you may be experiencing {matched['conditions'][0]['name']}. A {matched['specialist']} would be best suited to evaluate your condition. Please consult a healthcare professional for proper diagnosis.",
+        "brief_assessment": (
+            f"Based on your symptoms, you may be experiencing {matched['conditions'][0]['name']}. "
+            f"A {specialist} would be best suited to evaluate your condition.{age_note} "
+            "Please consult a healthcare professional for proper diagnosis."
+        ),
         "shap_insights": shap_insights,
-        "risk_factors": ["Age-related risk", "Environmental factors", "Lifestyle factors"],
+        "risk_factors": risk_factors,
         "confidence_score": 65
     }
 
@@ -170,9 +248,41 @@ async def analyze_symptoms(
 ) -> dict:
     """Analyze symptoms using OpenAI with rule-based fallback."""
 
-    patient_context = f"Patient symptoms: {symptoms}"
-    if patient_age:
-        patient_context += f"\nPatient age: {patient_age} years"
+    # Age goes first — it is the highest-priority context for accurate diagnosis
+    if patient_age is not None:
+        if patient_age < 15:
+            age_group = f"CHILD ({patient_age} years)"
+            age_directive = (
+                "MANDATORY: specialist_type = 'Pediatrician'. "
+                "severity_level must be at least 'Moderate' (never 'Mild'). "
+                "Flag child-specific risk factors. "
+                "Mention the child's age in brief_assessment and advise prompt Pediatrician visit."
+            )
+        elif patient_age >= 60:
+            age_group = f"ELDERLY ({patient_age} years)"
+            age_directive = (
+                "MANDATORY: escalate severity by one level vs a younger adult with the same symptoms. "
+                "Chest pain / dizziness / confusion / breathlessness = Emergency. "
+                "List 'Advanced age' as first risk_factor. "
+                "Recommend primary specialist + geriatric review. "
+                "brief_assessment must stress urgency of prompt medical attention at this age."
+            )
+        else:
+            age_group = (
+                "Teenager (13–18)"    if patient_age <= 18 else
+                "Young Adult (19–35)" if patient_age <= 35 else
+                "Middle-aged (36–59)"
+            )
+            age_directive = "Adjust condition probabilities and severity for this age group."
+
+        patient_context = (
+            f"⚠ PATIENT AGE: {patient_age} years [{age_group}]\n"
+            f"AGE RULE: {age_directive}\n"
+        )
+    else:
+        patient_context = ""
+
+    patient_context += f"Patient symptoms: {symptoms}"
     if patient_gender:
         patient_context += f"\nPatient gender: {patient_gender}"
     if duration:
@@ -237,7 +347,7 @@ async def analyze_symptoms(
         except Exception as e:
             logger.warning(f"OpenAI analysis failed: {e}")
 
-    return rule_based_analysis(symptoms)
+    return rule_based_analysis(symptoms, patient_age)
 
 
 async def chat_with_ai(
@@ -253,8 +363,22 @@ async def chat_with_ai(
     patient_info = ""
     if patient_name:
         patient_info += f"Patient name: {patient_name}\n"
-    if patient_age:
+    if patient_age is not None:
         patient_info += f"Patient age: {patient_age} years\n"
+        if patient_age < 15:
+            patient_info += (
+                f"AGE CONTEXT: This is a CHILD ({patient_age} years old). "
+                "Always recommend a Pediatrician. Treat symptoms as at least Moderate in seriousness. "
+                "Be extra gentle and reassuring — speak to the parent/guardian. "
+                "Emphasise that children need specialist paediatric care.\n"
+            )
+        elif patient_age >= 60:
+            patient_info += (
+                f"AGE CONTEXT: This is an ELDERLY patient ({patient_age} years old). "
+                "Treat all symptoms with elevated concern — what is mild at 30 can be serious at 60+. "
+                "Highlight the need for prompt medical attention. "
+                "Mention possible comorbidities and the importance of not delaying care.\n"
+            )
     if patient_gender:
         patient_info += f"Patient gender: {patient_gender}\n"
 

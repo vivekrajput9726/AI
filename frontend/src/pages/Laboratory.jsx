@@ -96,14 +96,17 @@ function SymptomsTab() {
 
   const analyze = async () => {
     if (!symptoms.trim()) { toast.error('Enter your symptoms'); return }
+    if (!age) { toast.error('Please enter your age for accurate analysis'); return }
     setLoading(true); setResult(null)
     try {
-      const res = await api.post('/ai/analyze', { symptoms, patient_age: parseInt(age)||25, patient_gender: gender })
+      const res = await api.post('/ai/analyze', { symptoms, patient_age: parseInt(age), patient_gender: gender })
       setResult(res.data)
       toast.success('AI Analysis complete!')
     } catch { toast.error('Analysis failed') }
     finally { setLoading(false) }
   }
+
+  const canAnalyze = symptoms.trim() && age && !loading
 
   return (
     <div className="space-y-4">
@@ -117,8 +120,16 @@ function SymptomsTab() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Age</label>
-            <input type="number" value={age} onChange={e=>setAge(e.target.value)} placeholder="25" className="input-field"/>
+            <label className="text-xs font-semibold mb-1 flex items-center gap-1 text-gray-700">
+              Age <span className="text-red-500">*</span>
+              <span className="text-xs font-normal text-gray-400">(required)</span>
+            </label>
+            <input
+              type="number" min="1" max="120"
+              value={age} onChange={e=>setAge(e.target.value)}
+              placeholder="e.g. 25"
+              className={`input-field ${!age ? 'border-red-300 focus:border-red-400' : 'border-green-300'}`}
+            />
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Gender</label>
@@ -127,8 +138,13 @@ function SymptomsTab() {
             </select>
           </div>
         </div>
-        <button onClick={analyze} disabled={!symptoms.trim()||loading}
-          className="w-full py-3 bg-gradient-to-r from-teal-600 to-cyan-500 text-white font-bold rounded-xl disabled:opacity-40 flex items-center justify-center gap-2">
+        {!age && (
+          <p className="text-xs text-red-500 flex items-center gap-1">
+            <AlertCircle size={11}/> Age is required — AI uses it to give accurate, age-specific diagnosis
+          </p>
+        )}
+        <button onClick={analyze} disabled={!canAnalyze}
+          className="w-full py-3 bg-gradient-to-r from-teal-600 to-cyan-500 text-white font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all">
           {loading ? <><Loader size={15} className="animate-spin"/>Analyzing...</> : <><Zap size={15}/>Analyze</>}
         </button>
       </div>
