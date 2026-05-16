@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { User, Mail, Phone, MapPin, Calendar, Shield, Edit3, Save, X, Camera, Activity, Heart, Droplets, AlertCircle } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
@@ -51,6 +51,25 @@ function Profile() {
     blood_sugar_mg_dl: user?.blood_sugar_mg_dl ?? '',
     heart_rate_bpm: user?.heart_rate_bpm ?? '',
   })
+
+  // Sync form with Redux user whenever user updates (e.g. after save), but only when not actively editing
+  useEffect(() => {
+    if (!editing && !editingVitals) {
+      setForm({
+        full_name: user?.full_name || '',
+        phone: user?.phone || '',
+        date_of_birth: user?.date_of_birth || '',
+        gender: user?.gender || '',
+        address: user?.address || '',
+        weight_kg: user?.weight_kg ?? '',
+        height_cm: user?.height_cm ?? '',
+        blood_pressure_systolic: user?.blood_pressure_systolic ?? '',
+        blood_pressure_diastolic: user?.blood_pressure_diastolic ?? '',
+        blood_sugar_mg_dl: user?.blood_sugar_mg_dl ?? '',
+        heart_rate_bpm: user?.heart_rate_bpm ?? '',
+      })
+    }
+  }, [user])
 
   const handleSave = async () => {
     const numericFields = ['weight_kg', 'height_cm', 'blood_pressure_systolic', 'blood_pressure_diastolic', 'blood_sugar_mg_dl', 'heart_rate_bpm']

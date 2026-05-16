@@ -90,6 +90,20 @@ export default function PatientDashboard() {
 
   useEffect(() => { loadData() }, [dispatch])
 
+  // Re-fetch health score whenever vitals change in Redux (e.g. after updating in Profile)
+  useEffect(() => {
+    api.get('/users/me/health-score')
+      .then(r => { setHealthScore(r.data); setHealthLoading(false) })
+      .catch(() => setHealthLoading(false))
+  }, [
+    user?.weight_kg,
+    user?.height_cm,
+    user?.heart_rate_bpm,
+    user?.blood_pressure_systolic,
+    user?.blood_pressure_diastolic,
+    user?.blood_sugar_mg_dl,
+  ])
+
   const firstName   = user?.full_name?.split(' ')[0] || 'there'
   const h           = new Date().getHours()
   const greeting    = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening'

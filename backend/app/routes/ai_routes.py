@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
+from bson import ObjectId
 from app.middleware.auth_middleware import get_current_user
 from app.ai.symptom_analyzer import analyze_symptoms, chat_with_ai
 from app.services.doctor_service import get_doctors_by_specialization
@@ -10,7 +11,7 @@ from app.utils.helpers import serialize_doc
 router = APIRouter()
 
 
-@router.post("/analyze", summary="Analyze symptoms with AI")
+@router.post("/analyze", summary="Analyze symptoms with AI — inserts new record or updates existing if analysis_id is provided")
 async def analyze(data: SymptomAnalysisRequest, current_user: dict = Depends(get_current_user)):
     analysis = await analyze_symptoms(
         symptoms=data.symptoms,
@@ -36,14 +37,48 @@ async def analyze(data: SymptomAnalysisRequest, current_user: dict = Depends(get
     analysis["disclaimer"] = "This is not a medical diagnosis. Please consult a qualified doctor."
 
     db = get_db()
-    report_doc = {
-        "patient_id": current_user["id"],
-        "symptoms": data.symptoms,
-        "ai_analysis": analysis,
-        "created_at": datetime.utcnow()
-    }
-    result = await db.medical_reports.insert_one(report_doc)
-    analysis["analysis_id"] = str(result.inserted_id)
+    now = datetime.utcnow()
+
+    # UPDATE existing record if analysis_id provided
+    if data.analysis_id:
+        try:
+            oid = ObjectId(data.analysis_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid analysis_id format")
+
+        existing = await db.medical_reports.find_one(
+            {"_id": oid, "patient_id": current_user["id"]}
+        )
+        if not existing:
+            raise HTTPException(status_code=404, detail="Report not found or access denied")
+
+        await db.medical_reports.update_one(
+            {"_id": oid},
+            {"$set": {
+                "symptoms": data.symptoms,
+                "patient_age": data.patient_age,
+                "patient_gender": data.patient_gender,
+                "ai_analysis": analysis,
+                "updated_at": now,
+            }}
+        )
+        analysis["analysis_id"] = data.analysis_id
+        analysis["action"] = "updated"
+
+    # INSERT new record
+    else:
+        report_doc = {
+            "patient_id": current_user["id"],
+            "symptoms": data.symptoms,
+            "patient_age": data.patient_age,
+            "patient_gender": data.patient_gender,
+            "ai_analysis": analysis,
+            "created_at": now,
+            "updated_at": now,
+        }
+        result = await db.medical_reports.insert_one(report_doc)
+        analysis["analysis_id"] = str(result.inserted_id)
+        analysis["action"] = "inserted"
 
     return analysis
 

@@ -9,6 +9,7 @@ class SymptomAnalysisRequest(BaseModel):
     duration: Optional[str] = None
     severity: Optional[str] = None
     report_context: Optional[str] = None  # JSON string of pre-analyzed report data
+    analysis_id: Optional[str] = None     # If provided, update existing record instead of insert
 
 
 class DoctorRecommendation(BaseModel):

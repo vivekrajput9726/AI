@@ -87,21 +87,31 @@ function ScoreCircle({ score, size = 96 }) {
 // ═══════════════════════════════════════════════════
 function SymptomsTab() {
   const navigate = useNavigate()
-  const [symptoms, setSymptoms] = useState('')
-  const [age, setAge]           = useState('')
-  const [gender, setGender]     = useState('male')
-  const [loading, setLoading]   = useState(false)
-  const [result, setResult]     = useState(null)
+  const [symptoms, setSymptoms]     = useState('')
+  const [age, setAge]               = useState('')
+  const [gender, setGender]         = useState('male')
+  const [loading, setLoading]       = useState(false)
+  const [result, setResult]         = useState(null)
+  const [analysisId, setAnalysisId] = useState(null)  // tracks saved record ID
+  const [saved, setSaved]           = useState(false)
   const QUICK = ['Fever, cough, headache','Chest pain, shortness of breath','Stomach pain, nausea','Joint pain, fatigue']
 
-  const analyze = async () => {
+  const analyze = async (isUpdate = false) => {
     if (!symptoms.trim()) { toast.error('Enter your symptoms'); return }
     if (!age) { toast.error('Please enter your age for accurate analysis'); return }
-    setLoading(true); setResult(null)
+    setLoading(true); setResult(null); setSaved(false)
     try {
-      const res = await api.post('/ai/analyze', { symptoms, patient_age: parseInt(age), patient_gender: gender })
+      const payload = {
+        symptoms,
+        patient_age: parseInt(age),
+        patient_gender: gender,
+        ...(isUpdate && analysisId ? { analysis_id: analysisId } : {})
+      }
+      const res = await api.post('/ai/analyze', payload)
       setResult(res.data)
-      toast.success('AI Analysis complete!')
+      setAnalysisId(res.data.analysis_id)
+      setSaved(true)
+      toast.success(res.data.action === 'updated' ? 'Report updated!' : 'Analysis saved!')
     } catch { toast.error('Analysis failed') }
     finally { setLoading(false) }
   }
@@ -143,10 +153,23 @@ function SymptomsTab() {
             <AlertCircle size={11}/> Age is required — AI uses it to give accurate, age-specific diagnosis
           </p>
         )}
-        <button onClick={analyze} disabled={!canAnalyze}
-          className="w-full py-3 bg-gradient-to-r from-teal-600 to-cyan-500 text-white font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all">
-          {loading ? <><Loader size={15} className="animate-spin"/>Analyzing...</> : <><Zap size={15}/>Analyze</>}
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => analyze(false)} disabled={!canAnalyze}
+            className="flex-1 py-3 bg-gradient-to-r from-teal-600 to-cyan-500 text-white font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all">
+            {loading ? <><Loader size={15} className="animate-spin"/>Analyzing...</> : <><Zap size={15}/>{analysisId ? 'Re-Analyze (New)' : 'Analyze'}</>}
+          </button>
+          {analysisId && !loading && (
+            <button onClick={() => analyze(true)} disabled={!canAnalyze}
+              className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-500 text-white font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all text-sm whitespace-nowrap">
+              <RefreshCw size={14}/> Update
+            </button>
+          )}
+        </div>
+        {analysisId && (
+          <p className={`text-xs flex items-center gap-1 ${saved ? 'text-green-600' : 'text-gray-400'}`}>
+            <CheckCircle size={11}/> {saved ? `Report saved (ID: ${analysisId.slice(-8)})` : 'Not saved yet'}
+          </p>
+        )}
       </div>
 
       {result && (
