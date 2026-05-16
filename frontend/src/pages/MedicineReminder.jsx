@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Bell, Trash2, X, Pill, Clock, Check, CheckCircle, XCircle, Activity } from 'lucide-react'
+import { Plus, Bell, Trash2, X, Pill, Clock, Check, CheckCircle, XCircle, Activity, CalendarPlus } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import api from '../services/api'
 import toast from 'react-hot-toast'
@@ -85,6 +85,54 @@ function MedicineReminder() {
     } catch { toast.error('Failed to log') }
   }
 
+  // ── Google Calendar Integration ──────────────────────────────────────────
+  const addToGoogleCalendar = (med) => {
+    // Build start datetime: today at med.time, formatted as YYYYMMDDTHHmmSS
+    const [hh, mm] = (med.time || '08:00').split(':').map(Number)
+    const now   = new Date()
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0)
+    const end   = new Date(start.getTime() + 30 * 60 * 1000) // 30 min duration
+
+    const fmt = d =>
+      `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}` +
+      `T${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}00`
+
+    // Recurrence rule based on frequency
+    const rrule = {
+      'Once daily':        'RRULE:FREQ=DAILY',
+      'Twice daily':       'RRULE:FREQ=DAILY',
+      'Three times daily': 'RRULE:FREQ=DAILY',
+      'Every 6 hours':     'RRULE:FREQ=HOURLY;INTERVAL=6',
+      'Every 8 hours':     'RRULE:FREQ=HOURLY;INTERVAL=8',
+      'Weekly':            'RRULE:FREQ=WEEKLY',
+    }[med.frequency] || 'RRULE:FREQ=DAILY'
+
+    const title  = `💊 ${med.name}${med.dosage ? ` — ${med.dosage}` : ''}`
+    const detail = [
+      med.dosage    && `Dosage: ${med.dosage}`,
+      med.frequency && `Frequency: ${med.frequency}`,
+      med.meal      && `Take: ${med.meal}`,
+      med.frequency === 'Twice daily'       && '2nd dose: Set a second reminder manually',
+      med.frequency === 'Three times daily' && '2nd & 3rd dose: Set additional reminders manually',
+      med.notes     && `Notes: ${med.notes}`,
+      '',
+      'Added via Synora Health App',
+    ].filter(Boolean).join('\n')
+
+    const params = new URLSearchParams({
+      action:  'TEMPLATE',
+      text:    title,
+      dates:   `${fmt(start)}/${fmt(end)}`,
+      details: detail,
+      recur:   rrule,
+      sf:      'true',
+      output:  'xml',
+    })
+
+    window.open(`https://calendar.google.com/calendar/render?${params}`, '_blank')
+    toast.success(`Opening Google Calendar for ${med.name}`)
+  }
+
   const active   = reminders.filter(r => r.active)
   const inactive = reminders.filter(r => !r.active)
 
@@ -97,10 +145,16 @@ function MedicineReminder() {
             <h1 className="text-2xl font-bold text-gray-900">Medicine Reminder</h1>
             <p className="text-gray-500 text-sm mt-1">Never miss your medications</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button onClick={requestNotificationPermission} className="btn-secondary text-sm flex items-center gap-2">
               <Bell size={14} /> Enable Alerts
             </button>
+            {active.length > 0 && (
+              <button onClick={() => active.forEach(m => addToGoogleCalendar(m))}
+                className="btn-secondary text-sm flex items-center gap-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50">
+                <CalendarPlus size={14} /> Add All to Calendar
+              </button>
+            )}
             <button onClick={() => setShowModal(true)} className="btn-primary text-sm flex items-center gap-2">
               <Plus size={14} /> Add Medicine
             </button>
@@ -166,6 +220,10 @@ function MedicineReminder() {
                     <button onClick={() => logDose(reminder._id || reminder.id, 'missed')}
                       className="p-2 bg-red-50 text-red-400 hover:bg-red-100 rounded-xl transition-colors" title="Mark Missed">
                       <XCircle size={16} />
+                    </button>
+                    <button onClick={() => addToGoogleCalendar(reminder)}
+                      className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors" title="Add to Google Calendar">
+                      <CalendarPlus size={16} />
                     </button>
                     <button onClick={() => toggleActive(reminder)}
                       className={`p-2 rounded-xl transition-colors ${reminder.active ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}

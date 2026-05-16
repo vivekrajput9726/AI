@@ -221,19 +221,23 @@ export default function AdminDashboard() {
     } catch { toast.error('Failed to update') }
   }
 
-  const totalUsers  = stats?.total_users  || users.length || 12458
-  const totalDocs   = stats?.total_doctors|| doctors.length || 568
-  const totalApts   = stats?.total_appointments || apts.length || 2854
-  const revenue     = stats?.total_revenue || 845230
-  const patients    = users.filter(u=>u.role==='patient').length || 10243
-  const pendingApts = apts.filter(a=>a.status==='pending').length
-  const confirmedApts= apts.filter(a=>a.status==='confirmed').length
-  const completedApts= apts.filter(a=>a.status==='completed').length
-  const cancelledApts= apts.filter(a=>a.status==='cancelled').length
+  // Use correct field names from /admin/stats response
+  const totalUsers    = stats?.total_patients      ?? 0
+  const totalDocs     = stats?.total_doctors       ?? 0
+  const totalApts     = stats?.total_appointments  ?? 0
+  const pendingApts   = stats?.pending_appointments ?? apts.filter(a=>a.status==='pending').length
+  const verifiedDocs  = stats?.verified_doctors    ?? doctors.filter(d=>d.is_verified).length
+  const revenue       = stats?.total_revenue       ?? 0
+
+  // Derived from loaded list data
+  const patients      = users.filter(u=>u.role==='patient').length
+  const confirmedApts = apts.filter(a=>a.status==='confirmed').length
+  const completedApts = apts.filter(a=>a.status==='completed').length
+  const cancelledApts = apts.filter(a=>a.status==='cancelled').length
 
   const recentApts  = apts.slice(0,4)
-  const pendingDocs = doctors.filter(d=>!d.is_verified && !d.is_static).slice(0,4)
-  const verifiedDocs= doctors.filter(d=>d.is_verified).slice(0,4)
+  const pendingDocs    = doctors.filter(d=>!d.is_verified && !d.is_static).slice(0,4)
+  const verifiedDocList= doctors.filter(d=>d.is_verified).slice(0,4)
 
   // Sidebar links
   const LINKS = [
@@ -375,7 +379,14 @@ export default function AdminDashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Good Morning, Admin 👋</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">
+                      {(() => {
+                        const h = new Date().getHours()
+                        const g = h < 12 ? 'Good Morning' : h < 18 ? 'Good Afternoon' : 'Good Evening'
+                        const name = user?.full_name?.split(' ')[0] || 'Admin'
+                        return `${g}, ${name} 👋`
+                      })()}
+                    </h1>
                     <p className="text-sm text-gray-500 mt-0.5">Here's your Synora Health platform overview for today.</p>
                   </div>
                   <button onClick={() => loadData(true)} disabled={refreshing}
@@ -385,23 +396,40 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* ── Stats Row (4 cards) ── */}
+                {loading ? (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[1,2,3,4].map(i => (
+                      <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 animate-pulse">
+                        <div className="w-12 h-12 bg-gray-100 rounded-2xl flex-shrink-0"/>
+                        <div className="flex-1 space-y-2">
+                          <div className="h-3 bg-gray-100 rounded w-20"/>
+                          <div className="h-7 bg-gray-100 rounded w-16"/>
+                          <div className="h-3 bg-gray-100 rounded w-24"/>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
-                    { icon:'👥', label:'Total Users',         value: totalUsers.toLocaleString('en-IN'), sub:'+18.6% this month', iconBg:'bg-blue-100' },
-                    { icon:'🩺', label:'Total Doctors',       value: totalDocs.toLocaleString('en-IN'),  sub:'+12.4% this month', iconBg:'bg-teal-100' },
-                    { icon:'📅', label:'Total Appointments',  value: totalApts.toLocaleString('en-IN'),  sub:'+15.3% this month', iconBg:'bg-orange-100' },
-                    { icon:'💰', label:'Revenue This Month',  value:`₹${(revenue/100000).toFixed(1)}L`, sub:'+26.4% vs last month', iconBg:'bg-green-100' },
+                    { icon:'👥', label:'Total Patients',     value: totalUsers.toLocaleString('en-IN'),    sub:`${pendingApts} pending apts`,       iconBg:'bg-blue-100',   subColor:'text-blue-600',   tab:'users'        },
+                    { icon:'🩺', label:'Total Doctors',      value: totalDocs.toLocaleString('en-IN'),     sub:`${verifiedDocs} verified`,          iconBg:'bg-teal-100',   subColor:'text-teal-600',   tab:'doctors'      },
+                    { icon:'📅', label:'Total Appointments', value: totalApts.toLocaleString('en-IN'),     sub:`${pendingApts} pending review`,     iconBg:'bg-orange-100', subColor:'text-orange-600', tab:'appointments' },
+                    { icon:'✅', label:'Completed Consults', value: completedApts.toLocaleString('en-IN'), sub:`${cancelledApts} cancelled`,        iconBg:'bg-green-100',  subColor:'text-green-600',  tab:'appointments' },
                   ].map((s,i)=>(
-                    <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
-                      <div className={`w-12 h-12 ${s.iconBg} rounded-2xl flex items-center justify-center text-2xl flex-shrink-0`}>{s.icon}</div>
-                      <div>
+                    <button key={i} onClick={() => setActiveTab(s.tab)}
+                      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer text-left w-full group">
+                      <div className={`w-12 h-12 ${s.iconBg} rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform`}>{s.icon}</div>
+                      <div className="flex-1 min-w-0">
                         <p className="text-xs text-gray-500 font-medium">{s.label}</p>
                         <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">{s.value}</p>
-                        <p className="text-xs text-green-600 font-medium mt-0.5">{s.sub}</p>
+                        <p className={`text-xs font-medium mt-0.5 ${s.subColor}`}>{s.sub}</p>
                       </div>
-                    </div>
+                      <ChevronRight size={14} className="text-gray-300 group-hover:text-blue-400 flex-shrink-0 transition-colors"/>
+                    </button>
                   ))}
                 </div>
+                )}
 
                 {/* ── MAIN 3-COLUMN ── */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -416,14 +444,15 @@ export default function AdminDashboard() {
                       <button onClick={()=>setActiveTab('appointments')} className="text-xs text-blue-600 font-semibold hover:underline">View All</button>
                     </div>
                     <div className="divide-y divide-gray-50">
-                      {(recentApts.length>0?recentApts:[
-                        {patient_name:'Riya Patel',   appointment_time:'10:00 AM', symptoms:'Chest Pain',       appointment_type:'in-person', status:'pending'},
-                        {patient_name:'Aman Verma',   appointment_time:'11:30 AM', symptoms:'Regular Checkup',  appointment_type:'video',     status:'confirmed'},
-                        {patient_name:'Neha Singh',   appointment_time:'01:00 PM', symptoms:'Follow-up',        appointment_type:'in-person', status:'confirmed'},
-                        {patient_name:'Rahul Mehta',  appointment_time:'04:00 PM', symptoms:'ECG Review',       appointment_type:'video',     status:'pending'},
-                        {patient_name:'Kavita Joshi', appointment_time:'05:00 PM', symptoms:'Blood Pressure',   appointment_type:'in-person', status:'confirmed'},
-                      ]).slice(0,5).map((a,i)=>(
-                        <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+                      {recentApts.length === 0 ? (
+                        <div className="py-10 text-center text-gray-400">
+                          <Calendar size={32} className="mx-auto mb-2 opacity-30"/>
+                          <p className="text-sm font-medium">No appointments yet</p>
+                          <button onClick={()=>setActiveTab('appointments')} className="mt-2 text-xs text-blue-500 hover:underline">View All Appointments</button>
+                        </div>
+                      ) : recentApts.slice(0,5).map((a,i)=>(
+                        <button key={i} onClick={()=>setActiveTab('appointments')}
+                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors text-left">
                           <p className="text-xs font-semibold text-gray-400 w-16 flex-shrink-0">{a.appointment_time}</p>
                           <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                             {(a.patient_name||'P').charAt(0)}
@@ -432,10 +461,14 @@ export default function AdminDashboard() {
                             <p className="text-sm font-semibold text-gray-900 truncate">{a.patient_name}</p>
                             <p className="text-xs text-gray-400 truncate">{a.symptoms||a.appointment_type}</p>
                           </div>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${a.appointment_type==='video'?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'}`}>
-                            {a.appointment_type==='video'?'Video':'Clinic'}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                            a.status==='confirmed'?'bg-green-100 text-green-700':
+                            a.status==='completed'?'bg-blue-100 text-blue-700':
+                            a.status==='cancelled'?'bg-red-100 text-red-600':
+                            'bg-yellow-100 text-yellow-700'}`}>
+                            {a.status}
                           </span>
-                        </div>
+                        </button>
                       ))}
                     </div>
                     <div className="px-5 py-3 border-t border-gray-100">
@@ -1664,44 +1697,81 @@ export default function AdminDashboard() {
 
             {/* ══ SETTINGS ══ */}
             {activeTab === 'settings' && (
-              <div className="space-y-4">
+              <div className="space-y-5">
+
+                {/* Header */}
                 <div className="bg-gradient-to-r from-gray-700 to-gray-900 rounded-2xl p-5 text-white flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Settings size={20}/></div>
-                  <div><h2 className="font-extrabold text-lg">Settings</h2><p className="text-gray-300 text-xs">Platform configuration, preferences and account settings</p></div>
-                </div>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[
-                    {icon:'👤',label:'Admin Profile',       sub:'Update your name, email and photo',   action:()=>toast.success('Go to profile page'),         color:'bg-blue-50 border-blue-100'},
-                    {icon:'🔒',label:'Security Settings',   sub:'Change password and 2FA settings',    action:()=>toast.success('Security settings opened'),    color:'bg-red-50 border-red-100'},
-                    {icon:'🔔',label:'Notification Settings',sub:'Manage alert preferences',           action:()=>setActiveTab('notifications'),                  color:'bg-orange-50 border-orange-100'},
-                    {icon:'💰',label:'Payment Settings',    sub:'Payment gateway configuration',       action:()=>setActiveTab('finance'),                       color:'bg-green-50 border-green-100'},
-                    {icon:'🤖',label:'AI Configuration',    sub:'API keys, model settings',            action:()=>setActiveTab('ai-analytics'),                  color:'bg-teal-50 border-teal-100'},
-                    {icon:'📧',label:'Email / SMS Settings',sub:'Configure SMTP and Twilio',           action:()=>setActiveTab('system'),                        color:'bg-purple-50 border-purple-100'},
-                    {icon:'🌐',label:'Language & Region',   sub:'Platform language and timezone',      action:()=>toast.success('Language settings opened'),     color:'bg-indigo-50 border-indigo-100'},
-                    {icon:'🎨',label:'Branding Settings',   sub:'Logo, colors and platform name',      action:()=>toast.success('Branding settings opened'),     color:'bg-pink-50 border-pink-100'},
-                    {icon:'⚙️',label:'System Settings',    sub:'Server config and maintenance mode',   action:()=>setActiveTab('system'),                        color:'bg-gray-50 border-gray-200'},
-                  ].map((s,i)=>(
-                    <button key={i} onClick={s.action}
-                      className={`flex items-center gap-4 p-4 border rounded-2xl hover:shadow-md transition-all text-left group ${s.color}`}>
-                      <span className="text-3xl">{s.icon}</span>
-                      <div className="flex-1">
-                        <p className="font-semibold text-gray-900 text-sm group-hover:text-teal-700">{s.label}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
-                      </div>
-                      <ChevronRight size={16} className="text-gray-300 group-hover:text-teal-500 flex-shrink-0"/>
-                    </button>
-                  ))}
-                </div>
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center justify-between">
                   <div>
-                    <p className="font-bold text-red-700 text-sm">Danger Zone</p>
-                    <p className="text-xs text-red-500 mt-0.5">These actions are irreversible. Proceed with caution.</p>
+                    <h2 className="font-extrabold text-lg">Settings</h2>
+                    <p className="text-gray-300 text-xs">Platform configuration and account management</p>
                   </div>
-                  <button onClick={()=>toast.error('This action requires super admin confirmation')}
-                    className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700">
-                    Reset Platform Data
-                  </button>
                 </div>
+
+                {/* ── Admin Profile Card (real data) ── */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <p className="font-bold text-gray-800 mb-4 flex items-center gap-2"><span>👤</span> Admin Profile</p>
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-gray-600 to-gray-800 rounded-2xl flex items-center justify-center text-white text-2xl font-extrabold flex-shrink-0">
+                      {user?.full_name?.charAt(0) || 'A'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900">{user?.full_name || 'System Admin'}</p>
+                      <p className="text-sm text-gray-500">{user?.email || '—'}</p>
+                      <span className="inline-block mt-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium capitalize">{user?.role || 'admin'}</span>
+                    </div>
+                    <div className="text-right text-xs text-gray-400">
+                      <p>Account active</p>
+                      <span className="inline-flex items-center gap-1 text-green-600 font-semibold mt-0.5">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full"/> Online
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Quick Navigation to Working Settings ── */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <p className="font-bold text-gray-800 mb-3 flex items-center gap-2"><span>⚙️</span> Platform Settings</p>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {[
+                      { icon:'🔔', label:'Notification Settings', sub:'Manage alert and notification preferences', tab:'notifications', color:'bg-orange-50 border-orange-200' },
+                      { icon:'💰', label:'Payment Gateway',        sub:'Razorpay keys and billing configuration',  tab:'finance',       color:'bg-green-50 border-green-200'  },
+                      { icon:'🤖', label:'AI Configuration',       sub:'AI usage, analytics and model settings',  tab:'ai-analytics',  color:'bg-teal-50 border-teal-200'    },
+                      { icon:'📧', label:'Email & SMS Settings',   sub:'Configure SMTP, Twilio and OTP settings', tab:'system',        color:'bg-purple-50 border-purple-200' },
+                      { icon:'🖥️', label:'System Settings',       sub:'Server config and maintenance controls',  tab:'system',        color:'bg-gray-50 border-gray-200'    },
+                      { icon:'📊', label:'Reports & Monitoring',   sub:'Platform health and usage reports',       tab:'reports',       color:'bg-blue-50 border-blue-200'    },
+                    ].map((s,i)=>(
+                      <button key={i} onClick={()=>setActiveTab(s.tab)}
+                        className={`flex items-center gap-3 p-3.5 border rounded-xl hover:shadow-sm transition-all text-left group ${s.color}`}>
+                        <span className="text-xl flex-shrink-0">{s.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm group-hover:text-teal-700 truncate">{s.label}</p>
+                          <p className="text-xs text-gray-400 mt-0.5 truncate">{s.sub}</p>
+                        </div>
+                        <ChevronRight size={14} className="text-gray-300 group-hover:text-teal-500 flex-shrink-0"/>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Platform Info ── */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <p className="font-bold text-gray-800 mb-3 flex items-center gap-2"><span>ℹ️</span> Platform Information</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                    {[
+                      { label:'Platform',  value:'Synora Health' },
+                      { label:'Version',   value:'1.0.0'         },
+                      { label:'Backend',   value:'FastAPI + MongoDB' },
+                      { label:'Frontend',  value:'React + Vite'  },
+                    ].map((r,i)=>(
+                      <div key={i} className="bg-gray-50 rounded-xl p-3">
+                        <p className="text-xs text-gray-400 font-medium">{r.label}</p>
+                        <p className="font-semibold text-gray-800 mt-0.5 text-xs">{r.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
               </div>
             )}
 

@@ -270,28 +270,46 @@ export default function HealthGoals() {
               </div>
             )}
           </div>
-          {/* Flow steps */}
+          {/* Flow steps — all clickable */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            {FLOW_STEPS.map((s,i)=>(
-              <div key={s.n} className="flex items-center gap-1.5 flex-shrink-0">
-                <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  step > s.n  ? 'bg-white/30 text-white' :
-                  step === s.n ? 'bg-white text-teal-700 shadow-md' :
-                                'bg-white/10 text-white/50'
-                }`}>
-                  {step > s.n ? <CheckCircle size={11}/> : <span>{s.icon}</span>}
-                  <span className="hidden sm:inline">{s.label}</span>
+            {FLOW_STEPS.map((s,i)=>{
+              // Determine if step is reachable
+              const reachable =
+                s.n <= 3 ||                          // steps 1-3 always reachable
+                (s.n === 4 && goals.length > 0) ||   // step 4 needs goals
+                (s.n === 5 && goals.length > 0)       // step 5 needs goals
+
+              const handleStepClick = () => {
+                if (!reachable) { toast.error('Complete previous steps first'); return }
+                if (s.n <= 3) { setStep(s.n); return }
+                if (s.n === 4) { if (suggestions.length > 0) { setStep(4) } else { getAISuggestions() } }
+                if (s.n === 5) { if (insights.length > 0)    { setStep(5) } else { getInsights() } }
+              }
+
+              return (
+                <div key={s.n} className="flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={handleStepClick}
+                    title={reachable ? s.label : 'Add goals first'}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all
+                      ${!reachable        ? 'bg-white/10 text-white/30 cursor-not-allowed' :
+                        step === s.n      ? 'bg-white text-teal-700 shadow-md scale-105' :
+                        step > s.n        ? 'bg-white/30 text-white hover:bg-white/40' :
+                                            'bg-white/10 text-white/60 hover:bg-white/20 cursor-pointer'}`}>
+                    {step > s.n ? <CheckCircle size={11}/> : <span>{s.icon}</span>}
+                    <span className="hidden sm:inline">{s.label}</span>
+                  </button>
+                  {i < FLOW_STEPS.length-1 && <ArrowRight size={10} className="text-white/30 flex-shrink-0"/>}
                 </div>
-                {i < FLOW_STEPS.length-1 && <ArrowRight size={10} className="text-white/30 flex-shrink-0"/>}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
         {/* ════════════════════════
-            STEP 1 — Set Goals
+            STEP 1 — Set Goals  (hidden on steps 4 & 5)
         ════════════════════════ */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {step < 4 && <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100">
             <div className="flex items-center gap-2">
               <Target size={16} className="text-emerald-600"/>
@@ -396,12 +414,12 @@ export default function HealthGoals() {
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* ════════════════════════
-            STEP 2+3 — Goals Grid + Progress
+            STEP 2+3 — Goals Grid + Progress  (hidden on steps 4 & 5)
         ════════════════════════ */}
-        {goals.length > 0 && (
+        {step < 4 && goals.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -468,9 +486,12 @@ export default function HealthGoals() {
         {/* ════════════════════════
             STEP 4 — AI Suggestions
         ════════════════════════ */}
-        {suggestions.length > 0 && (
+        {step === 4 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-violet-50 to-indigo-50 border-b border-violet-100">
+              <button onClick={()=>setStep(3)} className="p-1 text-violet-400 hover:text-violet-700 rounded-lg hover:bg-violet-100 transition-colors mr-1">
+                <ChevronRight size={16} className="rotate-180"/>
+              </button>
               <div className="w-7 h-7 bg-violet-600 rounded-xl flex items-center justify-center"><Brain size={14} className="text-white"/></div>
               <p className="font-bold text-violet-800 text-sm">Step 4 — AI Suggestions</p>
               <span className="ml-auto text-xs text-violet-500">Personalized for {fullName}</span>
@@ -495,9 +516,12 @@ export default function HealthGoals() {
         {/* ════════════════════════
             STEP 5 — Achievement Insights
         ════════════════════════ */}
-        {insights.length > 0 && (
+        {step === 5 && (
           <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-2xl border-2 border-yellow-300 shadow-sm overflow-hidden">
             <div className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-yellow-400 to-amber-400">
+              <button onClick={()=>setStep(3)} className="p-1 text-white/70 hover:text-white rounded-lg hover:bg-white/20 transition-colors mr-1">
+                <ChevronRight size={16} className="rotate-180"/>
+              </button>
               <Trophy size={18} className="text-white"/>
               <p className="font-extrabold text-white">Step 5 — Goal Achievement Insights</p>
             </div>
@@ -554,7 +578,7 @@ export default function HealthGoals() {
         )}
 
         {/* Empty state */}
-        {goals.length === 0 && !showAdd && (
+        {step < 4 && goals.length === 0 && !showAdd && (
           <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-10 text-center">
             <Target size={48} className="mx-auto text-gray-200 mb-4"/>
             <h3 className="font-bold text-gray-700 text-lg mb-2">Set Your First Health Goal</h3>

@@ -28,7 +28,7 @@ async def get_stats(current_user: dict = Depends(require_admin)):
 
 
 @router.get("/users", summary="List all users")
-async def list_users(page: int = 1, limit: int = 20, current_user: dict = Depends(require_admin)):
+async def list_users(page: int = 1, limit: int = 100, current_user: dict = Depends(require_admin)):
     db = get_db()
     skip, lim = paginate_query(page, limit)
     total = await db.users.count_documents({})

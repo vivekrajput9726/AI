@@ -59,7 +59,7 @@ export default function ChatInbox() {
   const emptyText  = isDoctor ? 'No patient replies yet' : 'No doctor messages yet'
 
   return (
-    <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start gap-2">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
 
       {/* Inbox panel */}
       {open && (

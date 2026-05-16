@@ -47,7 +47,7 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/splash" element={<SplashScreen />} />
         <Route path="/login" element={user ? <Navigate to={getDashboardPath()} /> : <Login />} />
-        <Route path="/register" element={user ? <Navigate to={getDashboardPath()} /> : <Register />} />
+        <Route path="/register" element={<Register />} />
 
         <Route path="/patient/dashboard" element={<ProtectedRoute roles={['patient']}><PatientDashboard /></ProtectedRoute>} />
         <Route path="/patient/symptoms"  element={<ProtectedRoute roles={['patient']}><SymptomChecker /></ProtectedRoute>} />

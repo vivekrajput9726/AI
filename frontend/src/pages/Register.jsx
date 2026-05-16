@@ -1,14 +1,41 @@
 import { useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { Heart, Eye, EyeOff, Mail, Lock, User, Phone, Stethoscope, ShieldCheck, RefreshCw } from 'lucide-react'
-import { loginUser } from '../redux/slices/authSlice'
+import { loginUser, logout } from '../redux/slices/authSlice'
 import api from '../services/api'
 import toast from 'react-hot-toast'
 
 export default function Register() {
   const dispatch  = useDispatch()
   const navigate  = useNavigate()
+  const { user }  = useSelector(s => s.auth)
+
+  // Already logged in — show switch screen instead of silently redirecting
+  if (user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm text-center card">
+          <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Heart size={26} className="text-blue-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-1">Already signed in</h2>
+          <p className="text-gray-500 text-sm mb-5">
+            You're logged in as <strong>{user.full_name}</strong> ({user.role}).<br/>
+            Log out to create a new account.
+          </p>
+          <div className="flex flex-col gap-3">
+            <button onClick={() => navigate(user.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')}
+              className="btn-primary w-full">Go to Dashboard</button>
+            <button onClick={() => { dispatch(logout()); navigate('/register') }}
+              className="btn-secondary w-full text-red-500 border-red-200 hover:bg-red-50">
+              Log out & Register New Account
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const [step,    setStep]    = useState(1)   // 1 = form, 2 = OTP
   const [loading, setLoading] = useState(false)
@@ -20,6 +47,8 @@ export default function Register() {
   // OTP state
   const [otp,       setOtp]       = useState(['', '', '', '', '', ''])
   const [demoOtp,   setDemoOtp]   = useState(null)
+  const [otpChannel,setOtpChannel]= useState(null)   // 'sms' | 'email' | 'demo'
+  const [phoneHint, setPhoneHint] = useState(null)   // e.g. "****1234"
   const [resending, setResending] = useState(false)
   const otpRefs = useRef([])
 
@@ -32,12 +61,18 @@ export default function Register() {
     setLoading(true)
     try {
       const res = await api.post('/auth/send-otp', form)
-      if (res.data.demo_otp) {
-        setDemoOtp(res.data.demo_otp)
-        toast.success('OTP generated — SMTP not configured, code shown below', { duration: 8000 })
+      const { demo_otp, otp_sent_via, phone_hint } = res.data
+      setOtpChannel(otp_sent_via)
+      setPhoneHint(phone_hint || null)
+      if (demo_otp) {
+        setDemoOtp(demo_otp)
+        toast.success('Demo mode — OTP shown below (configure Twilio for real SMS)', { duration: 8000 })
       } else {
         setDemoOtp(null)
-        toast.success(`Verification code sent to ${form.email}`)
+        const dest = otp_sent_via === 'sms'
+          ? `your phone ending ${phone_hint}`
+          : `${form.email}`
+        toast.success(`Verification code sent to ${dest}`)
       }
       setStep(2)
     } catch (err) {
@@ -90,11 +125,15 @@ export default function Register() {
     setError('')
     try {
       const res = await api.post('/auth/send-otp', form)
-      if (res.data.demo_otp) {
-        setDemoOtp(res.data.demo_otp)
+      const { demo_otp, otp_sent_via, phone_hint } = res.data
+      setOtpChannel(otp_sent_via)
+      setPhoneHint(phone_hint || null)
+      if (demo_otp) {
+        setDemoOtp(demo_otp)
         toast.success('New OTP generated', { duration: 8000 })
       } else {
-        toast.success(`New code sent to ${form.email}`)
+        const dest = otp_sent_via === 'sms' ? `phone ending ${phone_hint}` : form.email
+        toast.success(`New code sent to ${dest}`)
       }
     } catch { toast.error('Failed to resend OTP') }
     finally { setResending(false) }
@@ -119,9 +158,13 @@ export default function Register() {
             </>
           ) : (
             <>
-              <h1 className="text-2xl font-bold text-gray-900">Verify your email</h1>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {otpChannel === 'sms' ? 'Verify your phone' : 'Verify your email'}
+              </h1>
               <p className="text-gray-500 mt-1">
-                We sent a 6-digit code to <strong>{form.email}</strong>
+                {otpChannel === 'sms'
+                  ? <>We sent a 6-digit code to your phone <strong>ending {phoneHint}</strong></>
+                  : <>We sent a 6-digit code to <strong>{form.email}</strong></>}
               </p>
             </>
           )}
@@ -137,7 +180,7 @@ export default function Register() {
                 {step > s ? '✓' : s}
               </div>
               <span className={`text-xs font-medium ${step === s ? 'text-blue-600' : 'text-gray-400'}`}>
-                {s === 1 ? 'Details' : 'Verify Email'}
+                {s === 1 ? 'Details' : (otpChannel === 'sms' ? 'Verify Phone' : 'Verify OTP')}
               </span>
               {s < 2 && <div className={`w-8 h-0.5 ${step > s ? 'bg-green-400' : 'bg-gray-200'}`} />}
             </div>
@@ -186,13 +229,18 @@ export default function Register() {
                 <div>
                   <label className="label">
                     Mobile Number
-                    <span className="text-xs text-gray-400 ml-1 font-normal">(optional)</span>
+                    <span className="text-xs text-blue-500 ml-1 font-normal">(OTP sent here if provided)</span>
                   </label>
-                  <div className="relative">
-                    <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-                    <input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
-                      placeholder="+91 9876543210" className="input-field pl-10"/>
+                  <div className="relative flex">
+                    <span className="flex items-center px-3 bg-gray-100 border border-r-0 border-gray-200 rounded-l-xl text-sm text-gray-600 font-medium whitespace-nowrap">
+                      <Phone size={14} className="mr-1.5 text-gray-400"/> +91
+                    </span>
+                    <input type="tel" value={form.phone}
+                      onChange={e => setForm({...form, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})}
+                      placeholder="9876543210" className="input-field rounded-l-none flex-1"
+                      maxLength={10} inputMode="numeric"/>
                   </div>
+                  <p className="text-xs text-gray-400 mt-1">Enter 10-digit number — OTP will come as SMS</p>
                 </div>
 
                 <div>
@@ -232,14 +280,26 @@ export default function Register() {
           {step === 2 && (
             <div className="space-y-6">
 
-              {/* Info banner — only when email was actually sent */}
-              {!demoOtp && (
+              {/* Info banner — SMS or email */}
+              {!demoOtp && otpChannel === 'sms' && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3">
+                  <Phone size={18} className="text-green-600 flex-shrink-0 mt-0.5"/>
+                  <div>
+                    <p className="text-sm font-semibold text-green-800">SMS sent to your phone</p>
+                    <p className="text-xs text-green-600 mt-0.5">
+                      A 6-digit OTP was sent to your number ending <strong>{phoneHint}</strong>
+                    </p>
+                    <p className="text-xs text-green-400 mt-1">Valid for 10 minutes. Do not share with anyone.</p>
+                  </div>
+                </div>
+              )}
+              {!demoOtp && otpChannel === 'email' && (
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
                   <Mail size={18} className="text-blue-600 flex-shrink-0 mt-0.5"/>
                   <div>
                     <p className="text-sm font-semibold text-blue-800">Check your inbox</p>
                     <p className="text-xs text-blue-600 mt-0.5">
-                      A 6-digit verification code was sent to <strong>{form.email}</strong>
+                      A 6-digit code was sent to <strong>{form.email}</strong>
                     </p>
                     <p className="text-xs text-blue-400 mt-1">Also check your spam / junk folder.</p>
                   </div>
