@@ -1531,6 +1531,7 @@ export default function DoctorDashboard() {
   const [stats,        setStats]        = useState({ total:0, pending:0, confirmed:0, completed:0 })
   const [aptFilter,    setAptFilter]    = useState('all')
   const [insightsPt,   setInsightsPt]   = useState(null)
+  const [statCardFilter, setStatCardFilter] = useState(null)
   const [chatOpen,     setChatOpen]     = useState(false)
   const [chatRoom,     setChatRoom]     = useState(null)
   const [chatName,     setChatName]     = useState('')
@@ -1597,21 +1598,91 @@ export default function DoctorDashboard() {
             {/* ══════ STATS ROW ══════ */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label:"Today's Appointments", value: todayApts.length,    sub: todayApts.filter(a=>a.status==='confirmed').length + ' Confirmed', icon:'📅', iconBg:'bg-blue-100',   val:'text-gray-900' },
-                { label:'Total Appointments',   value: stats.total,         sub: stats.pending + ' Pending',                                        icon:'👥', iconBg:'bg-teal-100',   val:'text-gray-900' },
-                { label:'Completed',            value: stats.completed,     sub: stats.confirmed + ' Upcoming',                                     icon:'🩺', iconBg:'bg-orange-100', val:'text-gray-900' },
-                { label:'Pending Review',       value: stats.pending,       sub: 'Awaiting action',                                                 icon:'💰', iconBg:'bg-purple-100', val:'text-gray-900' },
-              ].map((s,i)=>(
-                <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+                { key:'today',     label:"Today's Appointments", value: todayApts.length,    sub: todayApts.filter(a=>a.status==='confirmed').length + ' Confirmed', icon:'📅', iconBg:'bg-blue-100',   ring:'ring-blue-400'   },
+                { key:'total',     label:'Total Appointments',   value: stats.total,         sub: stats.pending + ' Pending',                                        icon:'👥', iconBg:'bg-teal-100',   ring:'ring-teal-400'   },
+                { key:'completed', label:'Completed',            value: stats.completed,     sub: stats.confirmed + ' Upcoming',                                     icon:'🩺', iconBg:'bg-orange-100', ring:'ring-orange-400' },
+                { key:'pending',   label:'Pending Review',       value: stats.pending,       sub: 'Awaiting action',                                                 icon:'💰', iconBg:'bg-purple-100', ring:'ring-purple-400' },
+              ].map((s)=>(
+                <button key={s.key}
+                  onClick={()=>setStatCardFilter(f => f===s.key ? null : s.key)}
+                  className={`bg-white rounded-2xl border shadow-sm p-5 flex items-center gap-4 w-full text-left transition-all hover:shadow-md
+                    ${statCardFilter===s.key ? `ring-2 ${s.ring} border-transparent` : 'border-gray-100 hover:border-gray-200'}`}>
                   <div className={`w-12 h-12 ${s.iconBg} rounded-2xl flex items-center justify-center text-2xl flex-shrink-0`}>{s.icon}</div>
                   <div>
                     <p className="text-xs text-gray-500 font-medium">{s.label}</p>
-                    <p className={`text-2xl font-bold ${s.val} leading-tight mt-0.5`}>{s.value}</p>
+                    <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">{s.value}</p>
                     <p className="text-xs text-green-600 font-medium mt-0.5">{s.sub}</p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
+
+            {/* ══════ STAT CARD DRILL-DOWN TABLE ══════ */}
+            {statCardFilter && (() => {
+              const filterMap = {
+                today:     todayApts,
+                total:     appointments,
+                completed: appointments.filter(a=>a.status==='completed'),
+                pending:   appointments.filter(a=>a.status==='pending'),
+              }
+              const labelMap = { today:"Today's Appointments", total:'All Appointments', completed:'Completed Appointments', pending:'Pending Review' }
+              const rows = filterMap[statCardFilter] || []
+              return (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fade-in">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                    <p className="font-bold text-gray-900">{labelMap[statCardFilter]}
+                      <span className="ml-2 text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{rows.length}</span>
+                    </p>
+                    <button onClick={()=>setStatCardFilter(null)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><X size={15} className="text-gray-500"/></button>
+                  </div>
+                  {rows.length === 0
+                    ? <div className="py-10 text-center text-gray-400"><Calendar size={28} className="mx-auto mb-2 opacity-30"/><p className="text-sm">No appointments found</p></div>
+                    : <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-gray-50 text-xs text-gray-500 font-semibold uppercase tracking-wide">
+                              <th className="px-5 py-3 text-left">Patient</th>
+                              <th className="px-4 py-3 text-left">Date</th>
+                              <th className="px-4 py-3 text-left">Type</th>
+                              <th className="px-4 py-3 text-left">Reason / Symptoms</th>
+                              <th className="px-4 py-3 text-left">Status</th>
+                              <th className="px-4 py-3 text-center">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {rows.map((apt, i) => (
+                              <tr key={i} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-5 py-3">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                      {(apt.patient_name||'P').charAt(0)}
+                                    </div>
+                                    <span className="font-semibold text-gray-800 truncate max-w-[140px]">{apt.patient_name||'—'}</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{apt.appointment_date||'—'}</td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${apt.appointment_type==='video'?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'}`}>
+                                    {apt.appointment_type==='video'?'Video':'In-Clinic'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-gray-500 italic max-w-[200px] truncate">{apt.symptoms||apt.appointment_type||'—'}</td>
+                                <td className="px-4 py-3"><StatusBadge status={apt.status}/></td>
+                                <td className="px-4 py-3 text-center">
+                                  <button onClick={()=>setInsightsPt(apt)}
+                                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg transition-colors">
+                                    View
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                  }
+                </div>
+              )
+            })()}
 
             {/* ══════ MAIN 3-COLUMN ══════ */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
