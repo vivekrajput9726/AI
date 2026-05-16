@@ -24,7 +24,8 @@ function Login() {
   }
 
   const fillDemo = (role) => {
-    if (role === 'admin') setForm({ email: 'admin@aihealthcare.com', password: 'Admin@123' })
+    if (role === 'admin')   setForm({ email: 'admin@aihealthcare.com', password: 'Admin@123' })
+    else if (role === 'doctor')  setForm({ email: 'doctor@demo.com',  password: 'Demo@1234' })
     else if (role === 'patient') setForm({ email: 'patient@demo.com', password: 'Demo@1234' })
   }
 
@@ -91,21 +92,28 @@ function Login() {
           </form>
 
           <div className="mt-6 pt-6 border-t border-gray-100">
-            <p className="text-xs text-gray-400 text-center mb-3">Demo Accounts</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => fillDemo('admin')}
-                className="flex-1 text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 py-2 px-3 rounded-lg transition-colors"
-              >
-                Admin Demo
-              </button>
+            <p className="text-xs text-gray-400 text-center mb-3">Quick Demo Login</p>
+            <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => fillDemo('patient')}
-                className="flex-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 px-3 rounded-lg transition-colors"
+                className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 py-2.5 px-2 rounded-xl transition-colors font-medium"
               >
-                Patient Demo
+                🧑‍⚕️ Patient
+              </button>
+              <button
+                onClick={() => fillDemo('doctor')}
+                className="text-xs bg-teal-50 hover:bg-teal-100 text-teal-700 py-2.5 px-2 rounded-xl transition-colors font-medium"
+              >
+                🩺 Doctor
+              </button>
+              <button
+                onClick={() => fillDemo('admin')}
+                className="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 py-2.5 px-2 rounded-xl transition-colors font-medium"
+              >
+                🛡️ Admin
               </button>
             </div>
+            <p className="text-[10px] text-gray-300 text-center mt-2">Click a role to auto-fill credentials</p>
           </div>
         </div>
 

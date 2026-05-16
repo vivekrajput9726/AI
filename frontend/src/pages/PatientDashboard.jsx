@@ -5,7 +5,7 @@ import {
   Brain, Calendar, FileText, Pill, MapPin, Activity,
   CheckCircle, ArrowRight, Upload, Heart, Droplets,
   Moon, ChevronDown, Target, Users, Clock, Video,
-  Stethoscope, MessageSquare, Plus, Shield, Pencil
+  Stethoscope, MessageSquare, Plus, Shield, Pencil, RefreshCw
 } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import api from '../services/api'
@@ -43,6 +43,7 @@ export default function PatientDashboard() {
   const [records, setRecords]       = useState([])
   const [timePeriod, setTimePeriod] = useState('This Week')
   const [showPeriod, setShowPeriod] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const [vitals, setVitals] = useState(() => {
     try {
@@ -63,10 +64,20 @@ export default function PatientDashboard() {
     toast.success('Vital updated!')
   }
 
-  useEffect(() => {
-    dispatch(fetchMyAppointments())
-    api.get('/health-records/my').then(r => setRecords(r.data || [])).catch(() => {})
-  }, [dispatch])
+  const loadData = async (showFeedback = false) => {
+    if (showFeedback) setRefreshing(true)
+    try {
+      await Promise.all([
+        dispatch(fetchMyAppointments()),
+        api.get('/health-records/').then(r => setRecords(r.data || [])).catch(() => {})
+      ])
+      if (showFeedback) toast.success('Dashboard refreshed!')
+    } finally {
+      if (showFeedback) setRefreshing(false)
+    }
+  }
+
+  useEffect(() => { loadData() }, [dispatch])
 
   const firstName   = user?.full_name?.split(' ')[0] || 'there'
   const h           = new Date().getHours()
@@ -96,9 +107,15 @@ export default function PatientDashboard() {
         <div className="flex-1 min-w-0 space-y-5 pb-8">
 
           {/* Greeting */}
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{greeting}, {firstName} 👋</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Here's your health overview for today.</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">{greeting}, {firstName} 👋</h1>
+              <p className="text-sm text-gray-500 mt-0.5">Here's your health overview for today.</p>
+            </div>
+            <button onClick={() => loadData(true)} disabled={refreshing}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 bg-white border border-gray-200 px-3 py-2 rounded-xl hover:bg-gray-50 transition-all shadow-sm disabled:opacity-60">
+              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''}/> {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
 
           {/* ── Quick Actions ── */}

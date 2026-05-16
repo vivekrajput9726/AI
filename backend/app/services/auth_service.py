@@ -87,6 +87,25 @@ async def login_user(data: UserLoginRequest) -> dict:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account deactivated")
 
     serialized = serialize_doc(user)
+
+    # Merge doctor profile data so the frontend gets specialization, hospital, etc.
+    if serialized.get("role") == "doctor":
+        doctor = await db.doctors.find_one({"email": data.email})
+        if not doctor:
+            doctor = await db.doctors.find_one({"user_id": serialized["id"]})
+        if doctor:
+            doc_data = serialize_doc(doctor)
+            serialized.update({
+                "specialization":   doc_data.get("specialization", ""),
+                "qualification":    doc_data.get("qualification", ""),
+                "hospital":         doc_data.get("hospital", ""),
+                "experience_years": doc_data.get("experience_years", 0),
+                "consultation_fee": doc_data.get("consultation_fee", 500),
+                "rating":           doc_data.get("rating", 0),
+                "is_verified":      doc_data.get("is_verified", False),
+                "doctor_id":        doc_data.get("id", ""),
+            })
+
     access_token = create_access_token({"sub": serialized["id"], "role": serialized["role"]})
     refresh_token = create_refresh_token({"sub": serialized["id"], "role": serialized["role"]})
 

@@ -10,7 +10,7 @@ export const fetchMyAppointments = createAsyncThunk('appointments/fetchMy', asyn
 
 export const bookAppointment = createAsyncThunk('appointments/book', async (data, { rejectWithValue }) => {
   try {
-    const res = await api.post('/appointments', data)
+    const res = await api.post('/appointments/', data)
     toast.success('Appointment booked successfully!')
     return res.data
   } catch (err) {
@@ -57,8 +57,9 @@ const appointmentSlice = createSlice({
       })
       .addCase(bookAppointment.rejected, (state) => { state.bookingLoading = false })
       .addCase(updateAppointmentStatus.fulfilled, (state, action) => {
-        const idx = state.list.findIndex(a => a.id === action.payload.id)
-        if (idx !== -1) state.list[idx] = action.payload
+        const { id } = action.meta.arg
+        const idx = state.list.findIndex(a => (a._id || a.id) === id)
+        if (idx !== -1) state.list[idx] = { ...state.list[idx], status: action.meta.arg.status }
       })
   }
 })

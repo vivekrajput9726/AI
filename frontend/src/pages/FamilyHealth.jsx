@@ -526,7 +526,7 @@ Keep response practical, caring, and easy to understand.`
   // ── STEP 4: Track Medicines ──────────────────────────────────────────────
   const Step4 = () => {
     const today = new Date().toDateString()
-    const takenCount = meds.filter(m => m.taken?.includes(today)).length
+    const takenCount = meds.filter(m => m.taken_dates?.includes(today)).length
     return (
       <div className="space-y-5">
         <div className="flex items-center justify-between">
