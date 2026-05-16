@@ -83,6 +83,7 @@ export default function AIHealthCopilot() {
   // ── Step 3→4: Run full AI analysis ───────────────────────────────
   const runAnalysis = async () => {
     if (!symptoms.trim()) { toast.error('Please enter your symptoms first'); return }
+    if (!age) { toast.error('Please enter your age for accurate AI analysis'); return }
     setLoading(true)
     setCurrentStep(4)
 
@@ -90,7 +91,7 @@ export default function AIHealthCopilot() {
       // Step 4: AI Analysis Engine
       const res = await api.post('/ai/analyze', {
         symptoms: `${symptoms}. Vitals - BP: ${vitals.bp}, Blood Sugar: ${vitals.sugar} mg/dL, Weight: ${vitals.weight}kg, Sleep: ${vitals.sleep}hrs. Duration: ${duration||'not specified'}`,
-        patient_age: parseInt(age) || 25,
+        patient_age: parseInt(age),
         patient_gender: gender,
         severity: severity,
       })
@@ -272,8 +273,17 @@ export default function AIHealthCopilot() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-gray-700 mb-1 block">Age</label>
-                    <input type="number" value={age} onChange={e=>setAge(e.target.value)} placeholder="25" className="input-field"/>
+                    <label className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
+                      Age <span className="text-red-500">*</span>
+                      <span className="text-xs font-normal text-gray-400">(required)</span>
+                    </label>
+                    <input
+                      type="number" min="1" max="120"
+                      value={age} onChange={e=>setAge(e.target.value)}
+                      placeholder="e.g. 25"
+                      className={`input-field ${!age ? 'border-red-300 focus:border-red-400' : 'border-green-300'}`}
+                    />
+                    {!age && <p className="text-xs text-red-500 mt-1 flex items-center gap-1">⚠ Age required for age-specific diagnosis</p>}
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-700 mb-1 block">Gender</label>
@@ -332,10 +342,13 @@ export default function AIHealthCopilot() {
                 </div>
               </div>
 
-              <button onClick={runAnalysis} disabled={!symptoms.trim()}
-                className="w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold rounded-2xl flex items-center justify-center gap-3 disabled:opacity-40 hover:opacity-90 transition-all shadow-lg text-sm">
+              <button onClick={runAnalysis} disabled={!symptoms.trim() || !age}
+                className="w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold rounded-2xl flex items-center justify-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-all shadow-lg text-sm">
                 <Brain size={20}/> Run AI Analysis Engine <ArrowRight size={16}/>
               </button>
+              {!age && symptoms.trim() && (
+                <p className="text-center text-xs text-red-500 font-semibold">Enter your age to enable analysis</p>
+              )}
             </div>
           </div>
         )}
