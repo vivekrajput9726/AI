@@ -137,20 +137,100 @@ function AppointmentBooking() {
 
   const typeLabel = (t) => ({ video: 'Video Call', voice: 'Voice Call', 'in-person': 'In-Person' }[t] || t)
 
+  const bookAppointmentData = {
+    doctor_id:        doctorId,
+    appointment_date: selectedDate,
+    appointment_time: selectedTime,
+    appointment_type: appointmentType,
+    symptoms,
+    notes,
+  }
+
+  // ── Load Razorpay script lazily ───────────────────────────────────────────
+  const loadRazorpay = () =>
+    new Promise(resolve => {
+      if (window.Razorpay) { resolve(true); return }
+      const s = document.createElement('script')
+      s.src = 'https://checkout.razorpay.com/v1/checkout.js'
+      s.onload  = () => resolve(true)
+      s.onerror = () => resolve(false)
+      document.body.appendChild(s)
+    })
+
   const handlePayAndBook = async () => {
+    if (paying) return
     setPaying(true)
-    await new Promise(r => setTimeout(r, 1500))
-    const result = await dispatch(bookAppointment({
-      doctor_id: doctorId,
-      appointment_date: selectedDate,
-      appointment_time: selectedTime,
-      appointment_type: appointmentType,
-      symptoms,
-      notes,
-    }))
-    setPaying(false)
-    if (result.meta.requestStatus === 'fulfilled') {
-      setBooked(true)
+
+    try {
+      // ── Try Razorpay if keys are configured ───────────────────────────────
+      let keyId = null
+      try {
+        const kr = await api.get('/payments/key')
+        keyId = kr.data?.key_id
+      } catch { /* gateway not configured — fall through to direct booking */ }
+
+      if (keyId) {
+        // ── RAZORPAY FLOW ──────────────────────────────────────────────────
+        const loaded = await loadRazorpay()
+        if (!loaded) {
+          toast.error('Could not load payment gateway. Please check your internet.')
+          return
+        }
+
+        const orderRes = await api.post('/payments/create-order', {
+          amount:           doctor.consultation_fee,
+          doctor_id:        doctorId,
+          appointment_type: appointmentType,
+        })
+        const { order_id, amount: amt, currency, key_id } = orderRes.data
+
+        await new Promise((resolve, reject) => {
+          const rzp = new window.Razorpay({
+            key:         key_id,
+            amount:      amt,
+            currency,
+            order_id,
+            name:        'Synora Health',
+            description: `Consultation with ${doctor.name}`,
+            theme:       { color: '#2563eb' },
+            handler: async (response) => {
+              try {
+                const vr = await api.post('/payments/verify', {
+                  razorpay_order_id:   response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature:  response.razorpay_signature,
+                  appointment_data:    bookAppointmentData,
+                })
+                if (vr.data?.success) { setBooked(true); resolve() }
+                else { toast.error('Booking failed after payment. Contact support.'); reject() }
+              } catch (e) {
+                toast.error(e?.response?.data?.detail || 'Payment verification failed.')
+                reject(e)
+              }
+            },
+            modal: { ondismiss: () => { toast.error('Payment cancelled.'); reject(new Error('dismissed')) } },
+          })
+          rzp.open()
+        })
+        return
+      }
+
+      // ── DIRECT BOOKING (no gateway configured) ────────────────────────────
+      const result = await dispatch(bookAppointment(bookAppointmentData))
+      if (result.meta.requestStatus === 'fulfilled') {
+        setBooked(true)
+      } else {
+        const detail = result.payload?.detail
+        toast.error(detail || 'Booking failed. Please try again.')
+      }
+
+    } catch (err) {
+      // Only show toast for non-dismissed errors
+      if (err?.message !== 'dismissed') {
+        toast.error(err?.response?.data?.detail || err?.message || 'Something went wrong. Please try again.')
+      }
+    } finally {
+      setPaying(false)
     }
   }
 
@@ -333,22 +413,51 @@ function AppointmentBooking() {
                 )}
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5"><Clock size={14} className="text-blue-500" /> Available Slots</p>
+                <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                  <Clock size={14} className="text-blue-500" /> Available Slots
+                  {selectedDate && timeSlots.length > 0 && (
+                    <span className="ml-auto text-xs font-normal text-gray-400">{timeSlots.length} slots</span>
+                  )}
+                </p>
                 {!selectedDate ? (
-                  <div className="bg-blue-50 rounded-2xl p-6 text-center text-blue-400 text-sm">
-                    Pick a date first to see available slots
+                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 text-center">
+                    <Clock size={24} className="mx-auto text-blue-300 mb-2" />
+                    <p className="text-blue-400 text-sm font-medium">Pick a date first</p>
+                    <p className="text-blue-300 text-xs mt-0.5">Available slots will appear here</p>
+                  </div>
+                ) : timeSlots.length === 0 ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center">
+                    <p className="text-gray-400 text-sm">No slots available for this date</p>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                    {timeSlots.map(slot => (
-                      <button type="button" key={slot} onClick={() => setSelectedTime(slot)}
-                        className={`w-full py-3 px-4 rounded-xl text-sm font-medium border transition-all text-left
-                          ${selectedTime === slot ? 'bg-blue-600 text-white border-blue-600 shadow-sm' :
-                            'bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'}`}>
-                        {slot}
-                        {selectedTime === slot && <span className="float-right text-xs">✓ Selected</span>}
-                      </button>
-                    ))}
+                  <div className="max-h-72 overflow-y-auto pr-1">
+                    <div className="grid grid-cols-3 gap-2">
+                      {timeSlots.map(slot => {
+                        const [h, m] = slot.split(':').map(Number)
+                        const ampm  = h >= 12 ? 'PM' : 'AM'
+                        const h12   = h % 12 || 12
+                        const label = `${h12}:${String(m).padStart(2,'0')}`
+                        const isSelected = selectedTime === slot
+                        return (
+                          <button type="button" key={slot} onClick={() => setSelectedTime(slot)}
+                            className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-xl border-2 text-xs font-semibold transition-all
+                              ${isSelected
+                                ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100'
+                                : 'bg-white border-gray-200 text-gray-600 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700'}`}>
+                            <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-gray-800'}`}>{label}</span>
+                            <span className={`text-[10px] mt-0.5 ${isSelected ? 'text-blue-200' : 'text-gray-400'}`}>{ampm}</span>
+                            {isSelected && <span className="text-[10px] text-blue-200 mt-0.5">Selected ✓</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                {selectedTime && (
+                  <div className="mt-3 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+                    <Clock size={13} className="text-blue-500 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-blue-700">Selected: {selectedTime}</span>
+                    <button onClick={() => setSelectedTime('')} className="ml-auto text-blue-400 hover:text-blue-600 text-xs">✕ Clear</button>
                   </div>
                 )}
               </div>
@@ -486,7 +595,9 @@ function AppointmentBooking() {
                   : <><ShieldCheck size={15} /> Pay ₹{doctor.consultation_fee}</>}
               </button>
             </div>
-            <p className="text-center text-xs text-gray-400">Simulated payment — no real money charged.</p>
+            <p className="text-center text-xs text-gray-400 flex items-center justify-center gap-1">
+              <ShieldCheck size={11} className="text-green-500"/> Secured by Razorpay · 256-bit SSL encryption
+            </p>
           </div>
         )}
       </div>

@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
 
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
+
     DAILY_API_KEY: str = ""
     DAILY_API_URL: str = "https://api.daily.co/v1"
 

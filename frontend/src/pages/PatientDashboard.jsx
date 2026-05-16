@@ -341,27 +341,118 @@ export default function PatientDashboard() {
           </div>
 
           {/* ── Feature Cards ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { icon: '🎯', title: 'Health Goals',    count: '3 Goals Active',   desc: 'Track your goals',              link: 'View Goals',     path: '/patient/goals',     color: 'text-blue-600',   bg: 'from-blue-50 to-indigo-50' },
-              { icon: '👨‍👩‍👧', title: 'Family Health', count: '4 Members',         desc: 'Manage family health',          link: 'View Family',    path: '/patient/family',    color: 'text-green-600',  bg: 'from-green-50 to-teal-50' },
-              { icon: '📋', title: 'Health Timeline', count: '23 Activities',     desc: 'View your health history',      link: 'View Timeline',  path: '/patient/journey',   color: 'text-purple-600', bg: 'from-purple-50 to-pink-50' },
-            ].map((c, i) => (
-              <div key={i} className={`bg-gradient-to-br ${c.bg} rounded-2xl border border-gray-100 shadow-sm p-4`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">{c.icon}</span>
-                  <div>
-                    <p className="font-bold text-gray-800 text-sm">{c.title}</p>
-                    <p className={`text-xs font-semibold ${c.color}`}>{c.count}</p>
-                  </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+            {/* ── Health Goals ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-500 px-5 py-4 flex items-center justify-between">
+                <div>
+                  <p className="text-white font-extrabold text-base">Health Goals</p>
+                  <p className="text-blue-200 text-xs mt-0.5">Personal wellness targets</p>
                 </div>
-                <p className="text-xs text-gray-500 mb-3">{c.desc}</p>
-                <button onClick={() => navigate(c.path)}
-                  className={`text-xs font-semibold ${c.color} flex items-center gap-1 hover:underline`}>
-                  {c.link} <ArrowRight size={11} />
+                <div className="w-11 h-11 bg-white/20 rounded-2xl flex items-center justify-center">
+                  <Target size={22} className="text-white" />
+                </div>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                {[
+                  { label: 'Daily Steps',   pct: 68, color: 'bg-blue-500' },
+                  { label: 'Water Intake',  pct: 62, color: 'bg-cyan-500'  },
+                  { label: 'Sleep Target',  pct: 84, color: 'bg-indigo-500' },
+                ].map(g => (
+                  <div key={g.label}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-600 font-medium">{g.label}</span>
+                      <span className="font-bold text-gray-800">{g.pct}%</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full ${g.color} rounded-full`} style={{ width: `${g.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+                <button onClick={() => navigate('/patient/goals')}
+                  className="w-full mt-1 flex items-center justify-center gap-1.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl transition-colors">
+                  Manage Goals <ArrowRight size={12} />
                 </button>
               </div>
-            ))}
+            </div>
+
+            {/* ── Family Health ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-500 px-5 py-4 flex items-center justify-between">
+                <div>
+                  <p className="text-white font-extrabold text-base">Family Health</p>
+                  <p className="text-emerald-200 text-xs mt-0.5">Monitor all family members</p>
+                </div>
+                <div className="w-11 h-11 bg-white/20 rounded-2xl flex items-center justify-center">
+                  <Users size={22} className="text-white" />
+                </div>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                {[
+                  { name: 'You',           rel: 'Self',    status: 'Good',   color: 'from-blue-400 to-blue-500',    dot: 'bg-green-400' },
+                  { name: 'Spouse',        rel: 'Partner', status: 'Normal', color: 'from-pink-400 to-rose-500',    dot: 'bg-green-400' },
+                  { name: 'Child',         rel: 'Son',     status: 'Check',  color: 'from-amber-400 to-orange-500', dot: 'bg-yellow-400' },
+                ].map(m => (
+                  <div key={m.name} className="flex items-center gap-3">
+                    <div className={`w-8 h-8 bg-gradient-to-br ${m.color} rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                      {m.name.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-800">{m.name}</p>
+                      <p className="text-[10px] text-gray-400">{m.rel}</p>
+                    </div>
+                    <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      m.status === 'Good' ? 'bg-green-100 text-green-700' :
+                      m.status === 'Normal' ? 'bg-blue-100 text-blue-700' :
+                      'bg-yellow-100 text-yellow-700'}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`}/> {m.status}
+                    </span>
+                  </div>
+                ))}
+                <button onClick={() => navigate('/patient/family')}
+                  className="w-full mt-1 flex items-center justify-center gap-1.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl transition-colors">
+                  View Family <ArrowRight size={12} />
+                </button>
+              </div>
+            </div>
+
+            {/* ── Health Timeline ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              <div className="bg-gradient-to-r from-purple-600 to-violet-500 px-5 py-4 flex items-center justify-between">
+                <div>
+                  <p className="text-white font-extrabold text-base">Health Timeline</p>
+                  <p className="text-purple-200 text-xs mt-0.5">Your complete health journey</p>
+                </div>
+                <div className="w-11 h-11 bg-white/20 rounded-2xl flex items-center justify-center">
+                  <Clock size={22} className="text-white" />
+                </div>
+              </div>
+              <div className="px-5 py-4 space-y-0">
+                {[
+                  { icon: Calendar,   label: 'Appointments',  value: appointments.length || 0,  color: 'bg-blue-500',   textColor: 'text-blue-600' },
+                  { icon: FileText,   label: 'Health Records', value: records.length || 0,       color: 'bg-green-500',  textColor: 'text-green-600' },
+                  { icon: Brain,      label: 'AI Analyses',   value: '—',                        color: 'bg-purple-500', textColor: 'text-purple-600' },
+                  { icon: CheckCircle,label: 'Completed',     value: appointments.filter(a=>a.status==='completed').length || 0, color: 'bg-teal-500', textColor: 'text-teal-600' },
+                ].map((item, i, arr) => {
+                  const Icon = item.icon
+                  return (
+                    <div key={item.label} className={`flex items-center gap-3 py-2.5 ${i < arr.length - 1 ? 'border-b border-gray-50' : ''}`}>
+                      <div className={`w-7 h-7 ${item.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                        <Icon size={13} className="text-white" />
+                      </div>
+                      <span className="text-xs text-gray-600 flex-1">{item.label}</span>
+                      <span className={`text-sm font-extrabold ${item.textColor}`}>{item.value}</span>
+                    </div>
+                  )
+                })}
+                <button onClick={() => navigate('/patient/journey')}
+                  className="w-full mt-2 flex items-center justify-center gap-1.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold rounded-xl transition-colors">
+                  View Timeline <ArrowRight size={12} />
+                </button>
+              </div>
+            </div>
+
           </div>
 
           {/* ── Stay Protected ── */}

@@ -28,6 +28,7 @@ import PatientJourney from './pages/PatientJourney'
 import SmartReport from './pages/SmartReport'
 import Insurance from './pages/Insurance'
 import AIChatbot from './components/common/AIChatbot'
+import ChatInbox from './components/common/ChatInbox'
 import ProtectedRoute from './routes/ProtectedRoute'
 
 function App() {
@@ -78,6 +79,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {user && <AIChatbot />}
+      {user && <ChatInbox />}
     </BrowserRouter>
   )
 }

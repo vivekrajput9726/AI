@@ -554,13 +554,13 @@ function PrescriptionsTab({ appointments, onReload }) {
                     <div key={i} className="grid grid-cols-12 gap-2 items-center">
                       <input value={m.name} onChange={e=>updMed(i,'name',e.target.value)}
                         placeholder="Medicine name e.g. Tab. Paracetamol 500mg"
-                        className="input-field col-span-6 text-sm"/>
+                        className="input-field col-span-6 text-sm text-gray-900 caret-gray-900"/>
                       <input value={m.freq} onChange={e=>updMed(i,'freq',e.target.value)}
                         placeholder="BD/OD/TDS"
-                        className="input-field col-span-2 text-sm text-center"/>
+                        className="input-field col-span-2 text-sm text-center text-gray-900 caret-gray-900"/>
                       <input value={m.dur} onChange={e=>updMed(i,'dur',e.target.value)}
                         placeholder="5 Days"
-                        className="input-field col-span-3 text-sm"/>
+                        className="input-field col-span-3 text-sm text-gray-900 caret-gray-900"/>
                       {medicines.length > 1 && (
                         <button onClick={()=>remMed(i)} className="col-span-1 flex items-center justify-center text-red-400 hover:text-red-600 w-8 h-8 rounded-lg hover:bg-red-50">
                           <X size={14}/>
@@ -574,7 +574,7 @@ function PrescriptionsTab({ appointments, onReload }) {
                 <div>
                   <p className="text-sm font-semibold text-gray-700 mb-2">Notes</p>
                   <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={3}
-                    className="input-field text-sm resize-none w-full"
+                    className="input-field text-sm resize-none w-full text-gray-900 caret-gray-900"
                     placeholder="Take rest and drink plenty of fluids. Follow up after 5 days."/>
                 </div>
 
@@ -726,7 +726,7 @@ function AIAssistantTab({ appointments, onReload }) {
               )}
             </div>
             <textarea value={aiNotes} onChange={e=>setAiNotes(e.target.value)} rows={4}
-              className="input-field text-xs resize-none w-full"
+              className="input-field text-xs resize-none w-full text-gray-900 caret-gray-900"
               placeholder="AI will auto-generate consultation notes here..."/>
             <button onClick={()=>{ if(aiNotes){ toast.success('Notes saved to records!') } else toast.error('Generate notes first') }}
               className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2">

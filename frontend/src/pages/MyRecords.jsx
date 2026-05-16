@@ -28,6 +28,51 @@ const RECORD_TYPES = [
   { value: 'other',        label: 'Other',        icon: '📁', color: 'bg-gray-50 text-gray-700 border-gray-100' },
 ]
 
+const LAB_TEST_TYPES = ['Blood Test','Urine Test','X-Ray','MRI','CT Scan','ECG','Ultrasound','Biopsy','Other']
+const SEVERITIES     = ['Mild','Moderate','Severe','Critical']
+
+const EMPTY_FORM = {
+  record_type:'prescription', title:'', date:'', file_data:'',
+  doctor_name:'', medicines:'', dosage_notes:'',         // prescription
+  lab_name:'', test_type:'', referred_by:'', findings:'',// lab report
+  hospital:'', condition:'', severity:'', treatment:'',  // diagnosis
+  category:'', description:'',                           // other
+}
+
+function buildDescription(form) {
+  const parts = []
+  if (form.record_type === 'prescription') {
+    if (form.medicines)    parts.push(`Medicines: ${form.medicines}`)
+    if (form.dosage_notes) parts.push(`Instructions: ${form.dosage_notes}`)
+    return { doctor_name: form.doctor_name, description: parts.join('\n') }
+  }
+  if (form.record_type === 'lab_report') {
+    if (form.test_type)   parts.push(`Test Type: ${form.test_type}`)
+    if (form.lab_name)    parts.push(`Lab: ${form.lab_name}`)
+    if (form.referred_by) parts.push(`Referred by: ${form.referred_by}`)
+    if (form.findings)    parts.push(`Findings: ${form.findings}`)
+    return { doctor_name: form.referred_by || form.lab_name, description: parts.join('\n') }
+  }
+  if (form.record_type === 'diagnosis') {
+    if (form.hospital)   parts.push(`Hospital: ${form.hospital}`)
+    if (form.severity)   parts.push(`Severity: ${form.severity}`)
+    if (form.condition)  parts.push(`Condition: ${form.condition}`)
+    if (form.treatment)  parts.push(`Treatment Plan: ${form.treatment}`)
+    return { doctor_name: form.doctor_name, description: parts.join('\n') }
+  }
+  if (form.category)    parts.push(`Category: ${form.category}`)
+  if (form.description) parts.push(form.description)
+  return { doctor_name: '', description: parts.join('\n') }
+}
+
+function isValid(form) {
+  if (!form.title.trim()) return false
+  if (form.record_type === 'prescription') return !!form.doctor_name.trim() && !!form.medicines.trim()
+  if (form.record_type === 'lab_report')   return !!form.date && !!form.test_type
+  if (form.record_type === 'diagnosis')    return !!form.doctor_name.trim() && !!form.date && !!form.severity
+  return true
+}
+
 const TABS = [
   { id: 'records',   label: 'Health Records',  icon: FolderOpen },
   { id: 'history',   label: 'Medical History', icon: ClipboardList },
@@ -111,7 +156,7 @@ export default function MyRecords() {
   const [showModal, setShowModal] = useState(false)
   const [showShare, setShowShare] = useState(null)  // record to share
   const [doctors, setDoctors]     = useState([])
-  const [form, setForm] = useState({ title:'', record_type:'prescription', description:'', doctor_name:'', date:'', file_data:'' })
+  const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const fileRef = useRef(null)
 
@@ -155,13 +200,22 @@ export default function MyRecords() {
     reader.readAsDataURL(file)
   }
   const handleSave = async () => {
-    if (!form.title.trim()) { toast.error('Please enter a title'); return }
+    if (!form.title.trim()) { toast.error('Title is required'); return }
+    if (form.record_type === 'prescription' && !form.doctor_name.trim()) { toast.error('Doctor name is required'); return }
+    if (form.record_type === 'prescription' && !form.medicines.trim()) { toast.error('Medicines are required'); return }
+    if (form.record_type === 'lab_report' && !form.test_type) { toast.error('Test type is required'); return }
+    if (form.record_type === 'lab_report' && !form.date) { toast.error('Test date is required'); return }
+    if (form.record_type === 'diagnosis' && !form.doctor_name.trim()) { toast.error('Doctor name is required'); return }
+    if (form.record_type === 'diagnosis' && !form.date) { toast.error('Diagnosis date is required'); return }
+    if (form.record_type === 'diagnosis' && !form.severity) { toast.error('Severity is required'); return }
     setSaving(true)
     try {
-      const res = await api.post('/health-records/', form)
+      const extra   = buildDescription(form)
+      const payload = { record_type: form.record_type, title: form.title, date: form.date, file_data: form.file_data, ...extra }
+      const res = await api.post('/health-records/', payload)
       setRecords(p => [res.data, ...p])
       setShowModal(false)
-      setForm({ title:'', record_type:'prescription', description:'', doctor_name:'', date:'', file_data:'' })
+      setForm(EMPTY_FORM)
       toast.success('Record saved!')
     } catch { toast.error('Failed to save') } finally { setSaving(false) }
   }
@@ -578,52 +632,198 @@ export default function MyRecords() {
       {/* ── Add Record Modal ── */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-bold text-gray-900 text-lg">Add Health Record</h3>
-              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-xl"><X size={18}/></button>
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[92vh]">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{RECORD_TYPES.find(t=>t.value===form.record_type)?.icon}</span>
+                <h3 className="font-bold text-gray-900 text-lg">
+                  Add {RECORD_TYPES.find(t=>t.value===form.record_type)?.label}
+                </h3>
+              </div>
+              <button onClick={()=>{setShowModal(false);setForm(EMPTY_FORM)}} className="p-2 hover:bg-gray-100 rounded-xl"><X size={18}/></button>
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="label">Record Type</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {RECORD_TYPES.map(t => (
-                    <button key={t.value} type="button" onClick={() => setForm(f => ({...f,record_type:t.value}))}
-                      className={`p-3 rounded-xl border text-sm font-medium transition-all text-left flex items-center gap-2 ${form.record_type===t.value?'border-blue-500 bg-blue-50 text-blue-700':'border-gray-200 hover:border-blue-300'}`}>
-                      <span>{t.icon}</span> {t.label}
-                    </button>
-                  ))}
-                </div>
+
+            {/* Type selector */}
+            <div className="px-6 pt-4 flex-shrink-0">
+              <label className="label mb-2 block text-xs font-bold text-gray-500 uppercase tracking-wide">Record Type</label>
+              <div className="grid grid-cols-4 gap-2">
+                {RECORD_TYPES.map(t => (
+                  <button key={t.value} type="button"
+                    onClick={() => setForm({...EMPTY_FORM, record_type: t.value})}
+                    className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${
+                      form.record_type===t.value ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-blue-300'
+                    }`}>
+                    <span className="text-lg">{t.icon}</span>{t.label}
+                  </button>
+                ))}
               </div>
-              <div>
-                <label className="label">Title *</label>
-                <input type="text" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Blood Test Report" className="input-field"/>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+            </div>
+
+            {/* Scrollable body */}
+            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+
+              {/* ── PRESCRIPTION ── */}
+              {form.record_type === 'prescription' && (<>
                 <div>
-                  <label className="label">Doctor Name</label>
-                  <input type="text" value={form.doctor_name} onChange={e=>setForm(f=>({...f,doctor_name:e.target.value}))} placeholder="Dr. Name" className="input-field"/>
+                  <label className="label">Title <span className="text-red-500">*</span></label>
+                  <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))}
+                    placeholder="e.g. Dr. Sharma's Prescription — May 2025" className="input-field"/>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Doctor Name <span className="text-red-500">*</span></label>
+                    <input value={form.doctor_name} onChange={e=>setForm(f=>({...f,doctor_name:e.target.value}))}
+                      placeholder="Dr. Full Name" className="input-field"/>
+                  </div>
+                  <div>
+                    <label className="label">Prescription Date</label>
+                    <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} className="input-field"/>
+                  </div>
                 </div>
                 <div>
-                  <label className="label">Date</label>
-                  <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} className="input-field"/>
+                  <label className="label">Medicines Prescribed <span className="text-red-500">*</span></label>
+                  <textarea value={form.medicines} onChange={e=>setForm(f=>({...f,medicines:e.target.value}))}
+                    placeholder="e.g. Paracetamol 500mg, Amoxicillin 250mg, Vitamin D3..."
+                    className="input-field h-20 resize-none"/>
                 </div>
-              </div>
+                <div>
+                  <label className="label">Dosage Instructions <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <textarea value={form.dosage_notes} onChange={e=>setForm(f=>({...f,dosage_notes:e.target.value}))}
+                    placeholder="e.g. Take Paracetamol after meals, twice daily for 5 days..."
+                    className="input-field h-16 resize-none"/>
+                </div>
+              </>)}
+
+              {/* ── LAB REPORT ── */}
+              {form.record_type === 'lab_report' && (<>
+                <div>
+                  <label className="label">Report Title <span className="text-red-500">*</span></label>
+                  <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))}
+                    placeholder="e.g. Complete Blood Count — June 2025" className="input-field"/>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Test Type <span className="text-red-500">*</span></label>
+                    <select value={form.test_type} onChange={e=>setForm(f=>({...f,test_type:e.target.value}))} className="input-field">
+                      <option value="">Select test type</option>
+                      {LAB_TEST_TYPES.map(t=><option key={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Test Date <span className="text-red-500">*</span></label>
+                    <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} className="input-field"/>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Lab / Hospital Name</label>
+                    <input value={form.lab_name} onChange={e=>setForm(f=>({...f,lab_name:e.target.value}))}
+                      placeholder="e.g. Apollo Diagnostics" className="input-field"/>
+                  </div>
+                  <div>
+                    <label className="label">Referred by Doctor</label>
+                    <input value={form.referred_by} onChange={e=>setForm(f=>({...f,referred_by:e.target.value}))}
+                      placeholder="Dr. Name" className="input-field"/>
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Key Findings / Results <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <textarea value={form.findings} onChange={e=>setForm(f=>({...f,findings:e.target.value}))}
+                    placeholder="e.g. Hb: 11.2 g/dL (Low), WBC: 8200/μL (Normal), Platelet: 2.1 L (Normal)..."
+                    className="input-field h-20 resize-none"/>
+                </div>
+              </>)}
+
+              {/* ── DIAGNOSIS ── */}
+              {form.record_type === 'diagnosis' && (<>
+                <div>
+                  <label className="label">Diagnosis Title <span className="text-red-500">*</span></label>
+                  <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))}
+                    placeholder="e.g. Type 2 Diabetes Mellitus" className="input-field"/>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Doctor Name <span className="text-red-500">*</span></label>
+                    <input value={form.doctor_name} onChange={e=>setForm(f=>({...f,doctor_name:e.target.value}))}
+                      placeholder="Dr. Full Name" className="input-field"/>
+                  </div>
+                  <div>
+                    <label className="label">Date of Diagnosis <span className="text-red-500">*</span></label>
+                    <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} className="input-field"/>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Hospital / Clinic</label>
+                    <input value={form.hospital} onChange={e=>setForm(f=>({...f,hospital:e.target.value}))}
+                      placeholder="e.g. Apollo Hospital" className="input-field"/>
+                  </div>
+                  <div>
+                    <label className="label">Severity <span className="text-red-500">*</span></label>
+                    <select value={form.severity} onChange={e=>setForm(f=>({...f,severity:e.target.value}))} className="input-field">
+                      <option value="">Select severity</option>
+                      {SEVERITIES.map(s=><option key={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Condition Details <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <textarea value={form.condition} onChange={e=>setForm(f=>({...f,condition:e.target.value}))}
+                    placeholder="Describe the diagnosed condition, symptoms observed..."
+                    className="input-field h-16 resize-none"/>
+                </div>
+                <div>
+                  <label className="label">Treatment Plan <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <textarea value={form.treatment} onChange={e=>setForm(f=>({...f,treatment:e.target.value}))}
+                    placeholder="e.g. Metformin 500mg daily, low-carb diet, exercise 30 min/day..."
+                    className="input-field h-16 resize-none"/>
+                </div>
+              </>)}
+
+              {/* ── OTHER ── */}
+              {form.record_type === 'other' && (<>
+                <div>
+                  <label className="label">Title <span className="text-red-500">*</span></label>
+                  <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))}
+                    placeholder="e.g. Vaccination Certificate, Discharge Summary..." className="input-field"/>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Category</label>
+                    <input value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}
+                      placeholder="e.g. Vaccination, Surgery..." className="input-field"/>
+                  </div>
+                  <div>
+                    <label className="label">Date</label>
+                    <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} className="input-field"/>
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Description / Notes</label>
+                  <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
+                    placeholder="Any additional details about this record..."
+                    className="input-field h-20 resize-none"/>
+                </div>
+              </>)}
+
+              {/* File upload — common */}
               <div>
-                <label className="label">Notes / Description</label>
-                <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Any additional notes..." className="input-field h-20 resize-none"/>
-              </div>
-              <div>
-                <label className="label">Upload File (optional)</label>
-                <button type="button" onClick={() => fileRef.current?.click()} className="w-full border-2 border-dashed border-gray-200 rounded-xl p-4 text-sm text-gray-500 hover:border-blue-300 hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
-                  <Upload size={15}/> {form.file_data ? '✅ File selected' : 'Click to upload (PDF, Image — max 5MB)'}
+                <label className="label">Upload Document <span className="text-gray-400 font-normal">(optional)</span></label>
+                <button type="button" onClick={()=>fileRef.current?.click()}
+                  className="w-full border-2 border-dashed border-gray-200 rounded-xl p-4 text-sm text-gray-500 hover:border-blue-300 hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
+                  <Upload size={15}/>{form.file_data ? '✅ File selected — click to change' : 'Click to upload (PDF, Image — max 5MB)'}
                 </button>
                 <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleFileChange} className="hidden"/>
               </div>
             </div>
-            <div className="flex gap-3 mt-5">
-              <button onClick={() => setShowModal(false)} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2">
+
+            {/* Footer */}
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
+              <button onClick={()=>{setShowModal(false);setForm(EMPTY_FORM)}} className="btn-secondary flex-1">Cancel</button>
+              <button onClick={handleSave} disabled={saving || !isValid(form)}
+                className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-40">
                 {saving ? <LoadingSpinner size="sm"/> : <><Plus size={14}/> Save Record</>}
               </button>
             </div>

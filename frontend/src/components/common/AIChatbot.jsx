@@ -3,13 +3,22 @@ import { useSelector } from 'react-redux'
 import { Bot, X, Send, Minimize2, Maximize2, User, Trash2 } from 'lucide-react'
 import api from '../../services/api'
 
-const QUICK = [
+const PATIENT_QUICK = [
   'I have a headache and fever since 2 days',
   'What foods should I avoid for high blood pressure?',
   'How do I read my blood sugar report?',
   'I feel very tired and sleepy all the time',
   'What are early signs of diabetes?',
   'How much water should I drink daily?',
+]
+
+const DOCTOR_QUICK = [
+  'Suggest differential diagnosis for fever + rash in a child',
+  'Drug interaction: Metformin and Amlodipine',
+  'Treatment guidelines for Type 2 Diabetes',
+  'Red flags to watch for in chest pain patients',
+  'Antibiotic choice for UTI in elderly patient',
+  'When to refer hypertension to a cardiologist?',
 ]
 
 // Render markdown-like text: **bold**, *italic*, bullet points, line breaks
@@ -50,12 +59,16 @@ function MessageContent({ text }) {
 
 export default function AIChatbot() {
   const { user } = useSelector(s => s.auth)
+  const isDoctor = user?.role === 'doctor'
+  const QUICK    = isDoctor ? DOCTOR_QUICK : PATIENT_QUICK
+
+  const greeting = isDoctor
+    ? `Hi Dr. ${user?.full_name?.split(' ')[0] || ''}! 👨‍⚕️ I'm **Synora AI**, your clinical assistant.\n\nI can help with differential diagnoses, drug interactions, treatment guidelines, and clinical decision support.`
+    : `Hi${user?.full_name ? ` ${user.full_name.split(' ')[0]}` : ''}! 👋 I'm **Synora AI**, your personal health assistant.\n\nAsk me anything — symptoms, medicines, diet tips, reading your lab reports, or how to use the Synora platform.`
+
   const [open, setOpen]       = useState(false)
   const [big, setBig]         = useState(false)
-  const [messages, setMessages] = useState([{
-    role: 'assistant',
-    content: `Hi${user?.full_name ? ` ${user.full_name.split(' ')[0]}` : ''}! 👋 I'm **Synora AI**, your personal health assistant.\n\nAsk me anything — symptoms, medicines, diet tips, reading your lab reports, or how to use the Synora platform.`
-  }])
+  const [messages, setMessages] = useState([{ role: 'assistant', content: greeting }])
   const [input, setInput]   = useState('')
   const [loading, setLoading] = useState(false)
   const endRef              = useRef(null)
@@ -64,10 +77,7 @@ export default function AIChatbot() {
 
   // Reset greeting when user changes
   useEffect(() => {
-    setMessages([{
-      role: 'assistant',
-      content: `Hi${user?.full_name ? ` ${user.full_name.split(' ')[0]}` : ''}! 👋 I'm **Synora AI**, your personal health assistant.\n\nAsk me anything — symptoms, medicines, diet tips, reading your lab reports, or how to use the Synora platform.`
-    }])
+    setMessages([{ role: 'assistant', content: greeting }])
   }, [user?.id])
 
   const send = async (text) => {
@@ -97,14 +107,11 @@ export default function AIChatbot() {
     }
   }
 
-  const clearChat = () => setMessages([{
-    role: 'assistant',
-    content: `Hi${user?.full_name ? ` ${user.full_name.split(' ')[0]}` : ''}! 👋 Chat cleared. What can I help you with?`
-  }])
+  const clearChat = () => setMessages([{ role: 'assistant', content: isDoctor ? `Dr. ${user?.full_name?.split(' ')[0] || ''}! Chat cleared. How can I assist you clinically?` : `Chat cleared! What health question can I help you with?` }])
 
   if (!open) return (
     <button onClick={() => setOpen(true)}
-      className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95">
+      className={`fixed bottom-6 right-6 z-50 w-14 h-14 ${isDoctor ? 'bg-violet-600 hover:bg-violet-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95`}>
       <Bot size={26} />
       <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse" />
     </button>
@@ -114,16 +121,16 @@ export default function AIChatbot() {
     <div className={`fixed z-50 bottom-6 right-6 bg-white rounded-3xl shadow-2xl border border-gray-200 flex flex-col transition-all duration-200 ${big ? 'w-[440px] h-[620px]' : 'w-80 h-[500px]'}`}>
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-3xl flex-shrink-0">
+      <div className={`flex items-center gap-3 px-4 py-3 bg-gradient-to-r ${isDoctor ? 'from-violet-600 to-indigo-600' : 'from-blue-600 to-indigo-600'} rounded-t-3xl flex-shrink-0`}>
         <div className="relative">
           <div className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center">
             <Bot size={18} className="text-white"/>
           </div>
-          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-blue-600"/>
+          <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 ${isDoctor ? 'border-violet-600' : 'border-blue-600'}`}/>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-white font-bold text-sm">Synora AI</p>
-          <p className="text-blue-200 text-xs">Health Assistant · Always available</p>
+          <p className="text-white font-bold text-sm">Synora AI {isDoctor ? '— Clinical' : ''}</p>
+          <p className={`${isDoctor ? 'text-violet-200' : 'text-blue-200'} text-xs`}>{isDoctor ? 'Clinical Decision Support · Always available' : 'Health Assistant · Always available'}</p>
         </div>
         <button onClick={clearChat} title="Clear chat" className="p-1.5 text-white/60 hover:text-white transition-colors">
           <Trash2 size={13}/>
