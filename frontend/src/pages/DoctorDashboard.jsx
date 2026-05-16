@@ -594,8 +594,6 @@ function PrescriptionsTab({ appointments, onReload }) {
 // ═══════════════════════════════════════════════
 // Feature 4 + 11 — Patient Full Modal
 // ═══════════════════════════════════════════════
-// Feature 7+11+12+13+14 — AI Assistant Tab
-// ═══════════════════════════════════════════════
 function AIAssistantTab({ appointments, onReload }) {
   const confirmed  = appointments.filter(a => a.status === 'confirmed')
   const selected   = confirmed[0]
@@ -849,6 +847,11 @@ function PatientFullModal({ patient, onClose, onStartConsult }) {
   const [policies,    setPolicies]    = useState([])
   const [loadingIns,  setLoadingIns]  = useState(false)
 
+  const [aiAnalysis,   setAiAnalysis]   = useState(null)
+  const [aiLoading,    setAiLoading]    = useState(false)
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiGenAt,      setAiGenAt]      = useState(null)
+
   useEffect(() => {
     if (patient?.patient_id) {
       setLoadingRec(true)
@@ -856,17 +859,52 @@ function PatientFullModal({ patient, onClose, onStartConsult }) {
         .then(r => setRecords(r.data||[])).catch(()=>setRecords([]))
         .finally(()=>setLoadingRec(false))
     }
+    // Reset AI state when patient changes
+    setAiAnalysis(null)
+    setAiGenAt(null)
   }, [patient])
+
+  useEffect(() => {
+    if (activeTab === 'insights' && patient?.patient_id && !aiAnalysis && !aiLoading) {
+      setAiLoading(true)
+      api.get(`/doctor-ai/patient/${patient.patient_id}/analysis`)
+        .then(r => {
+          if (r.data?.exists && r.data?.analysis) {
+            setAiAnalysis(r.data.analysis)
+            setAiGenAt(r.data.generated_at)
+          }
+        })
+        .catch(() => {})
+        .finally(() => setAiLoading(false))
+    }
+  }, [activeTab, patient])
+
+  const generateAIAnalysis = async () => {
+    if (!patient?.patient_id) return
+    setAiGenerating(true)
+    try {
+      const res = await api.post(`/doctor-ai/patient/${patient.patient_id}/analyze`)
+      if (res.data?.analysis) {
+        setAiAnalysis(res.data.analysis)
+        setAiGenAt(res.data.generated_at)
+        toast.success('AI clinical analysis generated!')
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not generate AI analysis')
+    } finally {
+      setAiGenerating(false)
+    }
+  }
 
   useEffect(() => {
     if (activeTab === 'insurance' && patient?.patient_id) {
       setLoadingIns(true)
       Promise.all([
-        api.get('/insurance/claims').catch(()=>({ data:[] })),
-        api.get('/insurance/policies').catch(()=>({ data:[] })),
-      ]).then(([c, p]) => {
-        setClaims(c.data || [])
+        api.get(`/insurance/patient/${patient.patient_id}/policies`).catch(()=>({ data:[] })),
+        api.get(`/insurance/patient/${patient.patient_id}/claims`).catch(()=>({ data:[] })),
+      ]).then(([p, c]) => {
         setPolicies(p.data || [])
+        setClaims(c.data || [])
       }).finally(()=>setLoadingIns(false))
     }
   }, [activeTab, patient])
@@ -905,25 +943,155 @@ function PatientFullModal({ patient, onClose, onStartConsult }) {
         <div className="overflow-y-auto flex-1 p-5 space-y-3">
           {activeTab === 'insights' && (
             <>
-              {patient?.symptoms && <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3"><p className="text-xs font-bold text-indigo-700 mb-1">Patient Complaint</p><p className="text-sm text-indigo-800 italic">"{patient.symptoms}"</p></div>}
-              <p className="font-bold text-gray-800 text-sm">AI Health Lab Results</p>
-              {[
-                {icon:<Brain size={14} className="text-blue-600"/>,    label:'Symptom Analysis', val:'Viral Fever (Likely)',       bg:'bg-blue-50 border-blue-200'},
-                {icon:<FileText size={14} className="text-green-600"/>,label:'Report Analysis',  val:'Hb: 11.2 (Low), WBC: Normal',bg:'bg-green-50 border-green-200'},
-                {icon:<Scale size={14} className="text-orange-600"/>,  label:'BMI & Metrics',   val:'BMI: 23.6 (Healthy)',        bg:'bg-orange-50 border-orange-200'},
-                {icon:<Scan size={14} className="text-purple-600"/>,   label:'Skin Scan (CNN)', val:'No skin issues detected',    bg:'bg-purple-50 border-purple-200'},
-              ].map((ins,i)=>(
-                <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border ${ins.bg}`}>
-                  <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center shadow-sm">{ins.icon}</div>
-                  <div><p className="text-xs font-bold text-gray-700">{ins.label}</p><p className="text-xs text-gray-600">{ins.val}</p></div>
-                </div>
-              ))}
-              <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 flex items-center gap-3">
-                <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center shadow-sm"><Activity size={14} className="text-teal-600"/></div>
-                <div className="flex-1"><p className="text-xs font-bold text-gray-700">Health Score</p>
-                  <div className="flex items-center gap-2 mt-1"><div className="flex-1 h-2 bg-teal-100 rounded-full"><div className="h-full bg-teal-500 rounded-full" style={{width:'78%'}}/></div><span className="text-xs font-bold text-teal-700">78/100 Good</span></div>
-                </div>
+              {/* Header: current symptoms + generate button */}
+              <div className="flex items-center justify-between">
+                <p className="font-bold text-gray-800 text-sm flex items-center gap-1.5"><Brain size={14} className="text-indigo-600"/> AI Clinical Analysis</p>
+                <button
+                  onClick={generateAIAnalysis}
+                  disabled={aiGenerating}
+                  className={`text-xs px-3 py-1.5 rounded-full font-bold border transition-all flex items-center gap-1 ${aiGenerating ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'}`}>
+                  {aiGenerating ? <><RefreshCw size={11} className="animate-spin"/> Analysing…</> : <><Brain size={11}/> {aiAnalysis ? 'Re-run' : 'Generate'}</>}
+                </button>
               </div>
+
+              {patient?.symptoms && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+                  <p className="text-xs font-bold text-indigo-700 mb-1">Last Reported Complaint</p>
+                  <p className="text-sm text-indigo-800 italic">"{patient.symptoms}"</p>
+                </div>
+              )}
+
+              {/* Loading state */}
+              {(aiLoading || aiGenerating) && !aiAnalysis && (
+                <div className="py-8 text-center text-gray-400">
+                  <Brain size={28} className="mx-auto mb-2 opacity-40 animate-pulse"/>
+                  <p className="text-xs">{aiGenerating ? 'Generating clinical analysis…' : 'Loading analysis…'}</p>
+                </div>
+              )}
+
+              {/* No analysis yet */}
+              {!aiLoading && !aiGenerating && !aiAnalysis && (
+                <div className="py-8 text-center text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
+                  <Brain size={32} className="mx-auto mb-2 opacity-30"/>
+                  <p className="text-sm font-medium text-gray-600">No analysis yet</p>
+                  <p className="text-xs mt-1">Click <strong>Generate</strong> to run AI clinical analysis for this patient.</p>
+                </div>
+              )}
+
+              {/* Real AI Analysis */}
+              {aiAnalysis && (
+                <>
+                  {/* Generated timestamp */}
+                  {aiGenAt && <p className="text-[10px] text-gray-400 text-right">Generated: {new Date(aiGenAt).toLocaleString('en-IN')}</p>}
+
+                  {/* Emergency banner */}
+                  {aiAnalysis.emergency_indicators && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-300 rounded-xl">
+                      <AlertCircle size={16} className="text-red-600 flex-shrink-0"/>
+                      <p className="text-xs font-bold text-red-700">Emergency Indicators Present — Immediate attention required</p>
+                    </div>
+                  )}
+
+                  {/* Patient summary */}
+                  {aiAnalysis.patient_summary && (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+                      <p className="text-xs font-bold text-indigo-700 mb-1">Clinical Summary</p>
+                      <p className="text-xs text-indigo-800 leading-relaxed">{aiAnalysis.patient_summary}</p>
+                    </div>
+                  )}
+
+                  {/* Severity + Confidence + Specialist */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label:'Severity', val: aiAnalysis.severity_estimation || '—', color: aiAnalysis.severity_estimation==='Critical'||aiAnalysis.severity_estimation==='Severe' ? 'text-red-600 bg-red-50 border-red-200' : aiAnalysis.severity_estimation==='Moderate' ? 'text-orange-600 bg-orange-50 border-orange-200' : 'text-green-600 bg-green-50 border-green-200' },
+                      { label:'Confidence', val: aiAnalysis.confidence_score != null ? `${aiAnalysis.confidence_score}%` : '—', color:'text-blue-600 bg-blue-50 border-blue-200' },
+                      { label:'Specialist', val: aiAnalysis.suggested_specialist || '—', color:'text-purple-600 bg-purple-50 border-purple-200' },
+                    ].map((m,i)=>(
+                      <div key={i} className={`rounded-xl border p-2.5 text-center ${m.color}`}>
+                        <p className="text-[10px] text-gray-500 mb-0.5">{m.label}</p>
+                        <p className="text-xs font-extrabold leading-tight">{m.val}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Possible conditions */}
+                  {aiAnalysis.possible_conditions?.length > 0 && (
+                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                      <p className="text-xs font-bold text-gray-700 px-3 py-2 bg-gray-50 border-b border-gray-100">Possible Conditions</p>
+                      <div className="divide-y divide-gray-50">
+                        {aiAnalysis.possible_conditions.map((c,i)=>(
+                          <div key={i} className="flex items-start gap-2 px-3 py-2">
+                            <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${c.probability==='High'?'bg-red-400':c.probability==='Medium'?'bg-orange-400':'bg-green-400'}`}/>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="text-xs font-semibold text-gray-800">{c.name}</p>
+                                <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{c.probability}</span>
+                                {c.confidence != null && <span className="text-[10px] text-gray-400">{c.confidence}%</span>}
+                              </div>
+                              {c.description && <p className="text-[11px] text-gray-500 mt-0.5">{c.description}</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Key symptoms */}
+                  {aiAnalysis.key_symptoms_detected?.length > 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                      <p className="text-xs font-bold text-blue-700 mb-2">Key Symptoms Detected</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {aiAnalysis.key_symptoms_detected.map((s,i)=>(
+                          <span key={i} className="text-[11px] bg-white text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Important findings */}
+                  {aiAnalysis.important_findings?.length > 0 && (
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                      <p className="text-xs font-bold text-green-700 mb-2">Important Findings</p>
+                      {aiAnalysis.important_findings.map((f,i)=>(
+                        <p key={i} className="text-[11px] text-green-800 mb-1">• {f}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Recommended tests */}
+                  {aiAnalysis.recommended_tests?.length > 0 && (
+                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                      <p className="text-xs font-bold text-gray-700 px-3 py-2 bg-gray-50 border-b border-gray-100">Recommended Tests</p>
+                      <div className="divide-y divide-gray-50">
+                        {aiAnalysis.recommended_tests.map((t,i)=>(
+                          <div key={i} className="flex items-start gap-2 px-3 py-2">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5 ${t.urgency==='Urgent'?'bg-red-100 text-red-600':t.urgency==='Soon'?'bg-orange-100 text-orange-600':'bg-gray-100 text-gray-500'}`}>{t.urgency||'Routine'}</span>
+                            <div>
+                              <p className="text-xs font-semibold text-gray-800">{t.name}</p>
+                              {t.reason && <p className="text-[11px] text-gray-500">{t.reason}</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Risk alerts */}
+                  {aiAnalysis.risk_alerts?.length > 0 && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                      <p className="text-xs font-bold text-yellow-700 mb-2">Risk Alerts</p>
+                      {aiAnalysis.risk_alerts.map((a,i)=>(
+                        <p key={i} className="text-[11px] text-yellow-800 mb-1 flex items-start gap-1"><AlertCircle size={11} className="flex-shrink-0 mt-0.5"/>{a}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Disclaimer */}
+                  <p className="text-[10px] text-gray-400 text-center italic border-t border-gray-100 pt-2">
+                    {aiAnalysis.ai_disclaimer || 'AI analysis is for clinical decision support only. Final decisions rest with the treating physician.'}
+                  </p>
+                </>
+              )}
             </>
           )}
 
@@ -987,33 +1155,95 @@ function PatientFullModal({ patient, onClose, onStartConsult }) {
 
           {activeTab === 'insurance' && (
             <div className="space-y-4">
+              {/* Header */}
+              <div className="flex items-center gap-2 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
+                <Shield size={16} className="text-indigo-500 flex-shrink-0"/>
+                <div>
+                  <p className="text-xs font-bold text-indigo-800">{patient?.patient_name} — Insurance Details</p>
+                  <p className="text-[10px] text-indigo-400">Patient-added insurance policies and claims</p>
+                </div>
+              </div>
+
               {loadingIns ? (
                 <div className="py-6 flex justify-center"><LoadingSpinner/></div>
               ) : (
                 <>
+                  {/* Summary bar */}
+                  {(policies.length > 0 || claims.length > 0) && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label:'Policies', val: policies.length, color:'text-indigo-600 bg-indigo-50 border-indigo-100' },
+                        { label:'Total Coverage', val: policies.reduce((s,p)=>s+(p.coverage_amount||0),0) > 0 ? `₹${Number(policies.reduce((s,p)=>s+(p.coverage_amount||0),0)).toLocaleString('en-IN')}` : '—', color:'text-green-600 bg-green-50 border-green-100' },
+                        { label:'Claims', val: claims.length, color:'text-purple-600 bg-purple-50 border-purple-100' },
+                      ].map((m,i)=>(
+                        <div key={i} className={`rounded-xl border p-2 text-center ${m.color}`}>
+                          <p className="text-[10px] text-gray-500">{m.label}</p>
+                          <p className="text-xs font-extrabold mt-0.5">{m.val}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Policies */}
                   <div>
                     <p className="font-bold text-gray-800 text-sm mb-2 flex items-center gap-1.5">
-                      <Shield size={13} className="text-indigo-500"/> Active Policies
+                      <Shield size={13} className="text-indigo-500"/> Insurance Policies
                     </p>
                     {policies.length === 0
-                      ? <p className="text-xs text-gray-400 text-center py-3">No insurance policies on file</p>
+                      ? (
+                        <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-xl">
+                          <Shield size={28} className="mx-auto text-gray-200 mb-2"/>
+                          <p className="text-xs text-gray-400">Patient has not added any insurance policies</p>
+                        </div>
+                      )
                       : policies.map((p, i) => {
                           const isExpired = p.valid_till && new Date(p.valid_till) < new Date()
                           return (
-                            <div key={i} className="flex items-center justify-between bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2.5 mb-2">
-                              <div>
-                                <p className="text-xs font-bold text-indigo-800">{p.provider}</p>
-                                <p className="text-[11px] text-indigo-500">{p.policy_type} · {p.policy_number}</p>
-                              </div>
-                              <div className="text-right">
-                                {p.coverage_amount > 0 && (
-                                  <p className="text-xs font-bold text-indigo-700">₹{Number(p.coverage_amount).toLocaleString('en-IN')}</p>
-                                )}
-                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isExpired ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                            <div key={i} className="bg-white border border-indigo-100 rounded-xl p-3 mb-2 shadow-sm">
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-bold text-indigo-800 truncate">{p.provider}</p>
+                                  <p className="text-[11px] text-indigo-500">{p.policy_type} · <span className="font-mono">{p.policy_number}</span></p>
+                                </div>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${isExpired ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
                                   {isExpired ? 'Expired' : 'Active'}
                                 </span>
                               </div>
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                {p.coverage_amount > 0 && (
+                                  <div>
+                                    <p className="text-[10px] text-gray-400">Coverage</p>
+                                    <p className="text-xs font-bold text-green-700">₹{Number(p.coverage_amount).toLocaleString('en-IN')}</p>
+                                  </div>
+                                )}
+                                {p.premium_amount > 0 && (
+                                  <div>
+                                    <p className="text-[10px] text-gray-400">Premium</p>
+                                    <p className="text-xs font-semibold text-gray-700">₹{Number(p.premium_amount).toLocaleString('en-IN')}</p>
+                                  </div>
+                                )}
+                                {p.valid_from && (
+                                  <div>
+                                    <p className="text-[10px] text-gray-400">Valid From</p>
+                                    <p className="text-xs text-gray-600">{new Date(p.valid_from).toLocaleDateString('en-IN')}</p>
+                                  </div>
+                                )}
+                                {p.valid_till && (
+                                  <div>
+                                    <p className="text-[10px] text-gray-400">Valid Till</p>
+                                    <p className={`text-xs font-semibold ${isExpired ? 'text-red-500' : 'text-gray-600'}`}>{new Date(p.valid_till).toLocaleDateString('en-IN')}</p>
+                                  </div>
+                                )}
+                                {p.nominee && (
+                                  <div className="col-span-2">
+                                    <p className="text-[10px] text-gray-400">Nominee</p>
+                                    <p className="text-xs text-gray-600">{p.nominee}</p>
+                                  </div>
+                                )}
+                              </div>
+                              {p.notes && (
+                                <p className="text-[11px] text-gray-400 mt-2 italic border-t border-gray-100 pt-1.5">{p.notes}</p>
+                              )}
                             </div>
                           )
                         })
@@ -1026,26 +1256,37 @@ function PatientFullModal({ patient, onClose, onStartConsult }) {
                       <FileText size={13} className="text-purple-500"/> Claims History
                     </p>
                     {claims.length === 0
-                      ? <p className="text-xs text-gray-400 text-center py-3">No claims submitted yet</p>
+                      ? <p className="text-xs text-gray-400 text-center py-3">No claims submitted by patient</p>
                       : claims.map((c, i) => {
                           const status = (c.status || 'pending').toLowerCase()
                           return (
-                            <div key={i} className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 mb-2">
-                              <div className="flex items-start justify-between gap-2">
+                            <div key={i} className="bg-white border border-gray-200 rounded-xl p-3 mb-2 shadow-sm">
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
                                 <div className="flex-1 min-w-0">
                                   <p className="text-xs font-bold text-gray-800 truncate">{c.hospital_name}</p>
                                   <p className="text-[11px] text-gray-500">{c.treatment}</p>
-                                  {c.claim_date && (
-                                    <p className="text-[10px] text-gray-400 mt-0.5">{new Date(c.claim_date).toLocaleDateString('en-IN')}</p>
-                                  )}
                                 </div>
-                                <div className="text-right flex-shrink-0">
-                                  <p className="text-xs font-extrabold text-gray-800">₹{Number(c.bill_amount||0).toLocaleString('en-IN')}</p>
-                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize ${CLAIM_STATUS_COLOR[status] || 'bg-gray-100 text-gray-600'}`}>
-                                    {status}
-                                  </span>
-                                </div>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize flex-shrink-0 ${CLAIM_STATUS_COLOR[status] || 'bg-gray-100 text-gray-600'}`}>
+                                  {status}
+                                </span>
                               </div>
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                <div>
+                                  <p className="text-[10px] text-gray-400">Bill Amount</p>
+                                  <p className="text-xs font-bold text-gray-800">₹{Number(c.bill_amount||0).toLocaleString('en-IN')}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] text-gray-400">Claimed</p>
+                                  <p className="text-xs font-bold text-purple-700">₹{Number(c.claimed_amount||0).toLocaleString('en-IN')}</p>
+                                </div>
+                                {c.claim_date && (
+                                  <div>
+                                    <p className="text-[10px] text-gray-400">Claim Date</p>
+                                    <p className="text-xs text-gray-600">{new Date(c.claim_date).toLocaleDateString('en-IN')}</p>
+                                  </div>
+                                )}
+                              </div>
+                              {c.notes && <p className="text-[11px] text-gray-400 mt-1.5 italic">{c.notes}</p>}
                             </div>
                           )
                         })
@@ -1414,37 +1655,23 @@ export default function DoctorDashboard() {
                 </div>
               </div>
 
-              {/* ── AI Assistant ── */}
+              {/* ── Quick Actions ── */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                  <p className="font-bold text-gray-900">AI Assistant</p>
-                  <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-bold">New</span>
+                  <p className="font-bold text-gray-900">Quick Actions</p>
                 </div>
-                <div className="p-5 flex flex-col items-center text-center gap-3">
-                  <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-teal-100 rounded-full flex items-center justify-center">
-                    <Brain size={32} className="text-green-600"/>
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-900">Hello Dr. {firstName} 👋</p>
-                    <p className="text-xs text-gray-500 mt-0.5">How can I help you today?</p>
-                  </div>
-                  <div className="w-full space-y-2 mt-1">
-                    {[
-                      { icon:'🔍', label:'Suggest Diagnosis',      tab:'ai-assistant' },
-                      { icon:'💊', label:'Drug Interaction Check',  tab:'ai-assistant' },
-                      { icon:'📋', label:'Treatment Guidelines',    tab:'ai-assistant' },
-                      { icon:'📊', label:'Patient Risk Analysis',   tab:'patients'     },
-                    ].map((a,i)=>(
-                      <button key={i} onClick={()=>navigate(`/doctor/dashboard?tab=${a.tab}`)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 bg-gray-50 hover:bg-green-50 border border-gray-100 hover:border-green-200 rounded-xl text-sm font-medium text-gray-700 transition-all text-left">
-                        <span className="text-base">{a.icon}</span>{a.label}
-                      </button>
-                    ))}
-                  </div>
-                  <button onClick={()=>navigate('/doctor/dashboard?tab=ai-assistant')}
-                    className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
-                    <Brain size={15}/> Ask AI Assistant
-                  </button>
+                <div className="p-5 flex flex-col gap-2">
+                  {[
+                    { icon:'📊', label:'Patient Risk Analysis',   tab:'patients'     },
+                    { icon:'📅', label:'View Appointments',       tab:'appointments' },
+                    { icon:'💊', label:'Prescriptions',           tab:'prescription' },
+                    { icon:'📋', label:'Medical Records',         tab:'medical-records' },
+                  ].map((a,i)=>(
+                    <button key={i} onClick={()=>navigate(`/doctor/dashboard?tab=${a.tab}`)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 bg-gray-50 hover:bg-teal-50 border border-gray-100 hover:border-teal-200 rounded-xl text-sm font-medium text-gray-700 transition-all text-left">
+                      <span className="text-base">{a.icon}</span>{a.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -1769,9 +1996,6 @@ export default function DoctorDashboard() {
 
         {/* ── EARNINGS ── */}
         {activeTab === 'earnings' && <RevenueTab/>}
-
-        {/* ── AI ASSISTANT (Feature 7 + 12 + 13 + 14) ── */}
-        {activeTab === 'ai-assistant' && <AIAssistantTab appointments={appointments} onReload={loadAppointments}/>}
 
         {/* ── MESSAGES ── */}
         {activeTab === 'messages' && (

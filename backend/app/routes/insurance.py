@@ -113,6 +113,83 @@ async def submit_claim(data: ClaimIn, current_user: dict = Depends(get_current_u
     doc["_id"] = result.inserted_id
     return serialize_doc(doc)
 
+def _patient_id_query(patient_id: str) -> dict:
+    """Build a query that matches patient_id stored as either string or ObjectId."""
+    from bson import ObjectId as BsonObjectId
+    candidates = [patient_id]
+    try:
+        candidates.append(BsonObjectId(patient_id))
+    except Exception:
+        pass
+    return {"patient_id": {"$in": candidates}}
+
+
+@router.get("/patient/{patient_id}/policies", summary="Get insurance policies of a patient (doctor access)")
+async def get_patient_policies(patient_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") not in ["doctor", "admin"]:
+        raise HTTPException(status_code=403, detail="Doctors only")
+    db = get_db()
+
+    # First try exact match (handles both string and ObjectId stored formats)
+    query = _patient_id_query(patient_id)
+    cursor = db.insurance_policies.find(query).sort("created_at", -1)
+    results = [serialize_doc(p) async for p in cursor]
+
+    # Fallback: look up by user email if the patient exists and results are empty
+    if not results:
+        try:
+            user = await db.users.find_one({"_id": str_to_objectid(patient_id)})
+            if user and user.get("email"):
+                # Try matching by email-linked policies (edge case: policy stored under email key)
+                alt_id = str(user["_id"])
+                if alt_id != patient_id:
+                    cursor2 = db.insurance_policies.find(_patient_id_query(alt_id)).sort("created_at", -1)
+                    results = [serialize_doc(p) async for p in cursor2]
+        except Exception:
+            pass
+
+    return results
+
+
+@router.get("/patient/{patient_id}/claims", summary="Get insurance claims of a patient (doctor access)")
+async def get_patient_claims(patient_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") not in ["doctor", "admin"]:
+        raise HTTPException(status_code=403, detail="Doctors only")
+    db = get_db()
+
+    query = _patient_id_query(patient_id)
+    cursor = db.insurance_claims.find(query).sort("created_at", -1)
+    results = [serialize_doc(c) async for c in cursor]
+
+    if not results:
+        try:
+            user = await db.users.find_one({"_id": str_to_objectid(patient_id)})
+            if user:
+                alt_id = str(user["_id"])
+                if alt_id != patient_id:
+                    cursor2 = db.insurance_claims.find(_patient_id_query(alt_id)).sort("created_at", -1)
+                    results = [serialize_doc(c) async for c in cursor2]
+        except Exception:
+            pass
+
+    return results
+
+
+@router.get("/patient/{patient_id}/debug", summary="Debug: check what patient_id values exist in insurance_policies")
+async def debug_patient_insurance(patient_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") not in ["doctor", "admin"]:
+        raise HTTPException(status_code=403, detail="Doctors only")
+    db = get_db()
+    # Sample the first 5 docs to see what patient_id values are stored
+    sample = await db.insurance_policies.find({}).limit(5).to_list(length=5)
+    stored_ids = [str(doc.get("patient_id", "MISSING")) for doc in sample]
+    return {
+        "queried_patient_id": patient_id,
+        "sample_stored_patient_ids": stored_ids,
+        "match_found": patient_id in stored_ids,
+    }
+
+
 @router.patch("/claims/{claim_id}/status", summary="Update claim status")
 async def update_claim_status(claim_id: str, status: str, current_user: dict = Depends(get_current_user)):
     db = get_db()

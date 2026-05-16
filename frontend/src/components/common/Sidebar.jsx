@@ -34,7 +34,6 @@ const doctorLinks = [
   { tab: 'consultation',    icon: Stethoscope,     label: 'Consultations' },
   { tab: 'prescription',    icon: FileText,        label: 'Prescriptions' },
   { tab: 'medical-records', icon: FolderOpen,      label: 'Medical Records' },
-  { tab: 'ai-assistant',    icon: Brain,           label: 'AI Assistant',        badgeText: 'New' },
   { tab: 'analytics',       icon: BarChart2,       label: 'Reports & Analytics' },
   { tab: 'schedule',        icon: ClipboardList,   label: 'Schedule' },
   { tab: 'messages',        icon: MessageCircle,   label: 'Messages',            messageBadge: true },

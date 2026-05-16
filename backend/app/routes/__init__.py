@@ -1,3 +1,13 @@
-from . import auth, users, doctors, appointments, ai_routes, admin, video
+from . import (
+    auth, users, doctors, appointments, ai_routes, admin, video,
+    chat, health_records, prescription_ai, meetings, whatsapp,
+    emergency, family, wellness, extras, medicines, goals,
+    insurance, payments, doctor_ai,
+)
 
-__all__ = ["auth", "users", "doctors", "appointments", "ai_routes", "admin", "video"]
+__all__ = [
+    "auth", "users", "doctors", "appointments", "ai_routes", "admin", "video",
+    "chat", "health_records", "prescription_ai", "meetings", "whatsapp",
+    "emergency", "family", "wellness", "extras", "medicines", "goals",
+    "insurance", "payments", "doctor_ai",
+]
