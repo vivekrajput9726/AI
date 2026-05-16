@@ -65,6 +65,7 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
   const [showLangMenu, setShowLangMenu]       = useState(false)
   const [currentLang, setCurrentLang]         = useState(getCurrentLang)
   const [langSearch, setLangSearch]           = useState('')
+  const [readIds, setReadIds]                 = useState(new Set())
   const langRef = useRef(null)
 
   useEffect(() => {
@@ -76,16 +77,20 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
   }, [])
 
   const notifications = [
-    ...(appointments?.filter(a => a.status === 'confirmed').slice(0, 1).map(a => ({
+    ...(appointments?.filter(a => a.status === 'confirmed').slice(0, 1).map((a, i) => ({
+      id: `apt-${i}`,
       icon: <CheckCircle size={14} className="text-green-500" />,
       bg: 'bg-green-50',
       title: 'Appointment Confirmed',
       sub: `Dr. ${a.doctor_name} · ${a.appointment_time || 'Today'}`,
       time: a.appointment_date || 'Today'
     })) || []),
-    { icon: <FileText size={14} className="text-blue-500" />, bg: 'bg-blue-50', title: 'Report Analysis Ready', sub: 'Tap to view your AI analysis', time: 'Just now' },
-    { icon: <Pill size={14} className="text-orange-500" />, bg: 'bg-orange-50', title: 'Medicine Reminder', sub: 'Paracetamol — 6:00 PM', time: 'Today' },
+    { id: 'report-1', icon: <FileText size={14} className="text-blue-500" />, bg: 'bg-blue-50', title: 'Report Analysis Ready', sub: 'Tap to view your AI analysis', time: 'Just now' },
+    { id: 'med-1', icon: <Pill size={14} className="text-orange-500" />, bg: 'bg-orange-50', title: 'Medicine Reminder', sub: 'Paracetamol — 6:00 PM', time: 'Today' },
   ]
+  const unreadCount = notifications.filter(n => !readIds.has(n.id)).length
+  const markRead = (id) => setReadIds(prev => new Set([...prev, id]))
+  const markAllRead = () => setReadIds(new Set(notifications.map(n => n.id)))
 
   const { dark, toggle } = useTheme()
 
@@ -180,30 +185,46 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
               onClick={() => { setShowNotifications(n => !n); setShowDropdown(false); setShowLangMenu(false) }}
               className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors">
               <Bell size={18} className="text-gray-500" />
-              <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] font-bold flex items-center justify-center">{notifications.length}</span>
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] font-bold flex items-center justify-center">{unreadCount}</span>
+              )}
             </button>
             {showNotifications && (
               <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                   <p className="font-bold text-gray-900 text-sm">Notifications</p>
-                  <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold">{notifications.length} new</span>
+                  {unreadCount > 0
+                    ? <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold">{unreadCount} new</span>
+                    : <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-semibold">All read</span>
+                  }
                 </div>
                 <div className="max-h-72 overflow-y-auto">
-                  {notifications.map((n, i) => (
-                    <button key={i}
-                      onClick={() => { setShowNotifications(false); navigate('/patient/dashboard') }}
-                      className="w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 text-left">
-                      <div className={`w-8 h-8 ${n.bg} rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5`}>{n.icon}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800">{n.title}</p>
-                        <p className="text-xs text-gray-500 truncate">{n.sub}</p>
-                      </div>
-                      <span className="text-xs text-gray-400 flex-shrink-0">{n.time}</span>
-                    </button>
-                  ))}
+                  {notifications.map((n) => {
+                    const isRead = readIds.has(n.id)
+                    return (
+                      <button key={n.id}
+                        onClick={() => { markRead(n.id); setShowNotifications(false) }}
+                        className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 text-left ${isRead ? 'opacity-60' : ''}`}>
+                        <div className={`w-8 h-8 ${n.bg} rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5`}>{n.icon}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-semibold ${isRead ? 'text-gray-500' : 'text-gray-800'}`}>{n.title}</p>
+                          <p className="text-xs text-gray-500 truncate">{n.sub}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                          <span className="text-xs text-gray-400">{n.time}</span>
+                          {!isRead && <span className="w-2 h-2 bg-blue-500 rounded-full"/>}
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
-                <div className="px-4 py-2 border-t border-gray-100">
-                  <button className="w-full text-xs text-blue-600 font-medium hover:underline">Mark all as read</button>
+                <div className="px-4 py-2.5 border-t border-gray-100 flex items-center justify-between">
+                  <span className="text-xs text-gray-400">{unreadCount} unread</span>
+                  <button onClick={markAllRead}
+                    className="text-xs text-blue-600 font-semibold hover:underline disabled:opacity-40"
+                    disabled={unreadCount === 0}>
+                    Mark all as read
+                  </button>
                 </div>
               </div>
             )}

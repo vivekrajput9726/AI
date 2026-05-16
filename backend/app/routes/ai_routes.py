@@ -56,7 +56,8 @@ async def chat(data: ChatRequest, current_user: dict = Depends(get_current_user)
         history=history,
         patient_age=data.patient_age,
         patient_gender=data.patient_gender,
-        report_context=data.report_context
+        report_context=data.report_context,
+        patient_name=data.patient_name or current_user.get("full_name"),
     )
     return {"response": response, "disclaimer": "This is not a medical diagnosis. Please consult a doctor."}
 

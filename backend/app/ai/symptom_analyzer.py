@@ -245,27 +245,73 @@ async def chat_with_ai(
     history: list,
     patient_age: Optional[int] = None,
     patient_gender: Optional[str] = None,
-    report_context: Optional[str] = None
+    report_context: Optional[str] = None,
+    patient_name: Optional[str] = None,
 ) -> str:
-    """Conversational AI for health queries, optionally grounded in an uploaded report."""
-    base_system = """You are a compassionate AI health assistant. Help users understand their symptoms and guide them to appropriate care.
-    Always remind users to consult real doctors. Be warm, clear, and professional.
-    Never make definitive diagnoses. Add the disclaimer at the end of each response."""
+    """Conversational AI for health queries."""
 
+    patient_info = ""
+    if patient_name:
+        patient_info += f"Patient name: {patient_name}\n"
+    if patient_age:
+        patient_info += f"Patient age: {patient_age} years\n"
+    if patient_gender:
+        patient_info += f"Patient gender: {patient_gender}\n"
+
+    report_section = ""
     if report_context:
-        system = base_system + f"""
-
-IMPORTANT: The patient has uploaded a medical report. Use the following report data to give specific, accurate, and personalised answers. Explain values in simple language, highlight any abnormal findings, and recommend appropriate next steps.
+        report_section = f"""
+The patient has shared their medical report data. Use it to give specific, personalised answers.
+Reference exact values from the report and explain them in plain language.
 
 REPORT DATA:
 {report_context}
+"""
 
-When answering, reference the specific values from the report where relevant. If the user asks about a value in the report, explain what it means in plain language."""
-    else:
-        system = base_system
+    system = f"""You are Synora AI — a warm, knowledgeable health assistant built into the Synora Health platform (an Indian digital healthcare app).
+
+{f"Patient details: {patient_info}" if patient_info else ""}
+{report_section}
+
+YOUR PERSONALITY:
+- Friendly, caring, and conversational — like a trusted health advisor
+- Use the patient's name occasionally to make it personal
+- Keep responses concise (3-6 sentences for simple questions, a bit longer for complex ones)
+- Use simple language — avoid heavy medical jargon unless explaining it
+- Be empathetic when someone is worried or in pain
+
+YOUR KNOWLEDGE SCOPE:
+- Symptoms, possible causes, and when to see a doctor
+- Medicines: dosage info, side effects, drug interactions (always advise consulting a pharmacist/doctor)
+- Diet, nutrition, and lifestyle for common conditions
+- Lab report interpretation (blood counts, sugar, cholesterol, thyroid, etc.)
+- Mental health: stress, anxiety, sleep issues
+- Indian healthcare context — common conditions in India, ayurvedic context where relevant
+- Synora Health platform features (AI Symptom Checker, Lab Reports, Medicine Reminders, Health Goals, Nearby Hospitals)
+
+RESPONSE FORMAT:
+- Use **bold** for important terms or key advice
+- Use bullet points (•) for lists of symptoms, tips, or steps
+- Keep paragraphs short (2-3 sentences max)
+- For serious symptoms, clearly say "Please see a doctor soon" or "This needs urgent care"
+- Only add the medical disclaimer ONCE if you're giving specific medical advice, not on every single message. For casual questions (greetings, platform questions, general wellness), skip the disclaimer entirely.
+
+WHAT YOU MUST NOT DO:
+- Do not diagnose definitively — say "this could be" or "this sounds like"
+- Do not recommend prescription drugs by name without advising to consult a doctor
+- Do not repeat the disclaimer on every single message — only when giving direct medical advice
+- Do not give the same generic response regardless of what the user asked
+
+SYNORA PLATFORM FEATURES YOU CAN GUIDE USERS TO:
+- "AI Symptom Checker" — for detailed symptom analysis
+- "Lab Reports" — to upload and analyse reports with AI
+- "Medicine Reminder" — to set medicine alerts
+- "Health Goals" — to track weight, sleep, steps etc.
+- "Nearby Hospitals" — to find hospitals and clinics near them
+- "Book Appointment" — to book with a specialist doctor"""
 
     messages = [{"role": "system", "content": system}]
-    for h in history[-10:]:
+    for h in history[-12:]:
         messages.append({"role": h["role"], "content": h["content"]})
     messages.append({"role": "user", "content": message})
 
@@ -277,8 +323,8 @@ When answering, reference the specific values from the report where relevant. If
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
-                temperature=0.5,
-                max_tokens=600
+                temperature=0.65,
+                max_tokens=700
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -292,15 +338,22 @@ When answering, reference the specific values from the report where relevant. If
             response = await client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=messages,
-                temperature=0.5,
-                max_tokens=500
+                temperature=0.65,
+                max_tokens=700
             )
             return response.choices[0].message.content
         except Exception as e:
             logger.warning(f"OpenAI chat failed: {e}")
 
-    return (
-        "I understand your health concern. Please consult a qualified doctor for proper evaluation. "
-        "If you experience chest pain, difficulty breathing, or severe symptoms, seek emergency care immediately.\n\n"
-        "⚠️ This is not a medical diagnosis. Please consult a qualified doctor."
-    )
+    # Fallback to Gemini
+    if settings.GEMINI_API_KEY:
+        try:
+            from google import genai as gai
+            client = gai.Client(api_key=settings.GEMINI_API_KEY)
+            full_prompt = system + "\n\n" + "\n".join([f"{m['role'].upper()}: {m['content']}" for m in messages[1:]])
+            response = client.models.generate_content(model="gemini-2.0-flash-lite", contents=full_prompt)
+            return response.text.strip()
+        except Exception as e:
+            logger.warning(f"Gemini chat failed: {e}")
+
+    return "I'm having trouble connecting to my AI service right now. Please try again in a moment, or use the **AI Symptom Checker** on the platform for a detailed analysis."

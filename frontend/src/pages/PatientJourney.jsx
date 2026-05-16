@@ -192,9 +192,13 @@ Keep the response medically accurate but easy to understand.`
     if (!file) return
     patchField('labReport', { uploading: true, analysis: null })
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const r = await api.post('/prescription-ai/analyze-report', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const imageBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = e => resolve(e.target.result)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const r = await api.post('/ai/analyze-report', { image_base64: imageBase64 })
       patchField('labReport', { analysis: r.data.analysis || r.data.result || r.data, uploading: false })
       toast.success('Lab report analyzed!')
     } catch {

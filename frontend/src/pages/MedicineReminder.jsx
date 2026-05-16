@@ -64,7 +64,7 @@ function MedicineReminder() {
 
   const toggleActive = async (med) => {
     try {
-      await api.put(`/medicines/${med.id}`, { ...med, active: !med.active })
+      await api.put(`/medicines/${med._id || med.id}`, { ...med, active: !med.active })
       load()
     } catch { toast.error('Failed to update') }
   }
@@ -141,7 +141,7 @@ function MedicineReminder() {
           <div className="space-y-3">
             <h2 className="font-semibold text-gray-900">Your Medicines</h2>
             {reminders.map(reminder => (
-              <div key={reminder.id} className={`rounded-2xl p-4 border transition-all ${reminder.active ? 'bg-white border-gray-100 shadow-sm' : 'bg-gray-50 border-gray-100 opacity-60'}`}>
+              <div key={reminder._id || reminder.id} className={`rounded-2xl p-4 border transition-all ${reminder.active ? 'bg-white border-gray-100 shadow-sm' : 'bg-gray-50 border-gray-100 opacity-60'}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${reminder.active ? 'bg-blue-50' : 'bg-gray-100'}`}>
@@ -159,11 +159,11 @@ function MedicineReminder() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <button onClick={() => logDose(reminder.id, 'taken')}
+                    <button onClick={() => logDose(reminder._id || reminder.id, 'taken')}
                       className="p-2 bg-green-50 text-green-600 hover:bg-green-100 rounded-xl transition-colors" title="Mark Taken">
                       <CheckCircle size={16} />
                     </button>
-                    <button onClick={() => logDose(reminder.id, 'missed')}
+                    <button onClick={() => logDose(reminder._id || reminder.id, 'missed')}
                       className="p-2 bg-red-50 text-red-400 hover:bg-red-100 rounded-xl transition-colors" title="Mark Missed">
                       <XCircle size={16} />
                     </button>
@@ -172,7 +172,7 @@ function MedicineReminder() {
                       title={reminder.active ? 'Deactivate' : 'Activate'}>
                       <Check size={16} />
                     </button>
-                    <button onClick={() => deleteReminder(reminder.id)} className="p-2 bg-red-50 text-red-400 hover:bg-red-100 rounded-xl transition-colors">
+                    <button onClick={() => deleteReminder(reminder._id || reminder.id)} className="p-2 bg-red-50 text-red-400 hover:bg-red-100 rounded-xl transition-colors">
                       <Trash2 size={16} />
                     </button>
                   </div>

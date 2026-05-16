@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 
 const TABS = ['Policies', 'Documents', 'Claims']
 
-const POLICY_TYPES = ['Health', 'Life', 'Dental', 'Vision', 'Accident', 'Critical Illness', 'Other']
+const POLICY_TYPES = ['Health Insurance', 'Life Insurance', 'Accident Insurance', 'Dental', 'Vision', 'Critical Illness', 'Other']
 const CLAIM_STATUSES = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected', processing: 'Processing' }
 
 const statusColor = {
@@ -24,17 +24,18 @@ export default function Insurance() {
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState(null)
 
-  // Policy form
+  // Policy form — field names match backend PolicyIn model
   const [showPolicyForm, setShowPolicyForm] = useState(false)
   const [policyForm, setPolicyForm] = useState({
-    provider: '', policy_number: '', type: 'Health',
-    coverage_amount: '', premium: '', valid_from: '', valid_to: '', notes: ''
+    provider: '', policy_number: '', policy_type: 'Health Insurance',
+    coverage_amount: '', premium_amount: '', valid_from: '', valid_till: '', notes: ''
   })
 
-  // Claim form
+  // Claim form — field names match backend ClaimIn model
   const [showClaimForm, setShowClaimForm] = useState(false)
   const [claimForm, setClaimForm] = useState({
-    policy_id: '', hospital: '', treatment: '', bill_amount: '', claim_date: '', notes: ''
+    policy_id: '', hospital_name: '', treatment: '',
+    bill_amount: '', claimed_amount: '', claim_date: '', notes: ''
   })
 
   // Document upload
@@ -79,8 +80,8 @@ export default function Insurance() {
 
   // Stats
   const activePolicies = policies.filter(p => {
-    if (!p.valid_to) return true
-    return new Date(p.valid_to) >= new Date()
+    if (!p.valid_till) return true
+    return new Date(p.valid_till) >= new Date()
   }).length
   const totalCoverage = policies.reduce((s, p) => s + (Number(p.coverage_amount) || 0), 0)
   const pendingClaims = claims.filter(c => c.status === 'pending' || c.status === 'processing').length
@@ -92,7 +93,7 @@ export default function Insurance() {
       const res = await api.post('/insurance/policies', policyForm)
       setPolicies(prev => [...prev, res.data])
       setShowPolicyForm(false)
-      setPolicyForm({ provider: '', policy_number: '', type: 'Health', coverage_amount: '', premium: '', valid_from: '', valid_to: '', notes: '' })
+      setPolicyForm({ provider: '', policy_number: '', policy_type: 'Health Insurance', coverage_amount: '', premium_amount: '', valid_from: '', valid_till: '', notes: '' })
       toast.success('Policy added!')
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to add policy')
@@ -116,7 +117,7 @@ export default function Insurance() {
       const res = await api.post('/insurance/claims', claimForm)
       setClaims(prev => [...prev, res.data])
       setShowClaimForm(false)
-      setClaimForm({ policy_id: '', hospital: '', treatment: '', bill_amount: '', claim_date: '', notes: '' })
+      setClaimForm({ policy_id: '', hospital_name: '', treatment: '', bill_amount: '', claimed_amount: '', claim_date: '', notes: '' })
       toast.success('Claim submitted!')
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to submit claim')
@@ -133,10 +134,12 @@ export default function Insurance() {
     reader.onload = async () => {
       setUploading(true)
       try {
-        const res = await api.post(`/insurance/documents/${selectedPolicyForDoc}`, {
-          name: docName || file.name,
-          file_data: reader.result,
-          file_type: file.type,
+        // Backend DocumentIn expects: policy_id, doc_name, doc_type, doc_data
+        const res = await api.post('/insurance/documents', {
+          policy_id: selectedPolicyForDoc,
+          doc_name: docName || file.name,
+          doc_type: 'Policy Document',
+          doc_data: reader.result,
         })
         setDocuments(prev => [...prev, { ...res.data, policy_id: selectedPolicyForDoc }])
         setDocName('')
@@ -151,9 +154,9 @@ export default function Insurance() {
     reader.readAsDataURL(file)
   }
 
-  const deleteDocument = async (docId, policyId) => {
+  const deleteDocument = async (docId) => {
     try {
-      await api.delete(`/insurance/documents/${policyId}/${docId}`)
+      await api.delete(`/insurance/documents/${docId}`)
       setDocuments(prev => prev.filter(d => (d._id || d.id) !== docId))
       toast.success('Document deleted')
     } catch {
@@ -178,7 +181,7 @@ export default function Insurance() {
             </div>
             <div>
               <h1 className="text-lg font-extrabold">Insurance Manager</h1>
-              <p className="text-indigo-100 text-xs">Policies, Documents & Claims in one place</p>
+              <p className="text-indigo-100 text-xs">Policies, Documents &amp; Claims in one place</p>
             </div>
           </div>
         </div>
@@ -186,10 +189,10 @@ export default function Insurance() {
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: 'Active Policies', value: activePolicies, icon: <Shield size={16}/>, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-            { label: 'Total Coverage', value: `₹${totalCoverage.toLocaleString('en-IN')}`, icon: <CheckCircle size={16}/>, color: 'text-green-600', bg: 'bg-green-50' },
-            { label: 'Pending Claims', value: pendingClaims, icon: <Clock size={16}/>, color: 'text-yellow-600', bg: 'bg-yellow-50' },
-            { label: 'Approved Claims', value: approvedClaims, icon: <CheckCircle size={16}/>, color: 'text-blue-600', bg: 'bg-blue-50' },
+            { label: 'Active Policies',  value: activePolicies,   icon: <Shield size={16}/>,       color: 'text-indigo-600', bg: 'bg-indigo-50' },
+            { label: 'Total Coverage',   value: `₹${totalCoverage.toLocaleString('en-IN')}`, icon: <CheckCircle size={16}/>, color: 'text-green-600', bg: 'bg-green-50' },
+            { label: 'Pending Claims',   value: pendingClaims,    icon: <Clock size={16}/>,         color: 'text-yellow-600', bg: 'bg-yellow-50' },
+            { label: 'Approved Claims',  value: approvedClaims,   icon: <CheckCircle size={16}/>,   color: 'text-blue-600',   bg: 'bg-blue-50' },
           ].map(s => (
             <div key={s.label} className="card flex items-center gap-3 py-4">
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${s.bg} ${s.color}`}>{s.icon}</div>
@@ -245,7 +248,7 @@ export default function Insurance() {
                     </div>
                     <div>
                       <label className="label">Policy Type</label>
-                      <select className="input-field" value={policyForm.type} onChange={e => setPolicyForm({...policyForm, type: e.target.value})}>
+                      <select className="input-field" value={policyForm.policy_type} onChange={e => setPolicyForm({...policyForm, policy_type: e.target.value})}>
                         {POLICY_TYPES.map(t => <option key={t}>{t}</option>)}
                       </select>
                     </div>
@@ -257,7 +260,7 @@ export default function Insurance() {
                     <div>
                       <label className="label">Annual Premium (₹)</label>
                       <input type="number" placeholder="e.g. 12000" className="input-field"
-                        value={policyForm.premium} onChange={e => setPolicyForm({...policyForm, premium: e.target.value})}/>
+                        value={policyForm.premium_amount} onChange={e => setPolicyForm({...policyForm, premium_amount: e.target.value})}/>
                     </div>
                     <div>
                       <label className="label">Valid From</label>
@@ -265,9 +268,9 @@ export default function Insurance() {
                         value={policyForm.valid_from} onChange={e => setPolicyForm({...policyForm, valid_from: e.target.value})}/>
                     </div>
                     <div>
-                      <label className="label">Valid To</label>
+                      <label className="label">Valid Till</label>
                       <input type="date" className="input-field"
-                        value={policyForm.valid_to} onChange={e => setPolicyForm({...policyForm, valid_to: e.target.value})}/>
+                        value={policyForm.valid_till} onChange={e => setPolicyForm({...policyForm, valid_till: e.target.value})}/>
                     </div>
                   </div>
                   <div>
@@ -295,14 +298,14 @@ export default function Insurance() {
 
             {policies.map(policy => {
               const id = policy._id || policy.id
-              const isExpired = policy.valid_to && new Date(policy.valid_to) < new Date()
+              const isExpired = policy.valid_till && new Date(policy.valid_till) < new Date()
               return (
                 <div key={id} className="card hover:shadow-md transition-all">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className="font-bold text-gray-900">{policy.provider}</span>
-                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{policy.type}</span>
+                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{policy.policy_type}</span>
                         {isExpired
                           ? <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full flex items-center gap-1"><AlertCircle size={10}/> Expired</span>
                           : <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Active</span>
@@ -326,14 +329,14 @@ export default function Insurance() {
                       {policy.coverage_amount && (
                         <div><p className="text-gray-400 text-xs">Coverage</p><p className="font-semibold text-gray-800">₹{Number(policy.coverage_amount).toLocaleString('en-IN')}</p></div>
                       )}
-                      {policy.premium && (
-                        <div><p className="text-gray-400 text-xs">Annual Premium</p><p className="font-semibold text-gray-800">₹{Number(policy.premium).toLocaleString('en-IN')}</p></div>
+                      {policy.premium_amount && (
+                        <div><p className="text-gray-400 text-xs">Annual Premium</p><p className="font-semibold text-gray-800">₹{Number(policy.premium_amount).toLocaleString('en-IN')}</p></div>
                       )}
                       {policy.valid_from && (
                         <div><p className="text-gray-400 text-xs">Valid From</p><p className="font-semibold text-gray-800">{new Date(policy.valid_from).toLocaleDateString('en-IN')}</p></div>
                       )}
-                      {policy.valid_to && (
-                        <div><p className="text-gray-400 text-xs">Valid To</p><p className={`font-semibold ${isExpired ? 'text-red-600' : 'text-gray-800'}`}>{new Date(policy.valid_to).toLocaleDateString('en-IN')}</p></div>
+                      {policy.valid_till && (
+                        <div><p className="text-gray-400 text-xs">Valid Till</p><p className={`font-semibold ${isExpired ? 'text-red-600' : 'text-gray-800'}`}>{new Date(policy.valid_till).toLocaleDateString('en-IN')}</p></div>
                       )}
                       {policy.notes && (
                         <div className="col-span-2 sm:col-span-3"><p className="text-gray-400 text-xs">Notes</p><p className="text-gray-700">{policy.notes}</p></div>
@@ -405,17 +408,15 @@ export default function Insurance() {
                           <div key={dId} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2.5">
                             <div className="flex items-center gap-2">
                               <FileText size={14} className="text-indigo-400"/>
-                              <span className="text-sm font-medium text-gray-800">{doc.name || 'Document'}</span>
-                              {doc.file_type && (
-                                <span className="text-xs text-gray-400">{doc.file_type.includes('pdf') ? 'PDF' : 'Image'}</span>
-                              )}
+                              <span className="text-sm font-medium text-gray-800">{doc.doc_name || 'Document'}</span>
+                              <span className="text-xs text-gray-400">{doc.doc_type}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              {doc.file_data && (
-                                <a href={doc.file_data} target="_blank" rel="noreferrer"
+                              {doc.doc_data && (
+                                <a href={doc.doc_data} target="_blank" rel="noreferrer"
                                   className="text-blue-500 hover:text-blue-700 p-1"><Eye size={14}/></a>
                               )}
-                              <button onClick={() => deleteDocument(dId, pId)} className="text-red-400 hover:text-red-600 p-1">
+                              <button onClick={() => deleteDocument(dId)} className="text-red-400 hover:text-red-600 p-1">
                                 <Trash2 size={14}/>
                               </button>
                             </div>
@@ -460,7 +461,7 @@ export default function Insurance() {
                     <div>
                       <label className="label">Hospital / Clinic</label>
                       <input type="text" required placeholder="Hospital name" className="input-field"
-                        value={claimForm.hospital} onChange={e => setClaimForm({...claimForm, hospital: e.target.value})}/>
+                        value={claimForm.hospital_name} onChange={e => setClaimForm({...claimForm, hospital_name: e.target.value})}/>
                     </div>
                     <div>
                       <label className="label">Treatment / Diagnosis</label>
@@ -473,8 +474,13 @@ export default function Insurance() {
                         value={claimForm.bill_amount} onChange={e => setClaimForm({...claimForm, bill_amount: e.target.value})}/>
                     </div>
                     <div>
+                      <label className="label">Claimed Amount (₹)</label>
+                      <input type="number" required placeholder="e.g. 45000" className="input-field"
+                        value={claimForm.claimed_amount} onChange={e => setClaimForm({...claimForm, claimed_amount: e.target.value})}/>
+                    </div>
+                    <div>
                       <label className="label">Claim Date</label>
-                      <input type="date" className="input-field"
+                      <input type="date" required className="input-field"
                         value={claimForm.claim_date} onChange={e => setClaimForm({...claimForm, claim_date: e.target.value})}/>
                     </div>
                   </div>
@@ -514,13 +520,17 @@ export default function Insurance() {
                           {CLAIM_STATUSES[status] || status}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-500">{claim.hospital}</p>
+                      <p className="text-sm text-gray-500">{claim.hospital_name}</p>
                       {claim.policy_id && (
                         <p className="text-xs text-gray-400 mt-0.5">{getPolicyName(claim.policy_id)}</p>
                       )}
                     </div>
                     <div className="text-right">
+                      <p className="text-xs text-gray-400">Bill</p>
                       <p className="font-bold text-indigo-700 text-sm">₹{Number(claim.bill_amount || 0).toLocaleString('en-IN')}</p>
+                      {claim.claimed_amount && Number(claim.claimed_amount) !== Number(claim.bill_amount) && (
+                        <p className="text-xs text-gray-500">Claimed: ₹{Number(claim.claimed_amount).toLocaleString('en-IN')}</p>
+                      )}
                       {claim.claim_date && (
                         <p className="text-xs text-gray-400 mt-0.5">{new Date(claim.claim_date).toLocaleDateString('en-IN')}</p>
                       )}

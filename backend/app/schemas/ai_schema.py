@@ -44,7 +44,8 @@ class ChatRequest(BaseModel):
     history: List[ChatMessage] = []
     patient_age: Optional[int] = None
     patient_gender: Optional[str] = None
-    report_context: Optional[str] = None  # JSON string of analyzed report data
+    patient_name: Optional[str] = None
+    report_context: Optional[str] = None
 
 
 class ReportTextAnalysisRequest(BaseModel):

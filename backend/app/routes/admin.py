@@ -52,6 +52,48 @@ async def toggle_user(user_id: str, current_user: dict = Depends(require_admin))
     return serialize_doc(result)
 
 
+@router.get("/appointments", summary="List all appointments for admin")
+async def list_all_appointments(page: int = 1, limit: int = 50, status: str = None, current_user: dict = Depends(require_admin)):
+    db = get_db()
+    query = {}
+    if status:
+        query["status"] = status
+    skip, lim = paginate_query(page, limit)
+    total = await db.appointments.count_documents(query)
+    cursor = db.appointments.find(query).sort("created_at", -1).skip(skip).limit(lim)
+    apts = [serialize_doc(a) async for a in cursor]
+    return {"appointments": apts, "total": total}
+
+@router.patch("/appointments/{apt_id}/status", summary="Admin update appointment status")
+async def admin_update_appointment(apt_id: str, current_user: dict = Depends(require_admin)):
+    db = get_db()
+    apt = await db.appointments.find_one({"_id": str_to_objectid(apt_id)})
+    if not apt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    new_status = "cancelled" if apt.get("status") != "cancelled" else "confirmed"
+    result = await db.appointments.find_one_and_update(
+        {"_id": str_to_objectid(apt_id)},
+        {"$set": {"status": new_status, "updated_at": datetime.utcnow()}},
+        return_document=True
+    )
+    return serialize_doc(result)
+
+@router.delete("/users/{user_id}", summary="Delete user")
+async def delete_user(user_id: str, current_user: dict = Depends(require_admin)):
+    db = get_db()
+    result = await db.users.delete_one({"_id": str_to_objectid(user_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "User deleted"}
+
+@router.delete("/doctors/{doctor_id}", summary="Delete doctor")
+async def delete_doctor(doctor_id: str, current_user: dict = Depends(require_admin)):
+    db = get_db()
+    result = await db.doctors.delete_one({"_id": str_to_objectid(doctor_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    return {"message": "Doctor deleted"}
+
 @router.get("/doctors", summary="List all doctors for admin")
 async def list_doctors(page: int = 1, limit: int = 20, current_user: dict = Depends(require_admin)):
     db = get_db()
@@ -131,12 +173,18 @@ async def get_analytics(current_user: dict = Depends(require_admin)):
     }
 
 
-@router.patch("/doctors/{doctor_id}/verify", summary="Verify a doctor")
-async def verify_doctor(doctor_id: str, current_user: dict = Depends(require_admin)):
+from pydantic import BaseModel
+from typing import Optional
+
+class VerifyDoctorBody(BaseModel):
+    is_verified: bool = True
+
+@router.patch("/doctors/{doctor_id}/verify", summary="Verify or reject a doctor")
+async def verify_doctor(doctor_id: str, body: VerifyDoctorBody = VerifyDoctorBody(), current_user: dict = Depends(require_admin)):
     db = get_db()
     result = await db.doctors.find_one_and_update(
         {"_id": str_to_objectid(doctor_id)},
-        {"$set": {"is_verified": True, "updated_at": datetime.utcnow()}},
+        {"$set": {"is_verified": body.is_verified, "updated_at": datetime.utcnow()}},
         return_document=True
     )
     if not result:

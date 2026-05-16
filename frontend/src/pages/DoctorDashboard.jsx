@@ -1134,14 +1134,18 @@ export default function DoctorDashboard() {
 
   useEffect(() => { loadAppointments() }, [])
 
-  const loadAppointments = async () => {
+  const [refreshing, setRefreshing] = useState(false)
+
+  const loadAppointments = async (showFeedback = false) => {
+    if (showFeedback) setRefreshing(true)
     try {
       const res = await api.get('/appointments/my')
       const d   = Array.isArray(res.data) ? res.data : []
       setAppointments(d)
       setStats({ total:d.length, pending:d.filter(a=>a.status==='pending').length, confirmed:d.filter(a=>a.status==='confirmed').length, completed:d.filter(a=>a.status==='completed').length })
+      if (showFeedback) toast.success('Appointments refreshed!')
     } catch (e) { console.error('Doctor apts:', e.response?.data); setAppointments([]) }
-    finally { setLoading(false) }
+    finally { setLoading(false); setRefreshing(false) }
   }
 
   const handleStatusUpdate = async (id, status) => {
@@ -1498,7 +1502,10 @@ export default function DoctorDashboard() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-gray-900 text-lg">Appointments Management</h2>
-              <button onClick={loadAppointments} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700"><RefreshCw size={13}/>Refresh</button>
+              <button onClick={() => loadAppointments(true)} disabled={refreshing}
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 bg-white border border-gray-200 px-3 py-1.5 rounded-xl hover:bg-gray-50 disabled:opacity-60">
+                <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''}/> {refreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
             </div>
             <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit overflow-x-auto">
               {[{k:'all',l:`All (${stats.total})`},{k:'pending',l:`Pending (${stats.pending})`},{k:'confirmed',l:`Confirmed (${stats.confirmed})`},{k:'completed',l:`Completed (${stats.completed})`}].map(f=>(

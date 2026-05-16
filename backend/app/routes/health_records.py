@@ -36,6 +36,12 @@ async def add_record(data: HealthRecordCreate, current_user: dict = Depends(get_
     return serialize_doc(doc)
 
 
+@router.get("/my", summary="Get my health records (alias)")
+async def get_records_my(current_user: dict = Depends(get_current_user)):
+    db = get_db()
+    cursor = db.health_records.find({"patient_id": current_user["id"]}).sort("created_at", -1)
+    return [serialize_doc(r) async for r in cursor]
+
 @router.get("/", summary="Get my health records")
 async def get_records(current_user: dict = Depends(get_current_user)):
     db = get_db()

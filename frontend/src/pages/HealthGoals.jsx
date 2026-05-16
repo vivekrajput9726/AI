@@ -412,7 +412,7 @@ export default function HealthGoals() {
               <div className="space-y-2">
                 {goals.map(g=>{
                   const pct = Math.min(100, Math.round((g.current/g.target)*100))
-                  const tmpl = GOAL_TEMPLATES.find(t=>t.id===g.baseId) || GOAL_TEMPLATES[0]
+                  const tmpl = GOAL_TEMPLATES.find(t=>t.id===g.id) || GOAL_TEMPLATES[0]
                   return (
                     <div key={g.id} className="flex items-center gap-3">
                       <span className="text-base w-6 text-center flex-shrink-0">{tmpl.icon}</span>
@@ -493,7 +493,7 @@ export default function HealthGoals() {
                   <p className="text-sm font-bold text-yellow-800 mb-3">🎉 Goals Achieved</p>
                   <div className="flex flex-wrap gap-2">
                     {completedGoals.map((g,i)=>{
-                      const tmpl = GOAL_TEMPLATES.find(t=>t.id===g.baseId) || GOAL_TEMPLATES[0]
+                      const tmpl = GOAL_TEMPLATES.find(t=>t.id===g.id) || GOAL_TEMPLATES[0]
                       return (
                         <div key={i} className="flex items-center gap-2 bg-white border-2 border-yellow-400 rounded-2xl px-3 py-2 shadow-sm">
                           <span className="text-xl">{tmpl.icon}</span>
