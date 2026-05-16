@@ -184,8 +184,8 @@ export default function SymptomDiary() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div><label className="label">Temperature (°F)</label><input type="number" value={form.temperature} onChange={e=>setForm(f=>({...f,temperature:e.target.value}))} placeholder="98.6" className="input-field"/></div>
-                  <div><label className="label">Weight (kg)</label><input type="number" value={form.weight} onChange={e=>setForm(f=>({...f,weight:e.target.value}))} placeholder="70" className="input-field"/></div>
+                  <div><label className="label">Temperature (°F) <span className="text-gray-400 font-normal normal-case">(optional)</span></label><input type="number" value={form.temperature} onChange={e=>setForm(f=>({...f,temperature:e.target.value}))} placeholder="98.6" className="input-field"/></div>
+                  <div><label className="label">Weight (kg) <span className="text-gray-400 font-normal normal-case">(optional)</span></label><input type="number" value={form.weight} onChange={e=>setForm(f=>({...f,weight:e.target.value}))} placeholder="70" className="input-field"/></div>
                 </div>
 
                 <div><label className="label">Notes</label><textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Any additional observations..." className="input-field h-16 resize-none"/></div>

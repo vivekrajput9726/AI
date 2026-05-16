@@ -18,7 +18,6 @@ import MedicineReminder from './pages/MedicineReminder'
 import NearbyPlaces from './pages/NearbyPlaces'
 import Laboratory from './pages/Laboratory'
 import AIHealthCopilot from './pages/AIHealthCopilot'
-import AIFollowUp from './pages/AIFollowUp'
 import MyRecords from './pages/MyRecords'
 import EmergencySOS from './pages/EmergencySOS'
 import SymptomDiary from './pages/SymptomDiary'
@@ -61,7 +60,6 @@ function App() {
         <Route path="/patient/nearby"    element={<ProtectedRoute roles={['patient']}><NearbyPlaces /></ProtectedRoute>} />
         <Route path="/patient/laboratory"element={<ProtectedRoute roles={['patient']}><Laboratory /></ProtectedRoute>} />
         <Route path="/patient/copilot"    element={<ProtectedRoute roles={['patient']}><AIHealthCopilot /></ProtectedRoute>} />
-        <Route path="/patient/follow-up"  element={<ProtectedRoute roles={['patient']}><AIFollowUp /></ProtectedRoute>} />
         <Route path="/patient/emergency" element={<ProtectedRoute roles={['patient']}><EmergencySOS /></ProtectedRoute>} />
         <Route path="/patient/diary"     element={<ProtectedRoute roles={['patient']}><SymptomDiary /></ProtectedRoute>} />
         <Route path="/patient/vaccines"  element={<ProtectedRoute roles={['patient']}><VaccinationTracker /></ProtectedRoute>} />

@@ -1106,10 +1106,14 @@ function AvailabilitySection() {
   }
 
   const save = async () => {
-    setSaving(true)
     const availability = Object.entries(schedule)
       .filter(([, set]) => set.size > 0)
       .map(([day, set]) => ({ day, slots: [...set].sort() }))
+    if (availability.length === 0) {
+      toast.error('Select at least one working day with time slots')
+      return
+    }
+    setSaving(true)
     try {
       await api.put('/doctors/profile/update', { availability })
       toast.success('Schedule saved!')
@@ -1148,9 +1152,10 @@ function AvailabilitySection() {
 
       {/* Per-day slot picker */}
       {activeDays.length === 0 ? (
-        <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
-          <Clock size={32} className="mx-auto mb-2 opacity-30"/>
-          <p className="text-sm">Select working days above, then pick your available time slots.</p>
+        <div className="text-center py-8 text-gray-400 border-2 border-dashed border-orange-200 rounded-2xl bg-orange-50/50">
+          <Clock size={32} className="mx-auto mb-2 text-orange-300"/>
+          <p className="text-sm font-semibold text-orange-500">At least 1 working day required</p>
+          <p className="text-xs text-gray-400 mt-1">Select a day above, then pick your available time slots.</p>
         </div>
       ) : activeDays.map(day => (
         <div key={day} className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
@@ -1819,76 +1824,6 @@ export default function DoctorDashboard() {
             <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
               <MessageCircle size={15} className="text-blue-600 mt-0.5 flex-shrink-0"/>
               <p className="text-xs text-blue-700">Click on any patient to open real-time chat. Chats are linked to their appointment for easy reference.</p>
-            </div>
-          </div>
-        )}
-
-        {/* ── FOLLOW-UPS ── */}
-        {activeTab === 'follow-ups' && (
-          <div className="space-y-4">
-            <div className="bg-gradient-to-r from-teal-600 to-green-600 rounded-2xl p-5 text-white flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Activity size={20}/></div>
-              <div>
-                <h2 className="font-extrabold text-lg">Follow-Ups</h2>
-                <p className="text-teal-200 text-xs">Patient recovery & follow-up tracking</p>
-              </div>
-            </div>
-
-            {/* Summary cards */}
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { label: 'Due Today',     value: appointments.filter(a => a.status === 'confirmed').length || 2,  color: 'text-red-600 bg-red-50',    icon: '🔴' },
-                { label: 'This Week',     value: appointments.filter(a => a.status === 'pending').length || 5,    color: 'text-orange-600 bg-orange-50', icon: '⏰' },
-                { label: 'Completed',     value: appointments.filter(a => a.status === 'completed').length || 12, color: 'text-green-600 bg-green-50',  icon: '✅' },
-              ].map((s, i) => (
-                <div key={i} className={`${s.color.split(' ')[1]} rounded-2xl p-4 text-center border border-gray-100`}>
-                  <span className="text-2xl">{s.icon}</span>
-                  <p className={`text-2xl font-extrabold mt-1 ${s.color.split(' ')[0]}`}>{s.value}</p>
-                  <p className="text-xs text-gray-600 font-medium">{s.label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Follow-up list */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                <p className="font-bold text-gray-800 text-sm">Follow-Up Appointments</p>
-                <button onClick={() => navigate('/doctor/dashboard?tab=appointments')} className="text-xs text-teal-600 hover:underline font-semibold">View All</button>
-              </div>
-              {appointments.length === 0 ? (
-                <div className="py-12 text-center">
-                  <Activity size={36} className="mx-auto text-gray-200 mb-3"/>
-                  <p className="text-gray-500 text-sm">No follow-ups scheduled</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {appointments.slice(0, 6).map((apt, i) => (
-                    <div key={i} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors">
-                      <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-green-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
-                        {apt.patient_name?.charAt(0) || 'P'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 text-sm">{apt.patient_name}</p>
-                        <p className="text-xs text-gray-400">{apt.appointment_date} · {apt.appointment_time}</p>
-                        {apt.symptoms && <p className="text-xs text-teal-600 mt-0.5 truncate">{apt.symptoms}</p>}
-                      </div>
-                      <StatusBadge status={apt.status}/>
-                      <div className="flex gap-2 flex-shrink-0">
-                        {apt.status === 'pending' && (
-                          <button onClick={() => handleStatusUpdate(apt.id, 'confirmed')}
-                            className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700">
-                            Confirm
-                          </button>
-                        )}
-                        <button onClick={() => handleStartChat(apt)}
-                          className="px-3 py-1.5 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-100 flex items-center gap-1">
-                          <MessageCircle size={11}/> Chat
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         )}

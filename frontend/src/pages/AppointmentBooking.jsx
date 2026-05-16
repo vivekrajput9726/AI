@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   Video, MapPin, Star, IndianRupee, ArrowLeft, CheckCircle,
-  Phone, Mail, CreditCard, Smartphone, Building2, Wallet,
+  Phone, CreditCard, Smartphone, Building2, Wallet,
   ShieldCheck, Lock, MessageCircle, CalendarPlus, Clock, Calendar
 } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
@@ -16,10 +16,9 @@ import toast from 'react-hot-toast'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const TYPES = [
-  { type: 'video', label: 'Video Call', icon: <Video size={20} />, desc: 'Face-to-face online' },
-  { type: 'voice', label: 'Voice Call', icon: <Phone size={20} />, desc: 'Audio consultation' },
-  { type: 'in-person', label: 'In-Person', icon: <MapPin size={20} />, desc: 'Visit the clinic' },
-  { type: 'email', label: 'Email Consult', icon: <Mail size={20} />, desc: 'Written consultation' },
+  { type: 'video',      label: 'Video Call', icon: <Video size={20} />, desc: 'Face-to-face online' },
+  { type: 'voice',      label: 'Voice Call', icon: <Phone size={20} />, desc: 'Audio consultation'  },
+  { type: 'in-person',  label: 'In-Person',  icon: <MapPin size={20} />, desc: 'Visit the clinic'  },
 ]
 
 const PAYMENT_METHODS = [
@@ -136,7 +135,7 @@ function AppointmentBooking() {
     return availableDays.includes(d.toLocaleDateString('en-US', { weekday: 'long' }))
   }
 
-  const typeLabel = (t) => ({ video: 'Video Call', voice: 'Voice Call', 'in-person': 'In-Person', email: 'Email Consultation' }[t] || t)
+  const typeLabel = (t) => ({ video: 'Video Call', voice: 'Voice Call', 'in-person': 'In-Person' }[t] || t)
 
   const handlePayAndBook = async () => {
     setPaying(true)
@@ -258,8 +257,7 @@ function AppointmentBooking() {
             <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white flex-shrink-0">
               {appointmentType === 'video' ? <Video size={14} /> :
                appointmentType === 'voice' ? <Phone size={14} /> :
-               appointmentType === 'in-person' ? <MapPin size={14} /> :
-               <Mail size={14} />}
+               <MapPin size={14} />}
             </div>
             <span className="text-sm font-semibold text-blue-700">{typeLabel(appointmentType)}</span>
             <span className="text-xs text-blue-400 ml-1">selected</span>
@@ -408,11 +406,9 @@ function AppointmentBooking() {
                 </div>
               ))}
             </div>
-            {(appointmentType === 'voice' || appointmentType === 'email') && (
+            {appointmentType === 'voice' && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700">
-                {appointmentType === 'voice'
-                  ? '📞 The doctor will call your registered phone number at the scheduled time.'
-                  : '📧 The doctor will send a detailed response to your registered email address.'}
+                📞 The doctor will call your registered phone number at the scheduled time.
               </div>
             )}
             {symptoms && (

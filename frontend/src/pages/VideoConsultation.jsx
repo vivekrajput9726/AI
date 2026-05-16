@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import {
-  Video, Mic, MicOff, PhoneOff, Phone, Mail, MapPin,
+  Video, Mic, MicOff, PhoneOff, Phone, MapPin,
   AlertCircle, Loader, Copy, CheckCircle, ExternalLink,
   User, Clock, Calendar, IndianRupee, ArrowLeft,
   Maximize2, Minimize2
@@ -33,13 +33,6 @@ const TYPE_CONFIG = {
     color: 'bg-orange-500',
     light: 'bg-orange-50 border-orange-200',
     textColor: 'text-orange-700',
-  },
-  email: {
-    label: 'Email Consultation',
-    icon: Mail,
-    color: 'bg-purple-600',
-    light: 'bg-purple-50 border-purple-200',
-    textColor: 'text-purple-700',
   },
 }
 
@@ -426,58 +419,6 @@ export default function VideoConsultation() {
                 </p>
               </div>
             )}
-          </div>
-        )}
-
-        {/* ── EMAIL ── */}
-        {aptType === 'email' && (
-          <div className="card space-y-5">
-            <h2 className="font-bold text-gray-900 flex items-center gap-2">
-              <Mail size={18} className="text-purple-600" /> Email Consultation Instructions
-            </h2>
-
-            <div className="space-y-3">
-              {isDoctor ? (
-                <>
-                  <Step n={1} label="Confirm the appointment from your dashboard" done={isConfirmed} />
-                  <Step n={2} label="Review the patient's symptoms from the appointment details" done={isConfirmed} />
-                  <Step n={3} label="Write a detailed consultation response and send to patient's email" done={false} />
-                  <Step n={4} label="Add prescription notes and mark appointment as completed" done={false} />
-                </>
-              ) : (
-                <>
-                  <Step n={1} label="Doctor reviews your symptoms and health history" done={isConfirmed} />
-                  <Step n={2} label="Doctor prepares a detailed written consultation" done={false} />
-                  <Step n={3} label="You receive the consultation response on your registered email" done={false} />
-                  <Step n={4} label="Follow the recommendations and book a follow-up if needed" done={false} />
-                </>
-              )}
-            </div>
-
-            {appointment.symptoms && (
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs font-bold text-gray-500 mb-1">Patient's Symptoms</p>
-                <p className="text-sm text-gray-700">{appointment.symptoms}</p>
-              </div>
-            )}
-
-            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5 text-center space-y-3">
-              <div className="w-14 h-14 bg-purple-600 rounded-full flex items-center justify-center mx-auto">
-                <Mail size={26} className="text-white" />
-              </div>
-              <p className="font-bold text-gray-900">Email Consultation</p>
-              <p className="text-sm text-gray-500">
-                {isDoctor
-                  ? 'Write your consultation response below and send it to the patient.'
-                  : 'The doctor will send a detailed consultation response to your registered email address.'}
-              </p>
-              {isDoctor && (
-                <a href={`mailto:?subject=Consultation Report - ${appointment.patient_name}&body=Dear ${appointment.patient_name},%0D%0A%0D%0ARegarding your consultation on ${appointment.appointment_date}:%0D%0A%0D%0A[Write your consultation here]%0D%0A%0D%0ARegards,%0D%0A${user?.full_name}`}
-                  className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl transition-colors">
-                  <Mail size={16} /> Compose Email Response
-                </a>
-              )}
-            </div>
           </div>
         )}
 

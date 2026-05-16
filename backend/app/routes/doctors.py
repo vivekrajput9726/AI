@@ -101,6 +101,14 @@ async def update_profile(
     data: DoctorUpdateRequest,
     current_user: dict = Depends(require_doctor)
 ):
+    from fastapi import HTTPException, status
+    if data.availability is not None:
+        valid_slots = [s for s in data.availability if s.slots]
+        if len(valid_slots) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one working day with time slots is required"
+            )
     update = {k: v for k, v in data.model_dump().items() if v is not None}
     return await update_doctor_profile(current_user["id"], update)
 

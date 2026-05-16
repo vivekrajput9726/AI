@@ -150,13 +150,16 @@ export default function HealthGoals() {
 
   // ── Add Goal ──────────────────────────────────────────────────────
   const addGoal = async () => {
+    if (!newGoal.target || newGoal.target === '') { toast.error('Target value is required'); return }
+    if (newGoal.current === '' || newGoal.current === undefined) { toast.error('Current value is required'); return }
+    if (!newGoal.unit?.trim()) { toast.error('Unit is required (e.g. kg, hrs, steps)'); return }
     const tmpl = GOAL_TEMPLATES.find(t => t.id === newGoal.id) || GOAL_TEMPLATES[0]
     const payload = {
       id:      newGoal.id,
       label:   newGoal.label || tmpl.label,
-      target:  parseFloat(newGoal.target) || tmpl.target,
-      current: parseFloat(newGoal.current) || 0,
-      unit:    newGoal.unit || tmpl.unit,
+      target:  parseFloat(newGoal.target),
+      current: parseFloat(newGoal.current),
+      unit:    newGoal.unit.trim(),
       icon:    tmpl.icon,
     }
     try {
@@ -339,18 +342,36 @@ export default function HealthGoals() {
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="text-xs font-bold text-gray-600 mb-1 block">Target</label>
-                      <input type="number" value={newGoal.target} onChange={e=>setNewGoal(g=>({...g,target:e.target.value}))} className="input-field text-sm"/>
+                      <label className="text-xs font-bold text-gray-600 mb-1 block">
+                        Target <span className="text-red-500">*</span>
+                      </label>
+                      <input type="number" min="0" value={newGoal.target}
+                        onChange={e=>setNewGoal(g=>({...g,target:e.target.value}))}
+                        placeholder="e.g. 10"
+                        className={`input-field text-sm ${!newGoal.target ? 'border-red-200 bg-red-50' : ''}`}/>
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-gray-600 mb-1 block">Current</label>
-                      <input type="number" value={newGoal.current} onChange={e=>setNewGoal(g=>({...g,current:e.target.value}))} className="input-field text-sm"/>
+                      <label className="text-xs font-bold text-gray-600 mb-1 block">
+                        Current <span className="text-red-500">*</span>
+                      </label>
+                      <input type="number" min="0" value={newGoal.current}
+                        onChange={e=>setNewGoal(g=>({...g,current:e.target.value}))}
+                        placeholder="e.g. 0"
+                        className={`input-field text-sm ${newGoal.current === '' ? 'border-red-200 bg-red-50' : ''}`}/>
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-gray-600 mb-1 block">Unit</label>
-                      <input value={newGoal.unit} onChange={e=>setNewGoal(g=>({...g,unit:e.target.value}))} placeholder="kg" className="input-field text-sm"/>
+                      <label className="text-xs font-bold text-gray-600 mb-1 block">
+                        Unit <span className="text-red-500">*</span>
+                      </label>
+                      <input value={newGoal.unit}
+                        onChange={e=>setNewGoal(g=>({...g,unit:e.target.value}))}
+                        placeholder="kg / hrs / steps"
+                        className={`input-field text-sm ${!newGoal.unit?.trim() ? 'border-red-200 bg-red-50' : ''}`}/>
                     </div>
                   </div>
+                  <p className="text-xs text-red-400 flex items-center gap-1">
+                    <span className="text-red-500 font-bold">*</span> All three fields are required
+                  </p>
                 </div>
                 <div className="flex flex-col justify-end gap-3">
                   <div className="bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-200 rounded-2xl p-4">
@@ -365,7 +386,9 @@ export default function HealthGoals() {
                   </div>
                   <div className="flex gap-3">
                     <button onClick={()=>setShowAdd(false)} className="btn-secondary flex-1 text-sm">Cancel</button>
-                    <button onClick={addGoal} disabled={!newGoal.target} className="btn-primary flex-1 text-sm flex items-center justify-center gap-2 disabled:opacity-40">
+                    <button onClick={addGoal}
+                      disabled={!newGoal.target || newGoal.current === '' || !newGoal.unit?.trim()}
+                      className="btn-primary flex-1 text-sm flex items-center justify-center gap-2 disabled:opacity-40">
                       <Target size={14}/> Set This Goal
                     </button>
                   </div>

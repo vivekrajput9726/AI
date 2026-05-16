@@ -377,18 +377,22 @@ Generate a structured follow-up report:
           </div>
         </div>
         <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Duration</label>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+            Duration <span className="text-gray-400 normal-case font-normal">(optional)</span>
+          </label>
           <select value={journey.symptoms.duration} onChange={e=>patchField('symptoms',{duration:e.target.value})}
             className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400">
-            <option value="">Select duration</option>
+            <option value="">Not sure / skip</option>
             {DURATIONS.map(d=><option key={d}>{d}</option>)}
           </select>
         </div>
         <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Body Area Affected</label>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+            Body Area Affected <span className="text-gray-400 normal-case font-normal">(optional)</span>
+          </label>
           <select value={journey.symptoms.area} onChange={e=>patchField('symptoms',{area:e.target.value})}
             className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400">
-            <option value="">Select area</option>
+            <option value="">Not sure / skip</option>
             {BODY_AREAS.map(a=><option key={a}>{a}</option>)}
           </select>
         </div>

@@ -346,7 +346,6 @@ export default function PatientDashboard() {
               { icon: '🎯', title: 'Health Goals',    count: '3 Goals Active',   desc: 'Track your goals',              link: 'View Goals',     path: '/patient/goals',     color: 'text-blue-600',   bg: 'from-blue-50 to-indigo-50' },
               { icon: '👨‍👩‍👧', title: 'Family Health', count: '4 Members',         desc: 'Manage family health',          link: 'View Family',    path: '/patient/family',    color: 'text-green-600',  bg: 'from-green-50 to-teal-50' },
               { icon: '📋', title: 'Health Timeline', count: '23 Activities',     desc: 'View your health history',      link: 'View Timeline',  path: '/patient/journey',   color: 'text-purple-600', bg: 'from-purple-50 to-pink-50' },
-              { icon: '🔄', title: 'AI Follow-Up',    count: '2 Follow-Ups Due', desc: 'Check recovery progress',       link: 'View Follow-ups', path: '/patient/follow-up', color: 'text-orange-600', bg: 'from-orange-50 to-amber-50' },
             ].map((c, i) => (
               <div key={i} className={`bg-gradient-to-br ${c.bg} rounded-2xl border border-gray-100 shadow-sm p-4`}>
                 <div className="flex items-center gap-2 mb-2">
