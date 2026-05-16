@@ -126,7 +126,9 @@ function AppointmentBooking() {
   const getMinDate = () => { const d = new Date(); d.setDate(d.getDate() + 1); return toLocalDateStr(d) }
   const getMaxDate = () => { const d = new Date(); d.setDate(d.getDate() + 30); return toLocalDateStr(d) }
 
-  const availableDays = doctor?.availability?.filter(a => a.is_available).map(a => a.day) || DAYS
+  const availableDays = doctor?.availability?.length
+    ? doctor.availability.filter(a => a.slots?.length > 0).map(a => a.day)
+    : DAYS
 
   const isDateAvailable = (ds) => {
     const [y, m, day] = ds.split('-').map(Number)
@@ -192,7 +194,14 @@ function AppointmentBooking() {
     </DashboardLayout>
   )
 
-  const timeSlots = generateTimeSlots()
+  // Use doctor's specific slots for the selected day, or fall back to default generation
+  const selectedDayName = selectedDate
+    ? new Date(...selectedDate.split('-').map((v, i) => i === 1 ? Number(v) - 1 : Number(v))).toLocaleDateString('en-US', { weekday: 'long' })
+    : null
+  const doctorDaySlots = selectedDayName
+    ? doctor?.availability?.find(a => a.day === selectedDayName)?.slots
+    : null
+  const timeSlots = doctorDaySlots?.length ? doctorDaySlots : generateTimeSlots()
 
   return (
     <DashboardLayout>

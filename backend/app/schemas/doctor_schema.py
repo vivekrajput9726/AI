@@ -5,9 +5,7 @@ from datetime import datetime
 
 class AvailabilitySlotSchema(BaseModel):
     day: str
-    start_time: str
-    end_time: str
-    is_available: bool = True
+    slots: List[str]  # e.g. ["09:00", "10:00", "14:00"]
 
 
 class DoctorResponse(BaseModel):

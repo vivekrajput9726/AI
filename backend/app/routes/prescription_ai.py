@@ -239,6 +239,28 @@ Analyze it carefully and return ONLY a valid JSON object in this exact format (n
     if data.patient_gender:
         context += f"\nPatient gender: {data.patient_gender}"
 
+    # Try Groq first (free, fast)
+    if settings.GROQ_API_KEY:
+        try:
+            from groq import Groq
+            client = Groq(api_key=settings.GROQ_API_KEY)
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": REPORT_ANALYSIS_PROMPT},
+                    {"role": "user", "content": context}
+                ],
+                temperature=0.2,
+                max_tokens=1500
+            )
+            content = response.choices[0].message.content.strip()
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+                return {"success": True, "data": result, "source": "groq"}
+        except Exception as e:
+            logger.warning(f"Groq report text analysis failed: {e}")
+
     if settings.OPENAI_API_KEY:
         try:
             from openai import AsyncOpenAI

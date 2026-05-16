@@ -38,6 +38,9 @@ export default function Insurance() {
     bill_amount: '', claimed_amount: '', claim_date: '', notes: ''
   })
 
+  // Claim filter
+  const [claimFilter, setClaimFilter] = useState('all')
+
   // Document upload
   const [selectedPolicyForDoc, setSelectedPolicyForDoc] = useState('')
   const [docName, setDocName] = useState('')
@@ -121,6 +124,16 @@ export default function Insurance() {
       toast.success('Claim submitted!')
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to submit claim')
+    }
+  }
+
+  const updateClaimStatus = async (claimId, newStatus) => {
+    try {
+      await api.patch(`/insurance/claims/${claimId}/status?status=${newStatus}`)
+      setClaims(prev => prev.map(c => (c._id || c.id) === claimId ? { ...c, status: newStatus } : c))
+      toast.success(`Claim marked as ${CLAIM_STATUSES[newStatus] || newStatus}`)
+    } catch {
+      toast.error('Failed to update claim status')
     }
   }
 
@@ -434,12 +447,35 @@ export default function Insurance() {
         {/* ── CLAIMS TAB ── */}
         {activeTab === 'Claims' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h2 className="font-semibold text-gray-900">Claims ({claims.length})</h2>
               <button onClick={() => setShowClaimForm(!showClaimForm)}
                 className="btn-primary text-sm flex items-center gap-2 px-4 py-2">
                 <Plus size={15}/> Submit Claim
               </button>
+            </div>
+
+            {/* Status filter pills */}
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: 'all',        label: 'All',        count: claims.length },
+                { key: 'pending',    label: 'Pending',    count: claims.filter(c => c.status === 'pending').length },
+                { key: 'processing', label: 'Processing', count: claims.filter(c => c.status === 'processing').length },
+                { key: 'approved',   label: 'Approved',   count: claims.filter(c => c.status === 'approved').length },
+                { key: 'rejected',   label: 'Rejected',   count: claims.filter(c => c.status === 'rejected').length },
+              ].map(f => (
+                <button key={f.key} onClick={() => setClaimFilter(f.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    claimFilter === f.key
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-300'
+                  }`}>
+                  {f.label}
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${claimFilter === f.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    {f.count}
+                  </span>
+                </button>
+              ))}
             </div>
 
             {/* Submit Claim Form */}
@@ -507,41 +543,61 @@ export default function Insurance() {
               </div>
             )}
 
-            {claims.map(claim => {
-              const id = claim._id || claim.id
-              const status = (claim.status || 'pending').toLowerCase()
-              return (
-                <div key={id} className="card hover:shadow-md transition-all">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="font-bold text-gray-900">{claim.treatment}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${statusColor[status] || 'bg-gray-100 text-gray-600'}`}>
-                          {CLAIM_STATUSES[status] || status}
-                        </span>
+            {!loading && claims.length > 0 &&
+              claims.filter(c => claimFilter === 'all' || c.status === claimFilter).length === 0 && (
+              <div className="card text-center py-10">
+                <CheckCircle size={36} className="mx-auto text-gray-200 mb-2"/>
+                <p className="text-gray-500 font-medium capitalize">No {claimFilter} claims</p>
+              </div>
+            )}
+
+            {claims
+              .filter(c => claimFilter === 'all' || c.status === claimFilter)
+              .map(claim => {
+                const id = claim._id || claim.id
+                const status = (claim.status || 'pending').toLowerCase()
+                return (
+                  <div key={id} className="card hover:shadow-md transition-all">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-bold text-gray-900">{claim.treatment}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${statusColor[status] || 'bg-gray-100 text-gray-600'}`}>
+                            {CLAIM_STATUSES[status] || status}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-500">{claim.hospital_name}</p>
+                        {claim.policy_id && (
+                          <p className="text-xs text-gray-400 mt-0.5">{getPolicyName(claim.policy_id)}</p>
+                        )}
                       </div>
-                      <p className="text-sm text-gray-500">{claim.hospital_name}</p>
-                      {claim.policy_id && (
-                        <p className="text-xs text-gray-400 mt-0.5">{getPolicyName(claim.policy_id)}</p>
-                      )}
+                      <div className="flex flex-col items-end gap-1">
+                        <p className="font-bold text-indigo-700 text-sm">₹{Number(claim.bill_amount || 0).toLocaleString('en-IN')}</p>
+                        {claim.claimed_amount && Number(claim.claimed_amount) !== Number(claim.bill_amount) && (
+                          <p className="text-xs text-gray-500">Claimed: ₹{Number(claim.claimed_amount).toLocaleString('en-IN')}</p>
+                        )}
+                        {claim.claim_date && (
+                          <p className="text-xs text-gray-400">{new Date(claim.claim_date).toLocaleDateString('en-IN')}</p>
+                        )}
+                        {/* Status update dropdown */}
+                        <select
+                          value={status}
+                          onChange={e => updateClaimStatus(id, e.target.value)}
+                          className="mt-1 text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-600 cursor-pointer hover:border-indigo-300 focus:outline-none focus:border-indigo-500">
+                          <option value="pending">Pending</option>
+                          <option value="processing">Processing</option>
+                          <option value="approved">Approved</option>
+                          <option value="rejected">Rejected</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-400">Bill</p>
-                      <p className="font-bold text-indigo-700 text-sm">₹{Number(claim.bill_amount || 0).toLocaleString('en-IN')}</p>
-                      {claim.claimed_amount && Number(claim.claimed_amount) !== Number(claim.bill_amount) && (
-                        <p className="text-xs text-gray-500">Claimed: ₹{Number(claim.claimed_amount).toLocaleString('en-IN')}</p>
-                      )}
-                      {claim.claim_date && (
-                        <p className="text-xs text-gray-400 mt-0.5">{new Date(claim.claim_date).toLocaleDateString('en-IN')}</p>
-                      )}
-                    </div>
+                    {claim.notes && (
+                      <p className="text-xs text-gray-500 mt-2 pt-2 border-t border-gray-50">{claim.notes}</p>
+                    )}
                   </div>
-                  {claim.notes && (
-                    <p className="text-xs text-gray-500 mt-2 pt-2 border-t border-gray-50">{claim.notes}</p>
-                  )}
-                </div>
-              )
-            })}
+                )
+              })
+            }
           </div>
         )}
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from app.middleware.auth_middleware import require_patient
+from app.middleware.auth_middleware import get_current_user
 from app.database.connection import get_db
 from app.utils.helpers import serialize_doc, str_to_objectid
 from pydantic import BaseModel
@@ -27,13 +27,13 @@ class PolicyIn(BaseModel):
     notes: Optional[str] = ""
 
 @router.get("/policies", summary="Get my insurance policies")
-async def get_policies(current_user: dict = Depends(require_patient)):
+async def get_policies(current_user: dict = Depends(get_current_user)):
     db = get_db()
     cursor = db.insurance_policies.find({"patient_id": current_user["id"]}).sort("created_at", -1)
     return [serialize_doc(p) async for p in cursor]
 
 @router.post("/policies", summary="Add insurance policy")
-async def add_policy(data: PolicyIn, current_user: dict = Depends(require_patient)):
+async def add_policy(data: PolicyIn, current_user: dict = Depends(get_current_user)):
     db = get_db()
     doc = {**data.dict(), "patient_id": current_user["id"], "status": "active", "documents": [], "created_at": datetime.utcnow()}
     result = await db.insurance_policies.insert_one(doc)
@@ -41,7 +41,7 @@ async def add_policy(data: PolicyIn, current_user: dict = Depends(require_patien
     return serialize_doc(doc)
 
 @router.put("/policies/{policy_id}", summary="Update insurance policy")
-async def update_policy(policy_id: str, data: PolicyIn, current_user: dict = Depends(require_patient)):
+async def update_policy(policy_id: str, data: PolicyIn, current_user: dict = Depends(get_current_user)):
     db = get_db()
     await db.insurance_policies.update_one(
         {"_id": str_to_objectid(policy_id), "patient_id": current_user["id"]},
@@ -50,20 +50,20 @@ async def update_policy(policy_id: str, data: PolicyIn, current_user: dict = Dep
     return {"message": "Updated"}
 
 @router.delete("/policies/{policy_id}", summary="Delete insurance policy")
-async def delete_policy(policy_id: str, current_user: dict = Depends(require_patient)):
+async def delete_policy(policy_id: str, current_user: dict = Depends(get_current_user)):
     db = get_db()
     await db.insurance_policies.delete_one({"_id": str_to_objectid(policy_id), "patient_id": current_user["id"]})
     return {"message": "Deleted"}
 
 # ── Documents ────────────────────────────────────────────────────────────────
 @router.get("/documents/{policy_id}", summary="Get documents for a policy")
-async def get_documents(policy_id: str, current_user: dict = Depends(require_patient)):
+async def get_documents(policy_id: str, current_user: dict = Depends(get_current_user)):
     db = get_db()
     cursor = db.insurance_documents.find({"policy_id": policy_id, "patient_id": current_user["id"]}).sort("created_at", -1)
     return [serialize_doc(d) async for d in cursor]
 
 @router.post("/documents", summary="Upload document for a policy")
-async def upload_document(data: DocumentIn, current_user: dict = Depends(require_patient)):
+async def upload_document(data: DocumentIn, current_user: dict = Depends(get_current_user)):
     db = get_db()
     policy = await db.insurance_policies.find_one({"_id": str_to_objectid(data.policy_id), "patient_id": current_user["id"]})
     if not policy:
@@ -74,7 +74,7 @@ async def upload_document(data: DocumentIn, current_user: dict = Depends(require
     return serialize_doc(doc)
 
 @router.delete("/documents/{doc_id}", summary="Delete document")
-async def delete_document(doc_id: str, current_user: dict = Depends(require_patient)):
+async def delete_document(doc_id: str, current_user: dict = Depends(get_current_user)):
     db = get_db()
     await db.insurance_documents.delete_one({"_id": str_to_objectid(doc_id), "patient_id": current_user["id"]})
     return {"message": "Deleted"}
@@ -91,13 +91,13 @@ class ClaimIn(BaseModel):
     notes: Optional[str] = ""
 
 @router.get("/claims", summary="Get my claims")
-async def get_claims(current_user: dict = Depends(require_patient)):
+async def get_claims(current_user: dict = Depends(get_current_user)):
     db = get_db()
     cursor = db.insurance_claims.find({"patient_id": current_user["id"]}).sort("created_at", -1)
     return [serialize_doc(c) async for c in cursor]
 
 @router.post("/claims", summary="Submit a claim")
-async def submit_claim(data: ClaimIn, current_user: dict = Depends(require_patient)):
+async def submit_claim(data: ClaimIn, current_user: dict = Depends(get_current_user)):
     db = get_db()
     # Verify policy belongs to user
     policy = await db.insurance_policies.find_one({"_id": str_to_objectid(data.policy_id), "patient_id": current_user["id"]})
@@ -114,7 +114,7 @@ async def submit_claim(data: ClaimIn, current_user: dict = Depends(require_patie
     return serialize_doc(doc)
 
 @router.patch("/claims/{claim_id}/status", summary="Update claim status")
-async def update_claim_status(claim_id: str, status: str, current_user: dict = Depends(require_patient)):
+async def update_claim_status(claim_id: str, status: str, current_user: dict = Depends(get_current_user)):
     db = get_db()
     if status not in ["pending", "approved", "rejected"]:
         raise HTTPException(status_code=400, detail="Invalid status")

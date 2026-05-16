@@ -58,17 +58,34 @@ async def get_doctors_by_specialization(specialization: str) -> list:
     return [serialize_doc(doc) async for doc in cursor]
 
 
+async def find_doctor_for_user(user_id: str) -> dict | None:
+    """Find doctor profile by user_id, falling back to email match and auto-linking."""
+    db = get_db()
+    doctor = await db.doctors.find_one({"user_id": user_id})
+    if doctor:
+        return doctor
+
+    user = await db.users.find_one({"_id": str_to_objectid(user_id)})
+    if not user or not user.get("email"):
+        return None
+
+    doctor = await db.doctors.find_one({"email": user["email"]})
+    if doctor:
+        await db.doctors.update_one({"_id": doctor["_id"]}, {"$set": {"user_id": user_id}})
+    return doctor
+
+
 async def update_doctor_profile(user_id: str, update_data: dict) -> dict:
     db = get_db()
-    update_data["updated_at"] = datetime.utcnow()
-    result = await db.doctors.find_one_and_update(
-        {"user_id": user_id},
-        {"$set": update_data},
-        return_document=True
-    )
-    if not result:
+    doctor = await find_doctor_for_user(user_id)
+    if not doctor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor profile not found")
-    return serialize_doc(result)
+    update_data["updated_at"] = datetime.utcnow()
+    await db.doctors.update_one(
+        {"_id": doctor["_id"]},
+        {"$set": update_data}
+    )
+    return {"success": True, "message": "Profile updated successfully"}
 
 
 async def get_doctor_appointments(doctor_id: str, status_filter: Optional[str] = None) -> list:

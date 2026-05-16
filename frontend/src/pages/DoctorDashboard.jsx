@@ -834,10 +834,20 @@ function AIAssistantTab({ appointments, onReload }) {
 }
 
 // ═══════════════════════════════════════════════
+const CLAIM_STATUS_COLOR = {
+  pending:    'bg-yellow-100 text-yellow-700',
+  processing: 'bg-blue-100 text-blue-700',
+  approved:   'bg-green-100 text-green-700',
+  rejected:   'bg-red-100 text-red-600',
+}
+
 function PatientFullModal({ patient, onClose, onStartConsult }) {
-  const [activeTab, setActiveTab] = useState('insights')
-  const [records, setRecords] = useState([])
-  const [loadingRec, setLoadingRec] = useState(false)
+  const [activeTab,   setActiveTab]   = useState('insights')
+  const [records,     setRecords]     = useState([])
+  const [loadingRec,  setLoadingRec]  = useState(false)
+  const [claims,      setClaims]      = useState([])
+  const [policies,    setPolicies]    = useState([])
+  const [loadingIns,  setLoadingIns]  = useState(false)
 
   useEffect(() => {
     if (patient?.patient_id) {
@@ -848,11 +858,25 @@ function PatientFullModal({ patient, onClose, onStartConsult }) {
     }
   }, [patient])
 
+  useEffect(() => {
+    if (activeTab === 'insurance' && patient?.patient_id) {
+      setLoadingIns(true)
+      Promise.all([
+        api.get('/insurance/claims').catch(()=>({ data:[] })),
+        api.get('/insurance/policies').catch(()=>({ data:[] })),
+      ]).then(([c, p]) => {
+        setClaims(c.data || [])
+        setPolicies(p.data || [])
+      }).finally(()=>setLoadingIns(false))
+    }
+  }, [activeTab, patient])
+
   const TABS = [
-    { id:'insights', label:'AI Insights',   icon:<Brain size={13}/> },
-    { id:'records',  label:'Health Records',icon:<FolderOpen size={13}/> },
-    { id:'reports',  label:'Reports',       icon:<FileText size={13}/> },
-    { id:'vitals',   label:'Vitals',        icon:<Activity size={13}/> },
+    { id:'insights',  label:'AI Insights',   icon:<Brain size={13}/> },
+    { id:'records',   label:'Health Records',icon:<FolderOpen size={13}/> },
+    { id:'reports',   label:'Reports',       icon:<FileText size={13}/> },
+    { id:'vitals',    label:'Vitals',        icon:<Activity size={13}/> },
+    { id:'insurance', label:'Insurance',     icon:<Shield size={13}/> },
   ]
 
   return (
@@ -960,6 +984,77 @@ function PatientFullModal({ patient, onClose, onStartConsult }) {
               ))}
             </div>
           )}
+
+          {activeTab === 'insurance' && (
+            <div className="space-y-4">
+              {loadingIns ? (
+                <div className="py-6 flex justify-center"><LoadingSpinner/></div>
+              ) : (
+                <>
+                  {/* Policies */}
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm mb-2 flex items-center gap-1.5">
+                      <Shield size={13} className="text-indigo-500"/> Active Policies
+                    </p>
+                    {policies.length === 0
+                      ? <p className="text-xs text-gray-400 text-center py-3">No insurance policies on file</p>
+                      : policies.map((p, i) => {
+                          const isExpired = p.valid_till && new Date(p.valid_till) < new Date()
+                          return (
+                            <div key={i} className="flex items-center justify-between bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2.5 mb-2">
+                              <div>
+                                <p className="text-xs font-bold text-indigo-800">{p.provider}</p>
+                                <p className="text-[11px] text-indigo-500">{p.policy_type} · {p.policy_number}</p>
+                              </div>
+                              <div className="text-right">
+                                {p.coverage_amount > 0 && (
+                                  <p className="text-xs font-bold text-indigo-700">₹{Number(p.coverage_amount).toLocaleString('en-IN')}</p>
+                                )}
+                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isExpired ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                                  {isExpired ? 'Expired' : 'Active'}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })
+                    }
+                  </div>
+
+                  {/* Claims */}
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm mb-2 flex items-center gap-1.5">
+                      <FileText size={13} className="text-purple-500"/> Claims History
+                    </p>
+                    {claims.length === 0
+                      ? <p className="text-xs text-gray-400 text-center py-3">No claims submitted yet</p>
+                      : claims.map((c, i) => {
+                          const status = (c.status || 'pending').toLowerCase()
+                          return (
+                            <div key={i} className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 mb-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-gray-800 truncate">{c.hospital_name}</p>
+                                  <p className="text-[11px] text-gray-500">{c.treatment}</p>
+                                  {c.claim_date && (
+                                    <p className="text-[10px] text-gray-400 mt-0.5">{new Date(c.claim_date).toLocaleDateString('en-IN')}</p>
+                                  )}
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <p className="text-xs font-extrabold text-gray-800">₹{Number(c.bill_amount||0).toLocaleString('en-IN')}</p>
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize ${CLAIM_STATUS_COLOR[status] || 'bg-gray-100 text-gray-600'}`}>
+                                    {status}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })
+                    }
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3 px-5 py-4 border-t border-gray-100 flex-shrink-0">
@@ -974,44 +1069,106 @@ function PatientFullModal({ patient, onClose, onStartConsult }) {
 }
 
 // ── Availability ──────────────────────────────────────────────────
+const ALL_TIMES = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00']
+
 function AvailabilitySection() {
-  const [slots,   setSlots]   = useState([])
-  const [loading, setLoading] = useState(true)
-  const [saving,  setSaving]  = useState(false)
+  // schedule: { Monday: Set(['09:00','10:00',...]), ... }
+  const [schedule, setSchedule] = useState({})
+  const [loading,  setLoading]  = useState(true)
+  const [saving,   setSaving]   = useState(false)
 
   useEffect(() => {
-    api.get('/doctors/my/profile').then(r => setSlots(r.data?.availability||[])).catch(()=>setSlots([])).finally(()=>setLoading(false))
+    api.get('/doctors/profile/me')
+      .then(r => {
+        const avail = r.data?.availability || []
+        const map = {}
+        avail.forEach(({ day, slots }) => { map[day] = new Set(slots || []) })
+        setSchedule(map)
+      })
+      .catch(() => setSchedule({}))
+      .finally(() => setLoading(false))
   }, [])
 
-  const addSlot    = () => setSlots(s=>[...s,{day:'Monday',start_time:'09:00',end_time:'17:00',is_available:true}])
-  const removeSlot = i => setSlots(s=>s.filter((_,x)=>x!==i))
-  const update     = (i,f,v) => setSlots(s=>s.map((sl,x)=>x===i?{...sl,[f]:v}:sl))
-  const save = async () => { setSaving(true); try { await api.put('/doctors/my/profile',{availability:slots}); toast.success('Schedule saved!') } catch { toast.error('Failed') } finally { setSaving(false) } }
+  const toggleDay = (day) => {
+    setSchedule(s => {
+      const next = { ...s }
+      if (next[day]) { delete next[day] } else { next[day] = new Set() }
+      return next
+    })
+  }
+
+  const toggleSlot = (day, time) => {
+    setSchedule(s => {
+      const set = new Set(s[day] || [])
+      set.has(time) ? set.delete(time) : set.add(time)
+      return { ...s, [day]: set }
+    })
+  }
+
+  const save = async () => {
+    setSaving(true)
+    const availability = Object.entries(schedule)
+      .filter(([, set]) => set.size > 0)
+      .map(([day, set]) => ({ day, slots: [...set].sort() }))
+    try {
+      await api.put('/doctors/profile/update', { availability })
+      toast.success('Schedule saved!')
+    } catch {
+      toast.error('Failed to save schedule')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (loading) return <div className="py-8 flex justify-center"><LoadingSpinner/></div>
+
+  const activeDays = DAYS.filter(d => schedule[d])
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-gray-800">Availability Schedule</h3>
-        <button onClick={addSlot} className="btn-primary text-sm flex items-center gap-1.5"><Plus size={14}/>Add Slot</button>
+        <button onClick={save} disabled={saving} className="btn-primary text-sm px-5">
+          {saving ? 'Saving...' : <><Save size={14} className="inline mr-1.5"/>Save</>}
+        </button>
       </div>
-      {slots.length === 0 ? (
+
+      {/* Day toggles */}
+      <div>
+        <p className="text-xs text-gray-500 font-medium mb-2">Working Days</p>
+        <div className="flex flex-wrap gap-2">
+          {DAYS.map(d => (
+            <button key={d} onClick={() => toggleDay(d)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${schedule[d] ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-500 border-gray-200 hover:border-teal-300'}`}>
+              {d.slice(0, 3)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Per-day slot picker */}
+      {activeDays.length === 0 ? (
         <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
           <Clock size={32} className="mx-auto mb-2 opacity-30"/>
-          <p className="text-sm">No availability set. Add your working schedule.</p>
+          <p className="text-sm">Select working days above, then pick your available time slots.</p>
         </div>
-      ) : slots.map((slot, i) => (
-        <div key={i} className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-          <select value={slot.day} onChange={e=>update(i,'day',e.target.value)} className="input-field flex-1">
-            {DAYS.map(d=><option key={d} value={d}>{d}</option>)}
-          </select>
-          <input type="time" value={slot.start_time} onChange={e=>update(i,'start_time',e.target.value)} className="input-field w-32"/>
-          <span className="text-gray-400">–</span>
-          <input type="time" value={slot.end_time}   onChange={e=>update(i,'end_time',e.target.value)}   className="input-field w-32"/>
-          <button onClick={()=>removeSlot(i)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl"><XCircle size={16}/></button>
+      ) : activeDays.map(day => (
+        <div key={day} className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
+          <p className="text-sm font-bold text-gray-700 mb-3">{day}</p>
+          <div className="flex flex-wrap gap-2">
+            {ALL_TIMES.map(t => {
+              const active = schedule[day]?.has(t)
+              return (
+                <button key={t} onClick={() => toggleSlot(day, t)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${active ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-500 border-gray-200 hover:border-teal-300'}`}>
+                  {t}
+                </button>
+              )
+            })}
+          </div>
+          {schedule[day]?.size === 0 && <p className="text-xs text-orange-500 mt-2">No slots selected for this day.</p>}
         </div>
       ))}
-      {slots.length > 0 && <button onClick={save} disabled={saving} className="btn-primary w-full">{saving?'Saving...':'Save Schedule'}</button>}
     </div>
   )
 }
@@ -1194,10 +1351,10 @@ export default function DoctorDashboard() {
             {/* ══════ STATS ROW ══════ */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label:"Today's Appointments", value: todayApts.length || 12,  sub:'4 Upcoming',         icon:'📅', iconBg:'bg-blue-100',   val:'text-gray-900' },
-                { label:'Total Patients',        value: stats.total || 1248,     sub:'+18 This Week',      icon:'👥', iconBg:'bg-teal-100',   val:'text-gray-900' },
-                { label:'Consultations',         value: stats.completed || 856,  sub:'+22 This Week',      icon:'🩺', iconBg:'bg-orange-100', val:'text-gray-900' },
-                { label:'Earnings This Month',   value:'₹2,48,500',              sub:'+16% vs Last Month', icon:'💰', iconBg:'bg-purple-100', val:'text-gray-900' },
+                { label:"Today's Appointments", value: todayApts.length,    sub: todayApts.filter(a=>a.status==='confirmed').length + ' Confirmed', icon:'📅', iconBg:'bg-blue-100',   val:'text-gray-900' },
+                { label:'Total Appointments',   value: stats.total,         sub: stats.pending + ' Pending',                                        icon:'👥', iconBg:'bg-teal-100',   val:'text-gray-900' },
+                { label:'Completed',            value: stats.completed,     sub: stats.confirmed + ' Upcoming',                                     icon:'🩺', iconBg:'bg-orange-100', val:'text-gray-900' },
+                { label:'Pending Review',       value: stats.pending,       sub: 'Awaiting action',                                                 icon:'💰', iconBg:'bg-purple-100', val:'text-gray-900' },
               ].map((s,i)=>(
                 <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
                   <div className={`w-12 h-12 ${s.iconBg} rounded-2xl flex items-center justify-center text-2xl flex-shrink-0`}>{s.icon}</div>
@@ -1225,13 +1382,9 @@ export default function DoctorDashboard() {
                 </div>
                 <div className="divide-y divide-gray-50">
                   {loading ? <div className="py-6 flex justify-center"><LoadingSpinner/></div>
-                  : (todayApts.length === 0 ? [
-                      {patient_name:'Priya Patel',  info:'34 · Female', appointment_time:'10:00 AM', symptoms:'Chest Pain',      appointment_type:'in-person'},
-                      {patient_name:'Amit Verma',   info:'45 · Male',   appointment_time:'10:30 AM', symptoms:'Regular Checkup', appointment_type:'video'},
-                      {patient_name:'Neha Singh',   info:'28 · Female', appointment_time:'11:00 AM', symptoms:'Follow-up',       appointment_type:'in-person'},
-                      {patient_name:'Rohit Mehta',  info:'52 · Male',   appointment_time:'11:30 AM', symptoms:'ECG Review',      appointment_type:'video'},
-                      {patient_name:'Kavita Joshi', info:'40 · Female', appointment_time:'12:00 PM', symptoms:'Blood Pressure',  appointment_type:'in-person'},
-                    ] : todayApts).slice(0,5).map((apt,i)=>(
+                  : todayApts.length === 0
+                  ? <div className="py-8 text-center text-gray-400"><Calendar size={28} className="mx-auto mb-2 opacity-30"/><p className="text-sm font-medium">No appointments today</p></div>
+                  : todayApts.slice(0,5).map((apt,i)=>(
                     <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
                       <p className="text-xs font-semibold text-gray-500 w-16 flex-shrink-0">{apt.appointment_time||apt.time}</p>
                       <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
@@ -1239,7 +1392,7 @@ export default function DoctorDashboard() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-900 truncate">{apt.patient_name||apt.name}</p>
-                        <p className="text-xs text-gray-400">{apt.info||''}</p>
+                        <p className="text-xs text-gray-400 capitalize">{apt.appointment_type}</p>
                       </div>
                       <p className="text-xs text-gray-500 hidden sm:block flex-shrink-0 truncate max-w-20">{apt.symptoms||apt.appointment_type}</p>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${apt.appointment_type==='video'?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'}`}>
@@ -1301,15 +1454,9 @@ export default function DoctorDashboard() {
                       className="text-xs text-blue-600 font-semibold hover:underline">View All</button>
                   </div>
                   <div className="space-y-3">
-                    {(appointments.filter(a=>a.status==='confirmed').length>0
-                      ? appointments.filter(a=>a.status==='confirmed')
-                      : [
-                          {patient_name:'Sanjay Kumar', appointment_time:'02:00 PM', symptoms:'Consultation'},
-                          {patient_name:'Meera Iyer',   appointment_time:'02:30 PM', symptoms:'Follow-up'},
-                          {patient_name:'Arjun Nair',   appointment_time:'03:00 PM', symptoms:'ECG Review'},
-                          {patient_name:'Pooja Sharma', appointment_time:'03:30 PM', symptoms:'Consultation'},
-                        ]
-                    ).slice(0,4).map((apt,i)=>(
+                    {appointments.filter(a=>a.status==='confirmed').length === 0
+                      ? <p className="text-xs text-gray-400 text-center py-3">No upcoming confirmed appointments</p>
+                      : appointments.filter(a=>a.status==='confirmed').slice(0,4).map((apt,i)=>(
                       <div key={i} className="flex items-center gap-2.5">
                         <p className="text-xs text-gray-500 font-medium w-14 flex-shrink-0">{apt.appointment_time}</p>
                         <div className="w-7 h-7 bg-gradient-to-br from-teal-300 to-cyan-400 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
@@ -1317,7 +1464,7 @@ export default function DoctorDashboard() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-gray-800 truncate">{apt.patient_name}</p>
-                          <p className="text-xs text-gray-400 truncate">{apt.symptoms||apt.appointment_type}</p>
+                          <p className="text-xs text-gray-400 truncate capitalize">{apt.symptoms||apt.appointment_type}</p>
                         </div>
                       </div>
                     ))}
@@ -1327,25 +1474,27 @@ export default function DoctorDashboard() {
                 {/* Recent Activity */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="font-bold text-gray-900 text-sm">Recent Activity</p>
+                    <p className="font-bold text-gray-900 text-sm">Recent Appointments</p>
                     <button onClick={()=>navigate('/doctor/dashboard?tab=appointments')}
                       className="text-xs text-blue-600 font-semibold hover:underline">View All</button>
                   </div>
                   <div className="space-y-2.5">
-                    {[
-                      { icon:'💊', color:'bg-blue-100',   text:'Prescription created for Priya Patel',    time:'10:15 AM' },
-                      { icon:'🧪', color:'bg-green-100',  text:'Lab report uploaded by Amit Verma',       time:'09:45 AM' },
-                      { icon:'📅', color:'bg-orange-100', text:'Follow-up scheduled for Neha Singh',      time:'09:30 AM' },
-                      { icon:'📋', color:'bg-purple-100', text:'New appointment booked by Kavita Joshi',  time:'08:50 AM' },
-                    ].map((a,i)=>(
-                      <div key={i} className="flex items-start gap-2.5">
-                        <div className={`w-7 h-7 ${a.color} rounded-lg flex items-center justify-center flex-shrink-0 text-sm`}>{a.icon}</div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-gray-700 leading-snug">{a.text}</p>
-                        </div>
-                        <span className="text-[10px] text-gray-400 flex-shrink-0">{a.time}</span>
-                      </div>
-                    ))}
+                    {appointments.length === 0
+                      ? <p className="text-xs text-gray-400 text-center py-2">No recent appointments</p>
+                      : appointments.slice(0,4).map((apt,i)=>{
+                          const statusColor = apt.status==='completed'?'bg-green-100':apt.status==='confirmed'?'bg-blue-100':apt.status==='cancelled'?'bg-red-100':'bg-orange-100'
+                          const statusIcon  = apt.status==='completed'?'✅':apt.status==='confirmed'?'📅':apt.status==='cancelled'?'❌':'⏳'
+                          return (
+                            <div key={i} className="flex items-start gap-2.5">
+                              <div className={`w-7 h-7 ${statusColor} rounded-lg flex items-center justify-center flex-shrink-0 text-sm`}>{statusIcon}</div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-gray-700 leading-snug">{apt.patient_name} — <span className="capitalize">{apt.appointment_type}</span></p>
+                                <p className="text-[10px] text-gray-400">{apt.appointment_date} · <span className="capitalize">{apt.status}</span></p>
+                              </div>
+                            </div>
+                          )
+                        })
+                    }
                   </div>
                 </div>
 

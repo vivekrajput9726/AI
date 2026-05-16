@@ -315,10 +315,11 @@ async def analyze_symptoms(
     # Try Gemini
     if settings.GEMINI_API_KEY:
         try:
-            from google import genai as gai
-            client = gai.Client(api_key=settings.GEMINI_API_KEY)
+            import google.generativeai as genai
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            model = genai.GenerativeModel("gemini-2.0-flash-lite")
             prompt = SYSTEM_PROMPT + "\n\nPatient information:\n" + patient_context
-            response = client.models.generate_content(model="gemini-2.0-flash-lite", contents=prompt)
+            response = model.generate_content(prompt)
             content = response.text.strip()
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
@@ -472,10 +473,11 @@ SYNORA PLATFORM FEATURES YOU CAN GUIDE USERS TO:
     # Fallback to Gemini
     if settings.GEMINI_API_KEY:
         try:
-            from google import genai as gai
-            client = gai.Client(api_key=settings.GEMINI_API_KEY)
+            import google.generativeai as genai
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            model = genai.GenerativeModel("gemini-2.0-flash-lite")
             full_prompt = system + "\n\n" + "\n".join([f"{m['role'].upper()}: {m['content']}" for m in messages[1:]])
-            response = client.models.generate_content(model="gemini-2.0-flash-lite", contents=full_prompt)
+            response = model.generate_content(full_prompt)
             return response.text.strip()
         except Exception as e:
             logger.warning(f"Gemini chat failed: {e}")

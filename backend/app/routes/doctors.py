@@ -16,8 +16,9 @@ async def get_my_patients(current_user: dict = Depends(require_doctor)):
 
     db = get_db()
 
-    # Find the doctor profile to get their _id
-    doctor = await db.doctors.find_one({"user_id": current_user["id"]})
+    # Find the doctor profile to get their _id (with email fallback for seeded doctors)
+    from app.services.doctor_service import find_doctor_for_user
+    doctor = await find_doctor_for_user(current_user["id"])
     if not doctor:
         return []
 
@@ -86,12 +87,11 @@ async def get_specializations():
 
 @router.get("/profile/me", summary="Doctor gets own full profile")
 async def get_my_profile(current_user: dict = Depends(require_doctor)):
-    from app.database.connection import get_db
+    from app.services.doctor_service import find_doctor_for_user
     from app.utils.helpers import serialize_doc
-    db = get_db()
-    doctor = await db.doctors.find_one({"user_id": current_user["id"]})
+    from fastapi import HTTPException, status
+    doctor = await find_doctor_for_user(current_user["id"])
     if not doctor:
-        from fastapi import HTTPException, status
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor profile not found")
     return serialize_doc(doctor)
 
