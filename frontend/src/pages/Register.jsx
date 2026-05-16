@@ -13,14 +13,14 @@ export default function Register() {
   const [step,    setStep]    = useState(1)   // 1 = form, 2 = OTP
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ full_name: '', email: '', password: '', phone: '', role: 'patient' })
-  const [showPassword,   setShowPassword]   = useState(false)
+  const [showPassword,    setShowPassword]    = useState(false)
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
 
   // OTP state
-  const [otp,      setOtp]      = useState(['', '', '', '', '', ''])
-  const [demoOtp,  setDemoOtp]  = useState(null)
-  const [resending,setResending] = useState(false)
+  const [otp,       setOtp]       = useState(['', '', '', '', '', ''])
+  const [demoOtp,   setDemoOtp]   = useState(null)
+  const [resending, setResending] = useState(false)
   const otpRefs = useRef([])
 
   // ── Step 1: Send OTP ──────────────────────────────────────────────
@@ -28,15 +28,16 @@ export default function Register() {
     e.preventDefault()
     setError('')
     if (form.password !== confirmPassword) { setError('Passwords do not match'); return }
-    if (form.password.length < 8)         { setError('Password must be at least 8 characters'); return }
+    if (form.password.length < 8)          { setError('Password must be at least 8 characters'); return }
     setLoading(true)
     try {
       const res = await api.post('/auth/send-otp', form)
       if (res.data.demo_otp) {
         setDemoOtp(res.data.demo_otp)
-        toast.success(`OTP: ${res.data.demo_otp} (demo mode — SMS not configured)`, { duration: 15000 })
+        toast.success('OTP generated — SMTP not configured, code shown below', { duration: 8000 })
       } else {
-        toast.success(`OTP sent to ${form.phone || form.email}`)
+        setDemoOtp(null)
+        toast.success(`Verification code sent to ${form.email}`)
       }
       setStep(2)
     } catch (err) {
@@ -53,11 +54,11 @@ export default function Register() {
     setError('')
     setLoading(true)
     try {
-      const res = await api.post('/auth/verify-otp', { email: form.email, otp: code })
+      await api.post('/auth/verify-otp', { email: form.email, otp: code })
       // Auto-login after successful registration
       const loginRes = await dispatch(loginUser({ email: form.email, password: form.password }))
       if (loginRes.meta.requestStatus === 'fulfilled') {
-        toast.success('Account created successfully!')
+        toast.success('Account created & email verified!')
         const role = loginRes.payload.user.role
         navigate(role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')
       }
@@ -85,14 +86,15 @@ export default function Register() {
   const resendOtp = async () => {
     setResending(true)
     setOtp(['', '', '', '', '', ''])
+    setDemoOtp(null)
     setError('')
     try {
       const res = await api.post('/auth/send-otp', form)
       if (res.data.demo_otp) {
         setDemoOtp(res.data.demo_otp)
-        toast.success(`New OTP: ${res.data.demo_otp}`, { duration: 15000 })
+        toast.success('New OTP generated', { duration: 8000 })
       } else {
-        toast.success('New OTP sent!')
+        toast.success(`New code sent to ${form.email}`)
       }
     } catch { toast.error('Failed to resend OTP') }
     finally { setResending(false) }
@@ -117,8 +119,10 @@ export default function Register() {
             </>
           ) : (
             <>
-              <h1 className="text-2xl font-bold text-gray-900">Verify your OTP</h1>
-              <p className="text-gray-500 mt-1">Enter the 6-digit code sent to <strong>{form.phone || form.email}</strong></p>
+              <h1 className="text-2xl font-bold text-gray-900">Verify your email</h1>
+              <p className="text-gray-500 mt-1">
+                We sent a 6-digit code to <strong>{form.email}</strong>
+              </p>
             </>
           )}
         </div>
@@ -133,7 +137,7 @@ export default function Register() {
                 {step > s ? '✓' : s}
               </div>
               <span className={`text-xs font-medium ${step === s ? 'text-blue-600' : 'text-gray-400'}`}>
-                {s === 1 ? 'Details' : 'Verify OTP'}
+                {s === 1 ? 'Details' : 'Verify Email'}
               </span>
               {s < 2 && <div className={`w-8 h-0.5 ${step > s ? 'bg-green-400' : 'bg-gray-200'}`} />}
             </div>
@@ -166,22 +170,31 @@ export default function Register() {
                       placeholder="Your full name" className="input-field pl-10" required/>
                   </div>
                 </div>
+
                 <div>
-                  <label className="label">Email Address</label>
+                  <label className="label">
+                    Email Address
+                    <span className="text-xs text-blue-500 ml-1 font-normal">(OTP will be sent here)</span>
+                  </label>
                   <div className="relative">
                     <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
                     <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})}
                       placeholder="you@example.com" className="input-field pl-10" required/>
                   </div>
                 </div>
+
                 <div>
-                  <label className="label">Mobile Number <span className="text-xs text-gray-400">(OTP will be sent here)</span></label>
+                  <label className="label">
+                    Mobile Number
+                    <span className="text-xs text-gray-400 ml-1 font-normal">(optional)</span>
+                  </label>
                   <div className="relative">
                     <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
                     <input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
                       placeholder="+91 9876543210" className="input-field pl-10"/>
                   </div>
                 </div>
+
                 <div>
                   <label className="label">Password</label>
                   <div className="relative">
@@ -189,11 +202,13 @@ export default function Register() {
                     <input type={showPassword ? 'text' : 'password'} value={form.password}
                       onChange={e => setForm({...form, password: e.target.value})}
                       placeholder="Min. 8 characters" className="input-field pl-10 pr-10" required/>
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <button type="button" onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                       {showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}
                     </button>
                   </div>
                 </div>
+
                 <div>
                   <label className="label">Confirm Password</label>
                   <div className="relative">
@@ -207,7 +222,7 @@ export default function Register() {
 
                 <button type="submit" disabled={loading}
                   className="btn-primary w-full flex items-center justify-center gap-2 mt-2">
-                  {loading ? 'Sending OTP...' : `Send OTP & Continue`}
+                  {loading ? 'Sending verification code...' : 'Send Verification Code'}
                 </button>
               </form>
             </>
@@ -216,27 +231,39 @@ export default function Register() {
           {/* ── STEP 2: OTP Verification ── */}
           {step === 2 && (
             <div className="space-y-6">
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
-                <ShieldCheck size={18} className="text-blue-600 flex-shrink-0 mt-0.5"/>
-                <div>
-                  <p className="text-sm font-semibold text-blue-800">OTP Sent</p>
-                  <p className="text-xs text-blue-600 mt-0.5">
-                    {form.phone ? `SMS sent to ${form.phone}` : `Check ${form.email}`}
-                  </p>
-                </div>
-              </div>
 
-              {/* Demo OTP display */}
+              {/* Info banner — only when email was actually sent */}
+              {!demoOtp && (
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+                  <Mail size={18} className="text-blue-600 flex-shrink-0 mt-0.5"/>
+                  <div>
+                    <p className="text-sm font-semibold text-blue-800">Check your inbox</p>
+                    <p className="text-xs text-blue-600 mt-0.5">
+                      A 6-digit verification code was sent to <strong>{form.email}</strong>
+                    </p>
+                    <p className="text-xs text-blue-400 mt-1">Also check your spam / junk folder.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Dev mode — shown when SMTP is not configured */}
               {demoOtp && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-                  <p className="text-xs text-amber-600 font-medium mb-1">Demo Mode — OTP (SMS not configured)</p>
-                  <p className="text-2xl font-extrabold text-amber-700 tracking-widest">{demoOtp}</p>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                  <p className="text-xs font-semibold text-amber-700 mb-1">
+                    Email not configured — use this code to continue
+                  </p>
+                  <p className="text-3xl font-extrabold text-amber-700 tracking-widest mt-2">{demoOtp}</p>
+                  <p className="text-xs text-amber-500 mt-2">
+                    Configure SMTP in <code className="bg-amber-100 px-1 rounded">.env</code> to send real emails
+                  </p>
                 </div>
               )}
 
               {/* 6-digit OTP input */}
               <div>
-                <label className="text-xs font-bold text-gray-600 block mb-3 text-center">Enter 6-digit OTP</label>
+                <label className="text-xs font-bold text-gray-600 block mb-3 text-center">
+                  Enter 6-digit verification code
+                </label>
                 <div className="flex justify-center gap-2">
                   {otp.map((digit, i) => (
                     <input key={i} ref={el => otpRefs.current[i] = el}
@@ -259,15 +286,18 @@ export default function Register() {
               </button>
 
               <div className="flex items-center justify-between text-sm">
-                <button onClick={() => { setStep(1); setError(''); setOtp(['','','','','','']) }}
+                <button onClick={() => { setStep(1); setError(''); setOtp(['','','','','','']); setDemoOtp(null) }}
                   className="text-gray-500 hover:text-gray-700 font-medium">
                   ← Change Details
                 </button>
                 <button onClick={resendOtp} disabled={resending}
                   className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
-                  {resending ? <><RefreshCw size={13} className="animate-spin"/> Resending...</> : 'Resend OTP'}
+                  {resending
+                    ? <><RefreshCw size={13} className="animate-spin"/> Resending...</>
+                    : 'Resend Code'}
                 </button>
               </div>
+
             </div>
           )}
 

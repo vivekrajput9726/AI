@@ -26,6 +26,96 @@ def send_email(to_email: str, subject: str, html_body: str):
         logger.error(f"Failed to send email to {to_email}: {e}")
 
 
+_PLACEHOLDERS = {"", "your_app_password", "your_email@gmail.com"}
+
+def _smtp_configured() -> bool:
+    return (
+        bool(settings.SMTP_HOST)
+        and settings.SMTP_USER not in _PLACEHOLDERS
+        and settings.SMTP_PASSWORD not in _PLACEHOLDERS
+    )
+
+
+def send_otp_email(to_email: str, otp_code: str, full_name: str) -> bool:
+    """Send OTP verification email. Returns True on success, False if SMTP not configured."""
+    if not _smtp_configured():
+        logger.info(f"[OTP] {otp_code} for {to_email} — configure SMTP_USER/SMTP_PASSWORD in .env to send real emails")
+        return False
+
+    html_body = f"""<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f0f4f8;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="480" cellpadding="0" cellspacing="0"
+               style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);padding:32px;text-align:center;">
+              <span style="color:#fff;font-size:22px;font-weight:700;">&#10084; Synora Health</span>
+              <p style="color:#bfdbfe;margin:8px 0 0;font-size:14px;">Email Verification</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:40px 36px;">
+              <p style="color:#374151;font-size:16px;margin:0 0 8px;">Hi <strong>{full_name}</strong>,</p>
+              <p style="color:#6b7280;font-size:14px;margin:0 0 28px;line-height:1.6;">
+                Use the code below to verify your email and complete registration.
+                This code expires in <strong>10 minutes</strong>.
+              </p>
+              <div style="background:#eff6ff;border:2px dashed #3b82f6;border-radius:12px;
+                          padding:24px;text-align:center;margin-bottom:28px;">
+                <p style="color:#6b7280;font-size:12px;text-transform:uppercase;
+                           letter-spacing:2px;margin:0 0 10px;">Your verification code</p>
+                <p style="color:#1d4ed8;font-size:40px;font-weight:900;
+                           letter-spacing:12px;margin:0;font-family:monospace;">{otp_code}</p>
+              </div>
+              <p style="color:#9ca3af;font-size:12px;line-height:1.6;margin:0;">
+                If you did not request this code, you can safely ignore this email.
+                Never share this code with anyone.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#f9fafb;padding:20px 36px;text-align:center;border-top:1px solid #e5e7eb;">
+              <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; 2025 Synora Health</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+    plain = (
+        f"Hi {full_name},\n\n"
+        f"Your Synora Health verification code is: {otp_code}\n\n"
+        f"This code is valid for 10 minutes. Do not share it with anyone.\n\n"
+        f"— Synora Health Team"
+    )
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "Your Synora Health Verification Code"
+        msg["From"] = f"Synora Health <{settings.SMTP_USER}>"
+        msg["To"] = to_email
+        msg.attach(MIMEText(plain, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.sendmail(settings.SMTP_USER, to_email, msg.as_string())
+
+        logger.info(f"OTP email sent to {to_email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send OTP email to {to_email}: {e}")
+        return False
+
+
 def send_appointment_booked_email(patient_email: str, patient_name: str, doctor_name: str, date: str, time: str):
     send_email(
         to_email=patient_email,
