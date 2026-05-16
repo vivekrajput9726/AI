@@ -5,7 +5,8 @@ import {
   Brain, Calendar, FileText, Pill, MapPin, Activity,
   CheckCircle, ArrowRight, Upload, Heart, Droplets,
   Moon, ChevronDown, Target, Users, Clock, Video,
-  Stethoscope, MessageSquare, Plus, Shield, Pencil, RefreshCw
+  Stethoscope, MessageSquare, Plus, Shield, Pencil, RefreshCw,
+  AlertCircle, XCircle
 } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import api from '../services/api'
@@ -14,22 +15,25 @@ import { formatDate } from '../utils/helpers'
 import toast from 'react-hot-toast'
 
 // ── Health Score Ring ──────────────────────────────
-function ScoreRing({ score = 84 }) {
+function ScoreRing({ score = 84, label = 'Good' }) {
   const size = 150, sw = 13, r = size / 2 - sw
   const circ = 2 * Math.PI * r
   const dash = (score / 100) * circ
+  const ringColor = label === 'Good' ? '#22c55e' : label === 'Fair' ? '#eab308' : '#ef4444'
+  const trackColor = label === 'Good' ? '#f0fdf4' : label === 'Fair' ? '#fefce8' : '#fef2f2'
+  const labelColor = label === 'Good' ? 'text-green-500' : label === 'Fair' ? 'text-yellow-500' : 'text-red-500'
   return (
     <div className="relative flex-shrink-0 mx-auto" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#f0fdf4" strokeWidth={sw} />
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#22c55e" strokeWidth={sw}
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={trackColor} strokeWidth={sw} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={ringColor} strokeWidth={sw}
           strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
           transform={`rotate(-90 ${size/2} ${size/2})`} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-4xl font-bold text-gray-900 leading-none">{score}</span>
         <span className="text-gray-400 text-xs">/100</span>
-        <span className="text-green-500 font-semibold text-sm mt-0.5">Good</span>
+        <span className={`font-semibold text-sm mt-0.5 ${labelColor}`}>{label}</span>
       </div>
     </div>
   )
@@ -44,6 +48,9 @@ export default function PatientDashboard() {
   const [timePeriod, setTimePeriod] = useState('This Week')
   const [showPeriod, setShowPeriod] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+
+  const [healthScore, setHealthScore]   = useState(null)
+  const [healthLoading, setHealthLoading] = useState(true)
 
   const [vitals, setVitals] = useState(() => {
     try {
@@ -69,7 +76,11 @@ export default function PatientDashboard() {
     try {
       await Promise.all([
         dispatch(fetchMyAppointments()),
-        api.get('/health-records/').then(r => setRecords(r.data || [])).catch(() => {})
+        api.get('/health-records/').then(r => setRecords(r.data || [])).catch(() => {}),
+        api.get('/users/me/health-score')
+           .then(r => setHealthScore(r.data))
+           .catch(() => setHealthScore(null))
+           .finally(() => setHealthLoading(false)),
       ])
       if (showFeedback) toast.success('Dashboard refreshed!')
     } finally {
@@ -158,66 +169,121 @@ export default function PatientDashboard() {
               </button>
             </div>
 
-            {/* Health Score */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <p className="font-bold text-gray-800 mb-3">Health Score</p>
-              <div className="flex justify-center mb-4">
-                <ScoreRing score={84} />
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {vitalDefs.map((m) => (
-                  <div key={m.key}
-                    className={`${m.bg} rounded-xl p-2.5 text-center relative group cursor-pointer`}
-                    onClick={() => editingVital !== m.key && startEdit(m.key)}
-                    title="Click to edit">
-                    <m.icon size={14} className={`${m.iconColor} mx-auto mb-1`} />
-                    {editingVital === m.key ? (
-                      <input autoFocus value={editValue}
-                        onChange={e => setEditValue(e.target.value)}
-                        onBlur={() => saveEdit(m.key)}
-                        onKeyDown={e => { if (e.key === 'Enter') saveEdit(m.key); if (e.key === 'Escape') setEditingVital(null) }}
-                        onClick={e => e.stopPropagation()}
-                        placeholder={m.placeholder}
-                        className="w-full text-xs font-bold text-center bg-white border border-blue-300 rounded-lg px-1 py-0.5 focus:outline-none" />
-                    ) : (
-                      <p className="text-xs font-bold text-gray-900">{vitals[m.key]}</p>
-                    )}
-                    <p className="text-[10px] text-gray-500 leading-tight">{m.unit}</p>
-                    {editingVital !== m.key && (
-                      <Pencil size={8} className="absolute top-1 right-1 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    )}
+            {/* Health Score + Risk Status — gated on vitals completeness */}
+            {healthLoading ? (
+              <>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-4" />
+                  <div className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-4" />
+                  <div className="grid grid-cols-3 gap-2">
+                    {[0,1,2].map(i => <div key={i} className="h-12 bg-gray-100 rounded-xl" />)}
                   </div>
-                ))}
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-4" />
+                  <div className="h-10 bg-gray-100 rounded-xl mb-3" />
+                  <div className="h-3 bg-gray-200 rounded-full mb-2" />
+                  <div className="h-3 bg-gray-100 rounded w-2/3" />
+                </div>
+              </>
+            ) : !healthScore?.vitals_complete ? (
+              <div className="lg:col-span-2 bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 text-center">
+                <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center">
+                  <AlertCircle size={28} className="text-amber-500" />
+                </div>
+                <p className="font-bold text-gray-900 text-base">Complete Your Health Profile</p>
+                <p className="text-sm text-gray-500 max-w-xs leading-relaxed">
+                  Your health score and risk status can't be calculated yet.
+                  Add your weight and height to see real-time insights.
+                </p>
+                <button onClick={() => navigate('/patient/profile#vitals')}
+                  className="mt-1 px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl text-sm transition-colors flex items-center gap-2">
+                  <Plus size={14} /> Add Health Vitals
+                </button>
               </div>
-              <p className="text-[10px] text-gray-400 text-center mt-2">Click any vital to update</p>
-            </div>
+            ) : (
+              <>
+                {/* Health Score (dynamic) */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <p className="font-bold text-gray-800 mb-3">Health Score</p>
+                  <div className="flex justify-center mb-4">
+                    <ScoreRing
+                      score={healthScore.score}
+                      label={healthScore.score >= 80 ? 'Good' : healthScore.score >= 60 ? 'Fair' : 'Poor'}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {vitalDefs.map((m) => (
+                      <div key={m.key}
+                        className={`${m.bg} rounded-xl p-2.5 text-center relative group cursor-pointer`}
+                        onClick={() => editingVital !== m.key && startEdit(m.key)}
+                        title="Click to update locally">
+                        <m.icon size={14} className={`${m.iconColor} mx-auto mb-1`} />
+                        {editingVital === m.key ? (
+                          <input autoFocus value={editValue}
+                            onChange={e => setEditValue(e.target.value)}
+                            onBlur={() => saveEdit(m.key)}
+                            onKeyDown={e => { if (e.key === 'Enter') saveEdit(m.key); if (e.key === 'Escape') setEditingVital(null) }}
+                            onClick={e => e.stopPropagation()}
+                            placeholder={m.placeholder}
+                            className="w-full text-xs font-bold text-center bg-white border border-blue-300 rounded-lg px-1 py-0.5 focus:outline-none" />
+                        ) : (
+                          <p className="text-xs font-bold text-gray-900">{vitals[m.key]}</p>
+                        )}
+                        <p className="text-[10px] text-gray-500 leading-tight">{m.unit}</p>
+                        {editingVital !== m.key && (
+                          <Pencil size={8} className="absolute top-1 right-1 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-400 text-center mt-2">Click any vital to update</p>
+                </div>
 
-            {/* Health Risk Status */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <p className="font-bold text-gray-800 mb-4">Health Risk Status</p>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-11 h-11 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <CheckCircle size={24} className="text-green-600" />
-                </div>
-                <span className="text-xl font-bold text-green-600">Low Risk</span>
-              </div>
-              <p className="text-xs text-gray-500 mb-5 leading-relaxed">Keep maintaining your healthy lifestyle.</p>
-              <div className="relative mb-1">
-                <div className="w-full h-3 rounded-full overflow-hidden flex">
-                  <div className="flex-1 bg-green-400 rounded-l-full" />
-                  <div className="flex-1 bg-yellow-400" />
-                  <div className="flex-1 bg-red-500 rounded-r-full" />
-                </div>
-                <div className="absolute -top-0.5 w-4 h-4 bg-white border-2 border-gray-700 rounded-full shadow" style={{ left: '14%' }} />
-              </div>
-              <div className="flex justify-between text-[11px] text-gray-400 mt-2 mb-3">
-                <span>Low</span><span>Moderate</span><span>High</span>
-              </div>
-              <button onClick={() => navigate('/patient/laboratory')}
-                className="text-sm text-blue-600 font-semibold flex items-center gap-1 hover:underline">
-                View Full Analysis <ArrowRight size={13} />
-              </button>
-            </div>
+                {/* Health Risk Status (dynamic) */}
+                {(() => {
+                  const risk = healthScore.risk_level
+                  const isLow = risk === 'Low'
+                  const isMod = risk === 'Moderate'
+                  const RiskIcon = isLow ? CheckCircle : isMod ? AlertCircle : XCircle
+                  const riskColor = isLow ? 'text-green-600' : isMod ? 'text-yellow-600' : 'text-red-600'
+                  const riskBg    = isLow ? 'bg-green-100'  : isMod ? 'bg-yellow-100'  : 'bg-red-100'
+                  const riskMsg   = isLow
+                    ? 'Keep maintaining your healthy lifestyle.'
+                    : isMod
+                    ? 'Some vitals are outside normal ranges. Consider consulting a doctor.'
+                    : 'Multiple vitals are elevated. Please consult a healthcare provider.'
+                  const needlePos = isLow ? '14%' : isMod ? '50%' : '86%'
+                  return (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                      <p className="font-bold text-gray-800 mb-4">Health Risk Status</p>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-11 h-11 ${riskBg} rounded-full flex items-center justify-center flex-shrink-0`}>
+                          <RiskIcon size={24} className={riskColor} />
+                        </div>
+                        <span className={`text-xl font-bold ${riskColor}`}>{risk} Risk</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-5 leading-relaxed">{riskMsg}</p>
+                      <div className="relative mb-1">
+                        <div className="w-full h-3 rounded-full overflow-hidden flex">
+                          <div className="flex-1 bg-green-400 rounded-l-full" />
+                          <div className="flex-1 bg-yellow-400" />
+                          <div className="flex-1 bg-red-500 rounded-r-full" />
+                        </div>
+                        <div className="absolute -top-0.5 w-4 h-4 bg-white border-2 border-gray-700 rounded-full shadow" style={{ left: needlePos }} />
+                      </div>
+                      <div className="flex justify-between text-[11px] text-gray-400 mt-2 mb-3">
+                        <span>Low</span><span>Moderate</span><span>High</span>
+                      </div>
+                      <button onClick={() => navigate('/patient/laboratory')}
+                        className="text-sm text-blue-600 font-semibold flex items-center gap-1 hover:underline">
+                        View Full Analysis <ArrowRight size={13} />
+                      </button>
+                    </div>
+                  )
+                })()}
+              </>
+            )}
           </div>
 
           {/* ── Health Overview ── */}

@@ -37,6 +37,12 @@ class UserUpdateRequest(BaseModel):
     gender: Optional[str] = None
     address: Optional[str] = None
     profile_image: Optional[str] = None
+    weight_kg: Optional[float] = None
+    height_cm: Optional[float] = None
+    blood_pressure_systolic: Optional[int] = None
+    blood_pressure_diastolic: Optional[int] = None
+    blood_sugar_mg_dl: Optional[float] = None
+    heart_rate_bpm: Optional[int] = None
 
 
 class UserResponse(BaseModel):
@@ -49,6 +55,12 @@ class UserResponse(BaseModel):
     gender: Optional[str] = None
     address: Optional[str] = None
     profile_image: Optional[str] = None
+    weight_kg: Optional[float] = None
+    height_cm: Optional[float] = None
+    blood_pressure_systolic: Optional[int] = None
+    blood_pressure_diastolic: Optional[int] = None
+    blood_sugar_mg_dl: Optional[float] = None
+    heart_rate_bpm: Optional[int] = None
     is_active: bool
     is_verified: bool
     created_at: datetime

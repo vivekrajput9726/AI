@@ -4,6 +4,7 @@ from app.middleware.auth_middleware import get_current_user
 from app.database.connection import get_db
 from app.utils.helpers import serialize_doc, str_to_objectid
 from app.schemas.user_schema import UserUpdateRequest
+from app.services.health_score_service import calculate_health_score
 
 router = APIRouter()
 
@@ -11,6 +12,11 @@ router = APIRouter()
 @router.get("/me", summary="Get current user profile")
 async def get_profile(current_user: dict = Depends(get_current_user)):
     return current_user
+
+
+@router.get("/me/health-score", summary="Get calculated health score for current user")
+async def get_health_score(current_user: dict = Depends(get_current_user)):
+    return calculate_health_score(current_user)
 
 
 @router.put("/me", summary="Update current user profile")

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
-import { User, Mail, Phone, MapPin, Calendar, Shield, Edit3, Save, X, Camera } from 'lucide-react'
+import { User, Mail, Phone, MapPin, Calendar, Shield, Edit3, Save, X, Camera, Activity, Heart, Droplets, AlertCircle } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 import { updateProfile } from '../redux/slices/authSlice'
@@ -12,6 +12,8 @@ function Profile() {
   const { user, loading } = useSelector(s => s.auth)
   const dispatch = useDispatch()
   const [editing, setEditing] = useState(false)
+  const [editingVitals, setEditingVitals] = useState(false)
+  const [vitalsLoading, setVitalsLoading] = useState(false)
   const [photoUploading, setPhotoUploading] = useState(false)
   const fileInputRef = useRef(null)
 
@@ -42,10 +44,25 @@ function Profile() {
     date_of_birth: user?.date_of_birth || '',
     gender: user?.gender || '',
     address: user?.address || '',
+    weight_kg: user?.weight_kg ?? '',
+    height_cm: user?.height_cm ?? '',
+    blood_pressure_systolic: user?.blood_pressure_systolic ?? '',
+    blood_pressure_diastolic: user?.blood_pressure_diastolic ?? '',
+    blood_sugar_mg_dl: user?.blood_sugar_mg_dl ?? '',
+    heart_rate_bpm: user?.heart_rate_bpm ?? '',
   })
 
   const handleSave = async () => {
-    const result = await dispatch(updateProfile(form))
+    const numericFields = ['weight_kg', 'height_cm', 'blood_pressure_systolic', 'blood_pressure_diastolic', 'blood_sugar_mg_dl', 'heart_rate_bpm']
+    const payload = { ...form }
+    numericFields.forEach(f => {
+      if (payload[f] !== '' && payload[f] !== null && payload[f] !== undefined) {
+        payload[f] = parseFloat(payload[f])
+      } else {
+        delete payload[f]
+      }
+    })
+    const result = await dispatch(updateProfile(payload))
     if (result.meta.requestStatus === 'fulfilled') {
       setEditing(false)
     }
@@ -58,8 +75,44 @@ function Profile() {
       date_of_birth: user?.date_of_birth || '',
       gender: user?.gender || '',
       address: user?.address || '',
+      weight_kg: user?.weight_kg ?? '',
+      height_cm: user?.height_cm ?? '',
+      blood_pressure_systolic: user?.blood_pressure_systolic ?? '',
+      blood_pressure_diastolic: user?.blood_pressure_diastolic ?? '',
+      blood_sugar_mg_dl: user?.blood_sugar_mg_dl ?? '',
+      heart_rate_bpm: user?.heart_rate_bpm ?? '',
     })
     setEditing(false)
+  }
+
+  const handleSaveVitals = async () => {
+    const numericFields = ['weight_kg', 'height_cm', 'blood_pressure_systolic', 'blood_pressure_diastolic', 'blood_sugar_mg_dl', 'heart_rate_bpm']
+    const payload = {}
+    numericFields.forEach(f => {
+      if (form[f] !== '' && form[f] !== null && form[f] !== undefined) {
+        payload[f] = parseFloat(form[f])
+      }
+    })
+    setVitalsLoading(true)
+    const result = await dispatch(updateProfile(payload))
+    setVitalsLoading(false)
+    if (result.meta.requestStatus === 'fulfilled') {
+      setEditingVitals(false)
+      toast.success('Health vitals saved!')
+    }
+  }
+
+  const handleCancelVitals = () => {
+    setForm(prev => ({
+      ...prev,
+      weight_kg: user?.weight_kg ?? '',
+      height_cm: user?.height_cm ?? '',
+      blood_pressure_systolic: user?.blood_pressure_systolic ?? '',
+      blood_pressure_diastolic: user?.blood_pressure_diastolic ?? '',
+      blood_sugar_mg_dl: user?.blood_sugar_mg_dl ?? '',
+      heart_rate_bpm: user?.heart_rate_bpm ?? '',
+    }))
+    setEditingVitals(false)
   }
 
   return (
@@ -204,6 +257,107 @@ function Profile() {
               ) : (
                 <p className="text-gray-900 py-2.5 px-4 bg-gray-50 rounded-xl text-sm">{user?.address || 'Not set'}</p>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Health Vitals */}
+        <div id="vitals" className="card">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <Activity size={17} className="text-blue-600" />
+              <h3 className="font-semibold text-gray-900">Health Vitals</h3>
+            </div>
+            {!editingVitals ? (
+              <button onClick={() => setEditingVitals(true)} className="btn-secondary flex items-center gap-2 text-sm">
+                <Edit3 size={14} /> {user?.weight_kg ? 'Edit Vitals' : 'Add Vitals'}
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button onClick={handleCancelVitals} className="btn-secondary flex items-center gap-2 text-sm">
+                  <X size={14} /> Cancel
+                </button>
+                <button onClick={handleSaveVitals} disabled={vitalsLoading} className="btn-primary flex items-center gap-2 text-sm">
+                  {vitalsLoading ? <LoadingSpinner size="sm" /> : <><Save size={14} /> Save Vitals</>}
+                </button>
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mb-5">Used to calculate your real-time health score and risk status on the dashboard.</p>
+
+          {/* Completeness banner */}
+          {!user?.weight_kg && !user?.height_cm && !editingVitals && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-5">
+              <AlertCircle size={15} className="text-amber-500 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-amber-700">Weight and height are required to activate your health score. Click <strong>Add Vitals</strong> to get started.</p>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {/* Row 1: Weight + Height */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label flex items-center gap-1.5"><Activity size={12} /> Weight (kg)</label>
+                {editingVitals ? (
+                  <input type="number" min="20" max="300" step="0.1" value={form.weight_kg} onChange={e => setForm({ ...form, weight_kg: e.target.value })} placeholder="e.g. 70" className="input-field" autoFocus />
+                ) : (
+                  <p className="text-gray-900 py-2.5 px-4 bg-gray-50 rounded-xl text-sm">{user?.weight_kg ? `${user.weight_kg} kg` : 'Not set'}</p>
+                )}
+                <p className="text-[11px] text-gray-400 mt-1">Normal BMI: 18.5 – 24.9</p>
+              </div>
+              <div>
+                <label className="label flex items-center gap-1.5"><Activity size={12} /> Height (cm)</label>
+                {editingVitals ? (
+                  <input type="number" min="50" max="250" step="0.1" value={form.height_cm} onChange={e => setForm({ ...form, height_cm: e.target.value })} placeholder="e.g. 170" className="input-field" />
+                ) : (
+                  <p className="text-gray-900 py-2.5 px-4 bg-gray-50 rounded-xl text-sm">{user?.height_cm ? `${user.height_cm} cm` : 'Not set'}</p>
+                )}
+                <p className="text-[11px] text-gray-400 mt-1">Used to compute BMI</p>
+              </div>
+            </div>
+
+            {/* Row 2: Systolic + Diastolic BP */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label flex items-center gap-1.5"><Heart size={12} /> Systolic BP (mmHg)</label>
+                {editingVitals ? (
+                  <input type="number" min="60" max="200" value={form.blood_pressure_systolic} onChange={e => setForm({ ...form, blood_pressure_systolic: e.target.value })} placeholder="e.g. 120" className="input-field" />
+                ) : (
+                  <p className="text-gray-900 py-2.5 px-4 bg-gray-50 rounded-xl text-sm">{user?.blood_pressure_systolic ? `${user.blood_pressure_systolic} mmHg` : 'Not set'}</p>
+                )}
+                <p className="text-[11px] text-gray-400 mt-1">Normal: 90 – 120 mmHg</p>
+              </div>
+              <div>
+                <label className="label flex items-center gap-1.5"><Heart size={12} /> Diastolic BP (mmHg)</label>
+                {editingVitals ? (
+                  <input type="number" min="40" max="130" value={form.blood_pressure_diastolic} onChange={e => setForm({ ...form, blood_pressure_diastolic: e.target.value })} placeholder="e.g. 80" className="input-field" />
+                ) : (
+                  <p className="text-gray-900 py-2.5 px-4 bg-gray-50 rounded-xl text-sm">{user?.blood_pressure_diastolic ? `${user.blood_pressure_diastolic} mmHg` : 'Not set'}</p>
+                )}
+                <p className="text-[11px] text-gray-400 mt-1">Normal: 60 – 80 mmHg</p>
+              </div>
+            </div>
+
+            {/* Row 3: Blood Sugar + Heart Rate */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label flex items-center gap-1.5"><Droplets size={12} /> Blood Sugar (mg/dL)</label>
+                {editingVitals ? (
+                  <input type="number" min="40" max="400" step="0.1" value={form.blood_sugar_mg_dl} onChange={e => setForm({ ...form, blood_sugar_mg_dl: e.target.value })} placeholder="e.g. 95" className="input-field" />
+                ) : (
+                  <p className="text-gray-900 py-2.5 px-4 bg-gray-50 rounded-xl text-sm">{user?.blood_sugar_mg_dl ? `${user.blood_sugar_mg_dl} mg/dL` : 'Not set'}</p>
+                )}
+                <p className="text-[11px] text-gray-400 mt-1">Normal fasting: 70 – 100 mg/dL</p>
+              </div>
+              <div>
+                <label className="label flex items-center gap-1.5"><Heart size={12} /> Heart Rate (bpm)</label>
+                {editingVitals ? (
+                  <input type="number" min="30" max="220" value={form.heart_rate_bpm} onChange={e => setForm({ ...form, heart_rate_bpm: e.target.value })} placeholder="e.g. 72" className="input-field" />
+                ) : (
+                  <p className="text-gray-900 py-2.5 px-4 bg-gray-50 rounded-xl text-sm">{user?.heart_rate_bpm ? `${user.heart_rate_bpm} bpm` : 'Not set'}</p>
+                )}
+                <p className="text-[11px] text-gray-400 mt-1">Normal: 60 – 100 bpm</p>
+              </div>
             </div>
           </div>
         </div>
