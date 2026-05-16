@@ -563,35 +563,59 @@ Generate a structured follow-up report:
 
             {/* Doctors */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <p className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                <Stethoscope size={14} className="text-teal-500"/> Select Doctor
+              <p className="text-sm font-bold text-gray-700 mb-1 flex items-center gap-2">
+                <Stethoscope size={14} className="text-teal-500"/>
+                Select Doctor <span className="text-red-500">*</span>
+                <span className="text-xs font-normal text-gray-400">(required)</span>
               </p>
+              {!c.doctor && (
+                <p className="text-xs text-red-400 mb-3 flex items-center gap-1">
+                  <AlertTriangle size={11}/> Please select a doctor to book consultation
+                </p>
+              )}
+              {c.doctor && (
+                <p className="text-xs text-teal-600 mb-3 flex items-center gap-1">
+                  <Check size={11}/> Selected: <strong>{c.doctor.full_name || c.doctor.name}</strong>
+                </p>
+              )}
               {doctors.length === 0 ? (
                 <div className="py-6 text-center"><Loader size={20} className="animate-spin text-teal-400 mx-auto"/></div>
               ) : (
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                  {doctors.map(doc => (
-                    <div key={doc.id||doc._id}
-                      onClick={()=>patchField('consultation',{doctor:doc})}
-                      className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border-2 transition-all ${c.doctor?.id===doc.id||c.doctor?._id===doc._id?'border-teal-500 bg-teal-50':'border-transparent bg-gray-50 hover:bg-gray-100'}`}>
-                      <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-blue-500 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                        {(doc.full_name||doc.name||'D').charAt(0)}
+                  {doctors.map(doc => {
+                    const docId = doc.id || doc._id
+                    const selId = c.doctor?.id || c.doctor?._id
+                    const isSelected = !!selId && !!docId && selId === docId
+                    return (
+                      <div key={docId}
+                        onClick={()=>patchField('consultation',{doctor:{...doc, _selectedId: docId}})}
+                        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border-2 transition-all ${isSelected ? 'border-teal-500 bg-teal-50' : 'border-gray-100 bg-gray-50 hover:border-teal-300 hover:bg-teal-50/40'}`}>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${isSelected ? 'border-teal-500 bg-teal-500' : 'border-gray-300 bg-white'}`}>
+                          {isSelected && <div className="w-2 h-2 bg-white rounded-full"/>}
+                        </div>
+                        <div className="w-9 h-9 bg-gradient-to-br from-teal-400 to-blue-500 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                          {(doc.full_name||doc.name||'D').charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-bold text-sm ${isSelected ? 'text-teal-800' : 'text-gray-800'}`}>{doc.full_name||doc.name}</p>
+                          <p className="text-xs text-gray-400">{doc.specialization||'General Physician'}</p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-gray-800 text-sm">{doc.full_name||doc.name}</p>
-                        <p className="text-xs text-gray-400">{doc.specialization||'General Physician'}</p>
-                      </div>
-                      {(c.doctor?.id===doc.id||c.doctor?._id===doc._id) && <Check size={16} className="text-teal-500"/>}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
 
-            <button onClick={bookConsultation} disabled={loading}
-              className="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+            <button onClick={bookConsultation} disabled={loading || !c.doctor || !c.date || !c.time}
+              className="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
               {loading ? <><Loader size={16} className="animate-spin"/> Booking...</> : <><Calendar size={16}/> Book Consultation</>}
             </button>
+            {(!c.doctor || !c.date || !c.time) && (
+              <p className="text-center text-xs text-gray-400">
+                {!c.doctor ? '⚠ Select a doctor' : !c.date ? '⚠ Pick a date' : '⚠ Pick a time'} to enable booking
+              </p>
+            )}
           </>
         )}
       </div>
