@@ -11,11 +11,27 @@ export default function Register() {
   const navigate  = useNavigate()
   const { user }  = useSelector(s => s.auth)
 
-  // Already logged in — show switch screen instead of silently redirecting
+  // ── All hooks declared first (React rules) ───────────────────────
+  const [step,             setStep]             = useState(1)
+  const [loading,          setLoading]          = useState(false)
+  const [form,             setForm]             = useState({ full_name: '', email: '', password: '', phone: '', role: 'patient' })
+  const [showPassword,     setShowPassword]     = useState(false)
+  const [confirmPassword,  setConfirmPassword]  = useState('')
+  const [error,            setError]            = useState('')
+  const [alreadyRegistered,setAlreadyRegistered]= useState(false)
+  const [otp,              setOtp]              = useState(['', '', '', '', '', ''])
+  const [demoOtp,          setDemoOtp]          = useState(null)
+  const [otpChannel,       setOtpChannel]       = useState(null)
+  const [phoneHint,        setPhoneHint]        = useState(null)
+  const [resending,        setResending]        = useState(false)
+  const otpRefs = useRef([])
+
+  // ── Already logged in ────────────────────────────────────────────
   if (user) {
+    const dashPath = user.role === 'admin' ? '/admin' : user.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard'
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm text-center card">
+        <div className="w-full max-w-sm text-center bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
           <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Heart size={26} className="text-blue-600" />
           </div>
@@ -25,10 +41,11 @@ export default function Register() {
             Log out to create a new account.
           </p>
           <div className="flex flex-col gap-3">
-            <button onClick={() => navigate(user.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')}
-              className="btn-primary w-full">Go to Dashboard</button>
+            <button onClick={() => navigate(dashPath)} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors">
+              Go to Dashboard
+            </button>
             <button onClick={() => { dispatch(logout()); navigate('/register') }}
-              className="btn-secondary w-full text-red-500 border-red-200 hover:bg-red-50">
+              className="w-full py-3 border border-red-200 text-red-500 hover:bg-red-50 font-medium rounded-xl transition-colors text-sm">
               Log out & Register New Account
             </button>
           </div>
@@ -37,20 +54,33 @@ export default function Register() {
     )
   }
 
-  const [step,    setStep]    = useState(1)   // 1 = form, 2 = OTP
-  const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', phone: '', role: 'patient' })
-  const [showPassword,    setShowPassword]    = useState(false)
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
-
-  // OTP state
-  const [otp,       setOtp]       = useState(['', '', '', '', '', ''])
-  const [demoOtp,   setDemoOtp]   = useState(null)
-  const [otpChannel,setOtpChannel]= useState(null)   // 'sms' | 'email' | 'demo'
-  const [phoneHint, setPhoneHint] = useState(null)   // e.g. "****1234"
-  const [resending, setResending] = useState(false)
-  const otpRefs = useRef([])
+  // ── Email already registered ─────────────────────────────────────
+  if (alreadyRegistered) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm text-center bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
+          <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <ShieldCheck size={26} className="text-green-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Account already exists</h2>
+          <p className="text-gray-500 text-sm mb-1">
+            <strong>{form.email}</strong> is already registered.
+          </p>
+          <p className="text-gray-400 text-xs mb-6">Log in with your existing account, or use a different email to create a new one.</p>
+          <div className="flex flex-col gap-3">
+            <button onClick={() => navigate('/login', { state: { email: form.email } })}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors">
+              Login to My Account
+            </button>
+            <button onClick={() => { setAlreadyRegistered(false); setForm(f => ({ ...f, email: '' })) }}
+              className="w-full py-3 border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium rounded-xl transition-colors text-sm">
+              Use a Different Email
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // ── Step 1: Send OTP ──────────────────────────────────────────────
   const handleSendOtp = async (e) => {
@@ -76,7 +106,12 @@ export default function Register() {
       }
       setStep(2)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to send OTP')
+      const detail = err.response?.data?.detail || ''
+      if (detail.toLowerCase().includes('already registered')) {
+        setAlreadyRegistered(true)
+      } else {
+        setError(detail || 'Failed to send OTP')
+      }
     } finally {
       setLoading(false)
     }

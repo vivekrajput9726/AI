@@ -1,6 +1,5 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import api from '../../services/api'
+import { useState, useEffect, useCallback } from 'react'
 import {
   LayoutDashboard, Stethoscope, Calendar, User,
   Heart, LogOut, Shield, Activity, FolderOpen, Pill,
@@ -12,6 +11,7 @@ import {
 import { useSelector, useDispatch } from 'react-redux'
 import { logout } from '../../redux/slices/authSlice'
 import { getInitials } from '../../utils/helpers'
+import api from '../../services/api'
 
 const patientLinks = [
   { to: '/patient/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
@@ -67,20 +67,21 @@ function Sidebar({ isOpen, onClose }) {
   const isDoctor     = user?.role === 'doctor'
   const isAdmin      = user?.role === 'admin'
 
-  const [msgUnread, setMsgUnread] = useState(0)
+  const [unreadChat, setUnreadChat] = useState(0)
+
+  const fetchCounts = useCallback(async () => {
+    if (!user) return
+    try {
+      const res = await api.get('/chat/rooms')
+      setUnreadChat((res.data || []).filter(r => r.unread).length)
+    } catch { /* silent */ }
+  }, [user])
 
   useEffect(() => {
-    if (!user) return
-    api.get('/chat/rooms')
-      .then(res => setMsgUnread((res.data || []).filter(r => r.unread).length))
-      .catch(() => {})
-    const id = setInterval(() => {
-      api.get('/chat/rooms')
-        .then(res => setMsgUnread((res.data || []).filter(r => r.unread).length))
-        .catch(() => {})
-    }, 30000)
+    fetchCounts()
+    const id = setInterval(fetchCounts, 30000)
     return () => clearInterval(id)
-  }, [user])
+  }, [fetchCounts])
 
   const handleLogout = () => { dispatch(logout()); navigate('/') }
 
@@ -211,7 +212,7 @@ function Sidebar({ isOpen, onClose }) {
                       <span className="bg-yellow-400 text-gray-900 text-xs font-extrabold w-5 h-5 rounded-full flex items-center justify-center">{pendingCount}</span>
                     )}
                     {badgeText && <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded-full font-bold">{badgeText}</span>}
-                    {messageBadge && msgUnread > 0 && <span className="bg-green-500 text-white text-xs font-extrabold w-5 h-5 rounded-full flex items-center justify-center">{msgUnread}</span>}
+                    {messageBadge && unreadChat > 0 && <span className="bg-green-500 text-white text-xs font-extrabold w-5 h-5 rounded-full flex items-center justify-center">{unreadChat}</span>}
                     {notifBadge && pendingCount > 0 && <span className="bg-red-500 text-white text-xs font-extrabold w-5 h-5 rounded-full flex items-center justify-center">{pendingCount}</span>}
                   </button>
                 </li>

@@ -125,9 +125,20 @@ export default function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false)
 
   // Notification read state
-  const [readNotifs, setReadNotifs] = useState(new Set())
-  const markNotifRead  = (id) => setReadNotifs(prev => new Set([...prev, id]))
-  const markAllNotifs  = () => setReadNotifs(new Set(ADMIN_NOTIFS.map(n => n.id)))
+  const [readNotifs, setReadNotifs] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('admin_notifs_read') || '[]')) }
+    catch { return new Set() }
+  })
+  const markNotifRead = (id) => setReadNotifs(prev => {
+    const next = new Set([...prev, id])
+    localStorage.setItem('admin_notifs_read', JSON.stringify([...next]))
+    return next
+  })
+  const markAllNotifs = () => {
+    const next = new Set(ADMIN_NOTIFS.map(n => n.id))
+    localStorage.setItem('admin_notifs_read', JSON.stringify([...next]))
+    setReadNotifs(next)
+  }
 
   // Search / filter states
   const [userSearch,   setUserSearch]   = useState('')

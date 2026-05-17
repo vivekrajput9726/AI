@@ -1556,6 +1556,11 @@ export default function DoctorDashboard() {
   const [aptFilter,    setAptFilter]    = useState('all')
   const [insightsPt,   setInsightsPt]   = useState(null)
   const [statCardFilter, setStatCardFilter] = useState(null)
+  const [tabNotifs,    setTabNotifs]    = useState([])
+  const [tabNotifRead, setTabNotifRead] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('notif_read') || '[]')) } catch { return new Set() }
+  })
+  const [tabNotifLoading, setTabNotifLoading] = useState(false)
   const [chatOpen,     setChatOpen]     = useState(false)
   const [chatRoom,     setChatRoom]     = useState(null)
   const [chatName,     setChatName]     = useState('')
@@ -1593,6 +1598,18 @@ export default function DoctorDashboard() {
   const handleVideoCall  = apt => navigate(`/doctor/video/${apt.id}`)
   const handleStartChat  = apt => { setChatRoom(`appointment_${apt.id||apt.patient_id}`); setChatName(apt.patient_name); setChatOpen(true) }
 
+  const loadTabNotifs = async () => {
+    setTabNotifLoading(true)
+    try {
+      const res = await api.get('/notifications/')
+      setTabNotifs(res.data || [])
+    } catch { /* silent */ } finally { setTabNotifLoading(false) }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'notifications') loadTabNotifs()
+  }, [activeTab])
+
   const firstName  = user?.full_name?.split(' ')[0] || 'Doctor'
   const now        = new Date()
   const todayDate  = now.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric',weekday:'long'})
@@ -1628,6 +1645,32 @@ export default function DoctorDashboard() {
         {/* ── DASHBOARD ── */}
         {activeTab === 'dashboard' && (
           <div className="space-y-5 pb-6">
+            {/* ══════ GREETING BANNER ══════ */}
+            {(() => {
+              const h = new Date().getHours()
+              const greeting = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening'
+              const emoji    = h < 12 ? '🌅' : h < 17 ? '☀️' : '🌙'
+              const name     = user?.full_name?.split(' ').slice(-1)[0] || 'Doctor'
+              const today    = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
+              return (
+                <div className="bg-gradient-to-r from-teal-600 to-cyan-600 rounded-2xl p-5 text-white flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">{emoji}</div>
+                    <div>
+                      <h1 className="text-xl font-extrabold">{greeting}, Dr. {name}! 👋</h1>
+                      <p className="text-teal-100 text-sm mt-0.5">{today}</p>
+                    </div>
+                  </div>
+                  <div className="hidden lg:flex items-center gap-6 text-center">
+                    <div><p className="text-2xl font-extrabold">{stats.total}</p><p className="text-teal-200 text-xs">Total Appts</p></div>
+                    <div className="w-px h-8 bg-white/20"/>
+                    <div><p className="text-2xl font-extrabold">{stats.pending}</p><p className="text-teal-200 text-xs">Pending</p></div>
+                    <div className="w-px h-8 bg-white/20"/>
+                    <div><p className="text-2xl font-extrabold">{stats.completed}</p><p className="text-teal-200 text-xs">Completed</p></div>
+                  </div>
+                </div>
+              )
+            })()}
             {/* ══════ STATS ROW ══════ */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
@@ -2272,38 +2315,16 @@ export default function DoctorDashboard() {
           const today = new Date().toISOString().split('T')[0]
           const pendingNotifs = appointments
             .filter(a => a.status === 'pending')
-            .map(a => ({
-              icon:'📅', color:'bg-blue-100',
-              title:'New Appointment Request',
-              sub:`${a.patient_name || 'Patient'} — ${a.appointment_date || ''} · ${a.appointment_time || ''}`,
-              time:'New', unread:true
-            }))
+            .map(a => ({ icon:'📅', color:'bg-blue-100', title:'New Appointment Request', sub:`${a.patient_name || 'Patient'} — ${a.appointment_date || ''} · ${a.appointment_time || ''}`, time:'New', unread:true }))
           const todayNotifs = appointments
             .filter(a => a.status === 'confirmed' && a.appointment_date === today)
-            .map(a => ({
-              icon:'✅', color:'bg-green-100',
-              title:'Upcoming Appointment Today',
-              sub:`${a.patient_name || 'Patient'} — ${a.appointment_time || ''} · ${a.appointment_type === 'video' ? 'Video Call' : 'Clinic Visit'}`,
-              time:'Today', unread:true
-            }))
+            .map(a => ({ icon:'✅', color:'bg-green-100', title:'Upcoming Appointment Today', sub:`${a.patient_name || 'Patient'} — ${a.appointment_time || ''} · ${a.appointment_type === 'video' ? 'Video Call' : 'Clinic Visit'}`, time:'Today', unread:true }))
           const completedNotifs = appointments
-            .filter(a => a.status === 'completed')
-            .slice(0, 5)
-            .map(a => ({
-              icon:'🏁', color:'bg-purple-100',
-              title:'Appointment Completed',
-              sub:`${a.patient_name || 'Patient'} — ${a.appointment_date || ''}`,
-              time: a.appointment_date || '', unread:false
-            }))
+            .filter(a => a.status === 'completed').slice(0, 5)
+            .map(a => ({ icon:'🏁', color:'bg-purple-100', title:'Appointment Completed', sub:`${a.patient_name || 'Patient'} — ${a.appointment_date || ''}`, time: a.appointment_date || '', unread:false }))
           const confirmedNotifs = appointments
-            .filter(a => a.status === 'confirmed' && a.appointment_date !== today)
-            .slice(0, 3)
-            .map(a => ({
-              icon:'📋', color:'bg-orange-100',
-              title:'Confirmed Appointment',
-              sub:`${a.patient_name || 'Patient'} — ${a.appointment_date || ''} · ${a.appointment_time || ''}`,
-              time: a.appointment_date || '', unread:false
-            }))
+            .filter(a => a.status === 'confirmed' && a.appointment_date !== today).slice(0, 3)
+            .map(a => ({ icon:'📋', color:'bg-orange-100', title:'Confirmed Appointment', sub:`${a.patient_name || 'Patient'} — ${a.appointment_date || ''} · ${a.appointment_time || ''}`, time: a.appointment_date || '', unread:false }))
           const notifs = [...pendingNotifs, ...todayNotifs, ...completedNotifs, ...confirmedNotifs]
           const unreadCount = pendingNotifs.length + todayNotifs.length
           return (
@@ -2336,9 +2357,12 @@ export default function DoctorDashboard() {
                 </div>
               ))}
             </div>
-            {notifs.length > 0 && (
-              <p className="text-center text-xs text-gray-400">Showing {notifs.length} notification{notifs.length !== 1 ? 's' : ''} from your appointment data</p>
-            )}
+            <div className="flex gap-3">
+              <button onClick={() => loadAppointments(true)}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-500 text-sm font-medium rounded-xl hover:bg-gray-50 flex items-center justify-center gap-2">
+                <RefreshCw size={13}/> Refresh
+              </button>
+            </div>
           </div>
           )
         })()}
