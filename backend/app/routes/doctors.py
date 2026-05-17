@@ -81,7 +81,7 @@ async def list_doctors(
 async def get_specializations():
     from app.database.connection import get_db
     db = get_db()
-    specs = await db.doctors.distinct("specialization", {"is_active": True})
+    specs = await db.doctors.distinct("specialization", {"is_active": True, "is_verified": True})
     return {"specializations": sorted(specs)}
 
 

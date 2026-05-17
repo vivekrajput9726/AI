@@ -236,15 +236,16 @@ export default function AdminDashboard() {
   const cancelledApts = apts.filter(a=>a.status==='cancelled').length
 
   const recentApts  = apts.slice(0,4)
-  const pendingDocs    = doctors.filter(d=>!d.is_verified && !d.is_static).slice(0,4)
-  const verifiedDocList= doctors.filter(d=>d.is_verified).slice(0,4)
+  const pendingDocs       = doctors.filter(d => (d.is_verified === null || d.is_verified === undefined) && !d.is_static).slice(0,4)
+  const pendingDocsCount  = doctors.filter(d => (d.is_verified === null || d.is_verified === undefined) && !d.is_static).length
+  const verifiedDocList   = doctors.filter(d=>d.is_verified).slice(0,4)
 
   // Sidebar links
   const LINKS = [
     { tab:'dashboard',    icon:<LayoutDashboard size={17}/>, label:'Dashboard' },
     { tab:'users',        icon:<Users2 size={17}/>,          label:'Users & Doctors' },
     { tab:'appointments', icon:<Calendar size={17}/>,        label:'Appointments' },
-    { tab:'doctors',      icon:<Stethoscope size={17}/>,     label:'Doctors Management' },
+    { tab:'doctors',      icon:<Stethoscope size={17}/>,     label:'Doctors Management', badge: pendingDocsCount },
     { tab:'ai-analytics', icon:<FlaskConical size={17}/>,    label:'AI Lab Analytics' },
     { tab:'reports',      icon:<FileText size={17}/>,        label:'Reports & Monitoring' },
     { tab:'emergency',    icon:<AlertTriangle size={17}/>,   label:'Emergency Alerts',  highlight:true },
@@ -307,6 +308,11 @@ export default function AdminDashboard() {
               }`}>
               {l.icon}
               <span className="flex-1 text-left">{l.label}</span>
+              {l.badge > 0 && activeTab !== l.tab && (
+                <span className="bg-amber-400 text-gray-900 text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0">
+                  {l.badge}
+                </span>
+              )}
               {activeTab===l.tab && <ChevronRight size={13} className="text-white/50"/>}
             </button>
           ))}

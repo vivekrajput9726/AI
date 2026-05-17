@@ -14,7 +14,7 @@ async def get_all_doctors(
     max_fee: Optional[float] = None
 ) -> dict:
     db = get_db()
-    query = {"is_active": True}
+    query = {"is_active": True, "is_verified": True}
 
     if specialization:
         query["specialization"] = {"$regex": specialization, "$options": "i"}
