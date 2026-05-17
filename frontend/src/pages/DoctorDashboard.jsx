@@ -1532,6 +1532,11 @@ export default function DoctorDashboard() {
   const [aptFilter,    setAptFilter]    = useState('all')
   const [insightsPt,   setInsightsPt]   = useState(null)
   const [statCardFilter, setStatCardFilter] = useState(null)
+  const [tabNotifs,    setTabNotifs]    = useState([])
+  const [tabNotifRead, setTabNotifRead] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('notif_read') || '[]')) } catch { return new Set() }
+  })
+  const [tabNotifLoading, setTabNotifLoading] = useState(false)
   const [chatOpen,     setChatOpen]     = useState(false)
   const [chatRoom,     setChatRoom]     = useState(null)
   const [chatName,     setChatName]     = useState('')
@@ -1559,6 +1564,18 @@ export default function DoctorDashboard() {
 
   const handleVideoCall  = apt => navigate(`/doctor/video/${apt.id}`)
   const handleStartChat  = apt => { setChatRoom(`appointment_${apt.id||apt.patient_id}`); setChatName(apt.patient_name); setChatOpen(true) }
+
+  const loadTabNotifs = async () => {
+    setTabNotifLoading(true)
+    try {
+      const res = await api.get('/notifications/')
+      setTabNotifs(res.data || [])
+    } catch { /* silent */ } finally { setTabNotifLoading(false) }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'notifications') loadTabNotifs()
+  }, [activeTab])
 
   const firstName  = user?.full_name?.split(' ')[0] || 'Doctor'
   const now        = new Date()
@@ -2227,44 +2244,76 @@ export default function DoctorDashboard() {
         )}
 
         {/* ── NOTIFICATIONS ── */}
-        {activeTab === 'notifications' && (
-          <div className="space-y-4">
-            <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-5 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Bell size={20}/></div>
-                <div><h2 className="font-extrabold text-lg">Notifications</h2><p className="text-red-100 text-xs">All alerts, appointment updates and system notifications</p></div>
-              </div>
-              <span className="bg-white text-red-600 text-sm font-extrabold px-3 py-1 rounded-full">8 New</span>
-            </div>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              {[
-                { icon:'📅', color:'bg-blue-100',   title:'New Appointment Booked',          sub:'Priya Patel booked for 16 May · 10:00 AM', time:'2m ago',   unread:true },
-                { icon:'✅', color:'bg-green-100',  title:'Appointment Confirmed',            sub:'Amit Verma confirmed for today · 11:30 AM', time:'15m ago',  unread:true },
-                { icon:'💊', color:'bg-purple-100', title:'Prescription Acknowledged',        sub:'Neha Singh viewed her prescription',        time:'1h ago',   unread:true },
-                { icon:'🔴', color:'bg-red-100',    title:'High Risk Patient Alert',          sub:'Rohit Mehta — Blood pressure elevated',    time:'2h ago',   unread:true },
-                { icon:'📋', color:'bg-orange-100', title:'Lab Report Uploaded',              sub:'New blood test report from City Lab',       time:'3h ago',   unread:true },
-                { icon:'⭐', color:'bg-yellow-100', title:'New Patient Review',               sub:'4.8 ★ — Kavita Joshi left a review',        time:'5h ago',   unread:false },
-                { icon:'📹', color:'bg-teal-100',   title:'Video Consultation Reminder',      sub:'Consultation in 30 minutes with Raj Kumar', time:'Yesterday',unread:false },
-                { icon:'💬', color:'bg-indigo-100', title:'New Message',                      sub:'Sunita Sharma sent you a message',          time:'Yesterday',unread:false },
-              ].map((n,i)=>(
-                <div key={i} className={`flex items-start gap-3 px-5 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer ${n.unread?'bg-blue-50/30':''}`}>
-                  <div className={`w-10 h-10 ${n.color} rounded-xl flex items-center justify-center flex-shrink-0 text-lg`}>{n.icon}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-semibold ${n.unread?'text-gray-900':'text-gray-600'}`}>{n.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{n.sub}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-xs text-gray-400">{n.time}</p>
-                    {n.unread && <span className="w-2 h-2 bg-blue-500 rounded-full block ml-auto mt-1"/>}
-                  </div>
+        {activeTab === 'notifications' && (() => {
+          const NOTIF_META = {
+            appointment_confirmed: { icon:'✅', color:'bg-green-100'  },
+            appointment_pending:   { icon:'📅', color:'bg-blue-100'   },
+            appointment_cancelled: { icon:'❌', color:'bg-red-100'    },
+            new_appointment:       { icon:'📅', color:'bg-blue-100'   },
+            medicine_reminder:     { icon:'💊', color:'bg-purple-100' },
+            health_record:         { icon:'📋', color:'bg-orange-100' },
+            unread_message:        { icon:'💬', color:'bg-indigo-100' },
+          }
+          const unreadCount = tabNotifs.filter(n => !tabNotifRead.has(n.id)).length
+          const markRead = (id) => setTabNotifRead(prev => {
+            const next = new Set([...prev, id])
+            localStorage.setItem('notif_read', JSON.stringify([...next]))
+            return next
+          })
+          const markAllRead = () => {
+            const next = new Set(tabNotifs.map(n => n.id))
+            setTabNotifRead(next)
+            localStorage.setItem('notif_read', JSON.stringify([...next]))
+          }
+          return (
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-5 text-white flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Bell size={20}/></div>
+                  <div><h2 className="font-extrabold text-lg">Notifications</h2><p className="text-red-100 text-xs">All alerts, appointment updates and system notifications</p></div>
                 </div>
-              ))}
+                {unreadCount > 0 && <span className="bg-white text-red-600 text-sm font-extrabold px-3 py-1 rounded-full">{unreadCount} New</span>}
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                {tabNotifLoading
+                  ? <div className="py-10 text-center text-gray-400"><Bell size={28} className="mx-auto mb-2 opacity-30 animate-pulse"/><p className="text-sm">Loading notifications...</p></div>
+                  : tabNotifs.length === 0
+                  ? <div className="py-10 text-center text-gray-400"><Bell size={28} className="mx-auto mb-2 opacity-30"/><p className="text-sm font-medium">No notifications</p><p className="text-xs mt-1">You're all caught up!</p></div>
+                  : tabNotifs.map((n) => {
+                      const meta = NOTIF_META[n.type] || { icon:'🔔', color:'bg-gray-100' }
+                      const isRead = tabNotifRead.has(n.id)
+                      return (
+                        <div key={n.id} onClick={() => markRead(n.id)}
+                          className={`flex items-start gap-3 px-5 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors ${!isRead ? 'bg-blue-50/30' : ''}`}>
+                          <div className={`w-10 h-10 ${meta.color} rounded-xl flex items-center justify-center flex-shrink-0 text-lg`}>{meta.icon}</div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-semibold ${!isRead ? 'text-gray-900' : 'text-gray-500'}`}>{n.title}</p>
+                            <p className="text-xs text-gray-400 mt-0.5 truncate">{n.sub}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-xs text-gray-400">{n.time}</p>
+                            {!isRead && <span className="w-2 h-2 bg-blue-500 rounded-full block ml-auto mt-1"/>}
+                          </div>
+                        </div>
+                      )
+                    })
+                }
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={loadTabNotifs}
+                  className="flex-1 py-2.5 border border-gray-200 text-gray-500 text-sm font-medium rounded-xl hover:bg-gray-50 flex items-center justify-center gap-2">
+                  <RefreshCw size={13}/> Refresh
+                </button>
+                <button onClick={markAllRead} disabled={unreadCount === 0}
+                  className="flex-1 py-2.5 border border-gray-200 text-gray-500 text-sm font-medium rounded-xl hover:bg-gray-50 disabled:opacity-40">
+                  Mark all as read
+                </button>
+              </div>
             </div>
-            <button className="w-full py-2.5 border border-gray-200 text-gray-500 text-sm font-medium rounded-xl hover:bg-gray-50">
-              Mark all as read
-            </button>
-          </div>
-        )}
+          )
+        })()}
 
         {/* ── REFERRALS ── */}
         {activeTab === 'referrals' && (

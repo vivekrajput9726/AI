@@ -1,14 +1,16 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
   LogOut, Menu, X, Plus, Bell, Search, Settings, User,
-  Moon, Sun, Globe, CheckCircle, FileText, Pill, ChevronDown
+  Moon, Sun, Globe, CheckCircle, MessageCircle, Pill, Calendar,
+  FileText, ChevronDown, Clock, AlertCircle
 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import { logout } from '../../redux/slices/authSlice'
 import { getInitials } from '../../utils/helpers'
+import api from '../../services/api'
 
 const LANGUAGES = [
   { code: 'en',    label: 'English',            flag: '🇺🇸' },
@@ -59,13 +61,16 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const { user } = useSelector((state) => state.auth)
-  const { list: appointments } = useSelector(s => s.appointments || { list: [] })
-  const [showDropdown, setShowDropdown]       = useState(false)
+  const [showDropdown, setShowDropdown]           = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [showLangMenu, setShowLangMenu]       = useState(false)
-  const [currentLang, setCurrentLang]         = useState(getCurrentLang)
-  const [langSearch, setLangSearch]           = useState('')
-  const [readIds, setReadIds]                 = useState(new Set())
+  const [showLangMenu, setShowLangMenu]           = useState(false)
+  const [currentLang, setCurrentLang]             = useState(getCurrentLang)
+  const [langSearch, setLangSearch]               = useState('')
+  const [rawNotifs, setRawNotifs]                 = useState([])
+  const [readIds, setReadIds]                     = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('notif_read') || '[]')) }
+    catch { return new Set() }
+  })
   const langRef = useRef(null)
 
   useEffect(() => {
@@ -76,21 +81,57 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const notifications = [
-    ...(appointments?.filter(a => a.status === 'confirmed').slice(0, 1).map((a, i) => ({
-      id: `apt-${i}`,
-      icon: <CheckCircle size={14} className="text-green-500" />,
-      bg: 'bg-green-50',
-      title: 'Appointment Confirmed',
-      sub: `Dr. ${a.doctor_name} · ${a.appointment_time || 'Today'}`,
-      time: a.appointment_date || 'Today'
-    })) || []),
-    { id: 'report-1', icon: <FileText size={14} className="text-blue-500" />, bg: 'bg-blue-50', title: 'Report Analysis Ready', sub: 'Tap to view your AI analysis', time: 'Just now' },
-    { id: 'med-1', icon: <Pill size={14} className="text-orange-500" />, bg: 'bg-orange-50', title: 'Medicine Reminder', sub: 'Paracetamol — 6:00 PM', time: 'Today' },
-  ]
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return
+    try {
+      const res = await api.get('/notifications/')
+      setRawNotifs(res.data || [])
+    } catch { /* silent */ }
+  }, [user])
+
+  useEffect(() => {
+    fetchNotifications()
+    const id = setInterval(fetchNotifications, 30000)
+    return () => clearInterval(id)
+  }, [fetchNotifications])
+
+  // Re-fetch when bell is opened
+  const handleBellClick = () => {
+    setShowNotifications(n => !n)
+    setShowDropdown(false)
+    setShowLangMenu(false)
+    fetchNotifications()
+  }
+
+  const TYPE_META = {
+    appointment_confirmed:  { icon: <CheckCircle size={14} className="text-green-500"/>,  bg: 'bg-green-50'  },
+    appointment_pending:    { icon: <Clock size={14} className="text-yellow-500"/>,        bg: 'bg-yellow-50' },
+    appointment_cancelled:  { icon: <AlertCircle size={14} className="text-red-500"/>,     bg: 'bg-red-50'    },
+    new_appointment:        { icon: <Calendar size={14} className="text-teal-500"/>,       bg: 'bg-teal-50'   },
+    medicine_reminder:      { icon: <Pill size={14} className="text-orange-500"/>,         bg: 'bg-orange-50' },
+    health_record:          { icon: <FileText size={14} className="text-blue-500"/>,       bg: 'bg-blue-50'   },
+    unread_message:         { icon: <MessageCircle size={14} className="text-purple-500"/>,bg: 'bg-purple-50' },
+  }
+
+  const notifications = rawNotifs.map(n => ({
+    ...n,
+    ...(TYPE_META[n.type] || { icon: <Bell size={14} className="text-gray-500"/>, bg: 'bg-gray-50' }),
+  }))
+
   const unreadCount = notifications.filter(n => !readIds.has(n.id)).length
-  const markRead = (id) => setReadIds(prev => new Set([...prev, id]))
-  const markAllRead = () => setReadIds(new Set(notifications.map(n => n.id)))
+
+  const markRead = (id) => {
+    setReadIds(prev => {
+      const next = new Set([...prev, id])
+      localStorage.setItem('notif_read', JSON.stringify([...next]))
+      return next
+    })
+  }
+  const markAllRead = () => {
+    const next = new Set(notifications.map(n => n.id))
+    setReadIds(next)
+    localStorage.setItem('notif_read', JSON.stringify([...next]))
+  }
 
   const { dark, toggle } = useTheme()
 
@@ -138,7 +179,7 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
           {/* ── Language Selector (All Languages) ── */}
           <div className="relative hidden sm:block" ref={langRef}>
             <button
-              onClick={() => { setShowLangMenu(v => !v); setShowDropdown(false); setShowNotifications(false) }}
+              onClick={() => { setShowLangMenu(v => !v); setShowDropdown(false); setShowNotifications(false); }}
               className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl hover:bg-gray-100 transition-colors text-sm text-gray-600 font-medium"
               title="Change language">
               <Globe size={16} className="text-gray-500" />
@@ -179,10 +220,10 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
             {dark ? <Sun size={18} className="text-yellow-500" /> : <Moon size={18} className="text-gray-500" />}
           </button>
 
-          {/* ── Single Notifications Bell ── */}
+          {/* ── Notifications Bell ── */}
           <div className="relative">
             <button
-              onClick={() => { setShowNotifications(n => !n); setShowDropdown(false); setShowLangMenu(false) }}
+              onClick={handleBellClick}
               className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors">
               <Bell size={18} className="text-gray-500" />
               {unreadCount > 0 && (
@@ -199,24 +240,30 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
                   }
                 </div>
                 <div className="max-h-72 overflow-y-auto">
-                  {notifications.map((n) => {
-                    const isRead = readIds.has(n.id)
-                    return (
-                      <button key={n.id}
-                        onClick={() => { markRead(n.id); setShowNotifications(false) }}
-                        className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 text-left ${isRead ? 'opacity-60' : ''}`}>
-                        <div className={`w-8 h-8 ${n.bg} rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5`}>{n.icon}</div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-semibold ${isRead ? 'text-gray-500' : 'text-gray-800'}`}>{n.title}</p>
-                          <p className="text-xs text-gray-500 truncate">{n.sub}</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                          <span className="text-xs text-gray-400">{n.time}</span>
-                          {!isRead && <span className="w-2 h-2 bg-blue-500 rounded-full"/>}
-                        </div>
-                      </button>
-                    )
-                  })}
+                  {notifications.length === 0
+                    ? <div className="py-8 text-center text-gray-400">
+                        <Bell size={24} className="mx-auto mb-2 opacity-30"/>
+                        <p className="text-sm font-medium">No notifications</p>
+                      </div>
+                    : notifications.map((n) => {
+                        const isRead = readIds.has(n.id)
+                        return (
+                          <button key={n.id}
+                            onClick={() => { markRead(n.id); setShowNotifications(false) }}
+                            className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 text-left ${isRead ? 'opacity-60' : ''}`}>
+                            <div className={`w-8 h-8 ${n.bg} rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5`}>{n.icon}</div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-semibold ${isRead ? 'text-gray-500' : 'text-gray-800'}`}>{n.title}</p>
+                              <p className="text-xs text-gray-500 truncate">{n.sub}</p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                              <span className="text-xs text-gray-400">{n.time}</span>
+                              {!isRead && <span className="w-2 h-2 bg-blue-500 rounded-full"/>}
+                            </div>
+                          </button>
+                        )
+                      })
+                  }
                 </div>
                 <div className="px-4 py-2.5 border-t border-gray-100 flex items-center justify-between">
                   <span className="text-xs text-gray-400">{unreadCount} unread</span>
