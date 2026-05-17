@@ -28,14 +28,24 @@ function TaskRemindersSection({ appointments, navigate }) {
     { id:4, text:'Check blood test results — Rohit Mehta',   done:false, priority:'Medium', time:'2:00 PM' },
     { id:5, text:'Submit monthly earnings report',           done:false, priority:'Low',    time:'5:00 PM' },
   ])
-  const [newTask, setNewTask] = useState('')
+  const [newTask,     setNewTask]     = useState('')
+  const [newPriority, setNewPriority] = useState('Medium')
+  const inputRef = useRef(null)
 
   const toggle = id => setTasks(t => t.map(x => x.id===id ? {...x, done:!x.done} : x))
   const del    = id => setTasks(t => t.filter(x => x.id!==id))
   const add    = () => {
-    if (!newTask.trim()) return
-    setTasks(t => [...t, { id:Date.now(), text:newTask.trim(), done:false, priority:'Medium', time:'Now' }])
+    const text = newTask.trim()
+    if (!text) {
+      toast.error('Please type a task description first')
+      inputRef.current?.focus()
+      return
+    }
+    const time = new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true })
+    setTasks(prev => [...prev, { id: Date.now(), text, done: false, priority: newPriority, time }])
     setNewTask('')
+    setNewPriority('Medium')
+    toast.success('Task added!')
   }
 
   return (
@@ -56,15 +66,29 @@ function TaskRemindersSection({ appointments, navigate }) {
 
       {/* Add task */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-        <div className="flex gap-2">
-          <input value={newTask} onChange={e=>setNewTask(e.target.value)}
-            onKeyDown={e=>e.key==='Enter'&&add()}
-            placeholder="Add new task... (press Enter)"
+        <p className="text-xs font-bold text-gray-600 mb-2">Add New Task / Reminder</p>
+        <div className="flex gap-2 mb-2">
+          <input ref={inputRef} value={newTask} onChange={e => setNewTask(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && add()}
+            placeholder="Type task description..."
             className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-400"/>
-          <button onClick={add}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 flex items-center gap-1.5">
+          <button type="button" onClick={add}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 active:bg-blue-800 flex items-center gap-1.5 flex-shrink-0">
             <Plus size={14}/> Add
           </button>
+        </div>
+        <div className="flex gap-2 items-center">
+          <span className="text-xs text-gray-400">Priority:</span>
+          {['High','Medium','Low'].map(p => (
+            <button type="button" key={p} onClick={() => setNewPriority(p)}
+              className={`px-3 py-1 text-xs font-bold rounded-full border transition-all ${newPriority === p
+                ? p==='High' ? 'bg-red-100 text-red-600 border-red-300'
+                  : p==='Medium' ? 'bg-yellow-100 text-yellow-600 border-yellow-300'
+                  : 'bg-gray-100 text-gray-600 border-gray-300'
+                : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'}`}>
+              {p}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -763,7 +787,7 @@ function AIAssistantTab({ appointments, onReload }) {
               <Bell size={14} className="text-orange-600"/>
               <p className="font-bold text-orange-800 text-sm">Follow-up & Reminders</p>
             </div>
-            <button onClick={()=>toast.success('All reminders managed!')} className="text-xs text-orange-600 font-medium hover:underline">Manage</button>
+            <button onClick={()=>setActiveTab('tasks')} className="text-xs text-orange-600 font-medium hover:underline">Manage</button>
           </div>
           <div className="p-4 space-y-3">
             {reminders.map((r,i)=>(
@@ -781,7 +805,7 @@ function AIAssistantTab({ appointments, onReload }) {
                 </button>
               </div>
             ))}
-            <button onClick={()=>toast.success('Reminder added!')}
+            <button onClick={()=>setActiveTab('tasks')}
               className="w-full py-2 border-2 border-dashed border-orange-200 text-orange-600 text-xs font-bold rounded-xl hover:bg-orange-50 flex items-center justify-center gap-1">
               <Plus size={12}/> Add Reminder
             </button>
@@ -1535,8 +1559,17 @@ export default function DoctorDashboard() {
   const [chatOpen,     setChatOpen]     = useState(false)
   const [chatRoom,     setChatRoom]     = useState(null)
   const [chatName,     setChatName]     = useState('')
+  const [chatRooms,    setChatRooms]    = useState([])
 
   useEffect(() => { loadAppointments() }, [])
+
+  useEffect(() => {
+    api.get('/chat/rooms').then(r => setChatRooms(r.data || [])).catch(() => {})
+    const id = setInterval(() => {
+      api.get('/chat/rooms').then(r => setChatRooms(r.data || [])).catch(() => {})
+    }, 30000)
+    return () => clearInterval(id)
+  }, [])
 
   const [refreshing, setRefreshing] = useState(false)
 
@@ -2071,13 +2104,21 @@ export default function DoctorDashboard() {
         {/* ── MESSAGES ── */}
         {activeTab === 'messages' && (
           <div className="space-y-4">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-5 text-white flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><MessageCircle size={20}/></div>
-              <div>
-                <h2 className="font-extrabold text-lg">Messages</h2>
-                <p className="text-blue-200 text-xs">Patient conversations & chats</p>
+            {(() => {
+              const unreadMsgs = chatRooms.filter(r => r.unread).length
+              return (
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><MessageCircle size={20}/></div>
+                <div>
+                  <h2 className="font-extrabold text-lg">Messages</h2>
+                  <p className="text-blue-200 text-xs">Patient conversations & chats</p>
+                </div>
               </div>
+              {unreadMsgs > 0 && <span className="bg-white text-blue-600 text-sm font-extrabold px-3 py-1 rounded-full">{unreadMsgs} Unread</span>}
             </div>
+              )
+            })()}
 
             {appointments.length === 0 ? (
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
@@ -2227,26 +2268,61 @@ export default function DoctorDashboard() {
         )}
 
         {/* ── NOTIFICATIONS ── */}
-        {activeTab === 'notifications' && (
+        {activeTab === 'notifications' && (() => {
+          const today = new Date().toISOString().split('T')[0]
+          const pendingNotifs = appointments
+            .filter(a => a.status === 'pending')
+            .map(a => ({
+              icon:'📅', color:'bg-blue-100',
+              title:'New Appointment Request',
+              sub:`${a.patient_name || 'Patient'} — ${a.appointment_date || ''} · ${a.appointment_time || ''}`,
+              time:'New', unread:true
+            }))
+          const todayNotifs = appointments
+            .filter(a => a.status === 'confirmed' && a.appointment_date === today)
+            .map(a => ({
+              icon:'✅', color:'bg-green-100',
+              title:'Upcoming Appointment Today',
+              sub:`${a.patient_name || 'Patient'} — ${a.appointment_time || ''} · ${a.appointment_type === 'video' ? 'Video Call' : 'Clinic Visit'}`,
+              time:'Today', unread:true
+            }))
+          const completedNotifs = appointments
+            .filter(a => a.status === 'completed')
+            .slice(0, 5)
+            .map(a => ({
+              icon:'🏁', color:'bg-purple-100',
+              title:'Appointment Completed',
+              sub:`${a.patient_name || 'Patient'} — ${a.appointment_date || ''}`,
+              time: a.appointment_date || '', unread:false
+            }))
+          const confirmedNotifs = appointments
+            .filter(a => a.status === 'confirmed' && a.appointment_date !== today)
+            .slice(0, 3)
+            .map(a => ({
+              icon:'📋', color:'bg-orange-100',
+              title:'Confirmed Appointment',
+              sub:`${a.patient_name || 'Patient'} — ${a.appointment_date || ''} · ${a.appointment_time || ''}`,
+              time: a.appointment_date || '', unread:false
+            }))
+          const notifs = [...pendingNotifs, ...todayNotifs, ...completedNotifs, ...confirmedNotifs]
+          const unreadCount = pendingNotifs.length + todayNotifs.length
+          return (
           <div className="space-y-4">
             <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-5 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Bell size={20}/></div>
-                <div><h2 className="font-extrabold text-lg">Notifications</h2><p className="text-red-100 text-xs">All alerts, appointment updates and system notifications</p></div>
+                <div><h2 className="font-extrabold text-lg">Notifications</h2><p className="text-red-100 text-xs">Appointment updates and alerts from your real data</p></div>
               </div>
-              <span className="bg-white text-red-600 text-sm font-extrabold px-3 py-1 rounded-full">8 New</span>
+              {unreadCount > 0 && <span className="bg-white text-red-600 text-sm font-extrabold px-3 py-1 rounded-full">{unreadCount} New</span>}
             </div>
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              {[
-                { icon:'📅', color:'bg-blue-100',   title:'New Appointment Booked',          sub:'Priya Patel booked for 16 May · 10:00 AM', time:'2m ago',   unread:true },
-                { icon:'✅', color:'bg-green-100',  title:'Appointment Confirmed',            sub:'Amit Verma confirmed for today · 11:30 AM', time:'15m ago',  unread:true },
-                { icon:'💊', color:'bg-purple-100', title:'Prescription Acknowledged',        sub:'Neha Singh viewed her prescription',        time:'1h ago',   unread:true },
-                { icon:'🔴', color:'bg-red-100',    title:'High Risk Patient Alert',          sub:'Rohit Mehta — Blood pressure elevated',    time:'2h ago',   unread:true },
-                { icon:'📋', color:'bg-orange-100', title:'Lab Report Uploaded',              sub:'New blood test report from City Lab',       time:'3h ago',   unread:true },
-                { icon:'⭐', color:'bg-yellow-100', title:'New Patient Review',               sub:'4.8 ★ — Kavita Joshi left a review',        time:'5h ago',   unread:false },
-                { icon:'📹', color:'bg-teal-100',   title:'Video Consultation Reminder',      sub:'Consultation in 30 minutes with Raj Kumar', time:'Yesterday',unread:false },
-                { icon:'💬', color:'bg-indigo-100', title:'New Message',                      sub:'Sunita Sharma sent you a message',          time:'Yesterday',unread:false },
-              ].map((n,i)=>(
+              {notifs.length === 0 ? (
+                <div className="py-16 text-center text-gray-400">
+                  <Bell size={32} className="mx-auto mb-3 opacity-30"/>
+                  <p className="text-sm font-medium">No notifications yet</p>
+                  <p className="text-xs mt-1">New appointment requests will appear here</p>
+                </div>
+              ) : notifs.map((n,i) => (
                 <div key={i} className={`flex items-start gap-3 px-5 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer ${n.unread?'bg-blue-50/30':''}`}>
                   <div className={`w-10 h-10 ${n.color} rounded-xl flex items-center justify-center flex-shrink-0 text-lg`}>{n.icon}</div>
                   <div className="flex-1 min-w-0">
@@ -2260,11 +2336,12 @@ export default function DoctorDashboard() {
                 </div>
               ))}
             </div>
-            <button className="w-full py-2.5 border border-gray-200 text-gray-500 text-sm font-medium rounded-xl hover:bg-gray-50">
-              Mark all as read
-            </button>
+            {notifs.length > 0 && (
+              <p className="text-center text-xs text-gray-400">Showing {notifs.length} notification{notifs.length !== 1 ? 's' : ''} from your appointment data</p>
+            )}
           </div>
-        )}
+          )
+        })()}
 
         {/* ── REFERRALS ── */}
         {activeTab === 'referrals' && (

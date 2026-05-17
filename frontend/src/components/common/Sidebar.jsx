@@ -1,4 +1,6 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import api from '../../services/api'
 import {
   LayoutDashboard, Stethoscope, Calendar, User,
   Heart, LogOut, Shield, Activity, FolderOpen, Pill,
@@ -64,6 +66,21 @@ function Sidebar({ isOpen, onClose }) {
   const currentTab   = new URLSearchParams(location.search).get('tab') || 'dashboard'
   const isDoctor     = user?.role === 'doctor'
   const isAdmin      = user?.role === 'admin'
+
+  const [msgUnread, setMsgUnread] = useState(0)
+
+  useEffect(() => {
+    if (!user) return
+    api.get('/chat/rooms')
+      .then(res => setMsgUnread((res.data || []).filter(r => r.unread).length))
+      .catch(() => {})
+    const id = setInterval(() => {
+      api.get('/chat/rooms')
+        .then(res => setMsgUnread((res.data || []).filter(r => r.unread).length))
+        .catch(() => {})
+    }, 30000)
+    return () => clearInterval(id)
+  }, [user])
 
   const handleLogout = () => { dispatch(logout()); navigate('/') }
 
@@ -194,8 +211,8 @@ function Sidebar({ isOpen, onClose }) {
                       <span className="bg-yellow-400 text-gray-900 text-xs font-extrabold w-5 h-5 rounded-full flex items-center justify-center">{pendingCount}</span>
                     )}
                     {badgeText && <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded-full font-bold">{badgeText}</span>}
-                    {messageBadge && <span className="bg-green-500 text-white text-xs font-extrabold w-5 h-5 rounded-full flex items-center justify-center">6</span>}
-                    {notifBadge && <span className="bg-red-500 text-white text-xs font-extrabold w-5 h-5 rounded-full flex items-center justify-center">8</span>}
+                    {messageBadge && msgUnread > 0 && <span className="bg-green-500 text-white text-xs font-extrabold w-5 h-5 rounded-full flex items-center justify-center">{msgUnread}</span>}
+                    {notifBadge && pendingCount > 0 && <span className="bg-red-500 text-white text-xs font-extrabold w-5 h-5 rounded-full flex items-center justify-center">{pendingCount}</span>}
                   </button>
                 </li>
               )
