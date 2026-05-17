@@ -11,6 +11,21 @@ export default function Register() {
   const navigate  = useNavigate()
   const { user }  = useSelector(s => s.auth)
 
+  const [step,    setStep]    = useState(1)   // 1 = form, 2 = OTP
+  const [loading, setLoading] = useState(false)
+  const [form, setForm] = useState({ full_name: '', email: '', password: '', phone: '', role: 'patient' })
+  const [showPassword,    setShowPassword]    = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState('')
+
+  // OTP state
+  const [otp,       setOtp]       = useState(['', '', '', '', '', ''])
+  const [demoOtp,   setDemoOtp]   = useState(null)
+  const [otpChannel,setOtpChannel]= useState(null)   // 'sms' | 'email' | 'demo'
+  const [phoneHint, setPhoneHint] = useState(null)   // e.g. "****1234"
+  const [resending, setResending] = useState(false)
+  const otpRefs = useRef([])
+
   // Already logged in — show switch screen instead of silently redirecting
   if (user) {
     return (
@@ -36,21 +51,6 @@ export default function Register() {
       </div>
     )
   }
-
-  const [step,    setStep]    = useState(1)   // 1 = form, 2 = OTP
-  const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', phone: '', role: 'patient' })
-  const [showPassword,    setShowPassword]    = useState(false)
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
-
-  // OTP state
-  const [otp,       setOtp]       = useState(['', '', '', '', '', ''])
-  const [demoOtp,   setDemoOtp]   = useState(null)
-  const [otpChannel,setOtpChannel]= useState(null)   // 'sms' | 'email' | 'demo'
-  const [phoneHint, setPhoneHint] = useState(null)   // e.g. "****1234"
-  const [resending, setResending] = useState(false)
-  const otpRefs = useRef([])
 
   // ── Step 1: Send OTP ──────────────────────────────────────────────
   const handleSendOtp = async (e) => {
