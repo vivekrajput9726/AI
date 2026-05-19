@@ -79,7 +79,7 @@ def build_pipeline():
             # Word n-grams: captures medical terms and multi-word phrases
             ("word_tfidf", TfidfVectorizer(
                 ngram_range=(1, 3),
-                max_features=5000,
+                max_features=8000,
                 sublinear_tf=True,
                 analyzer="word",
                 min_df=1,
@@ -87,7 +87,7 @@ def build_pipeline():
             # Char n-grams: catches abbreviations, partial words, and typos
             ("char_tfidf", TfidfVectorizer(
                 ngram_range=(3, 5),
-                max_features=3000,
+                max_features=5000,
                 sublinear_tf=True,
                 analyzer="char_wb",
                 min_df=2,
@@ -100,8 +100,8 @@ def build_pipeline():
     # C=2.0 slight regularisation, class_weight handles imbalance
     classifier = MultiOutputClassifier(
         LogisticRegression(
-            C=2.0,
-            max_iter=2000,
+            C=5.0,
+            max_iter=3000,
             class_weight="balanced",
             solver="lbfgs",
             random_state=42,
@@ -256,6 +256,20 @@ def train():
 
     print(f"\n--- Specialist Classification Report ---\n{spec_report}")
     print(f"--- Severity Classification Report ---\n{sev_report}")
+
+    # Cross-validation for reliable macro F1 estimates (avoids single-split variance)
+    print("\n  Cross-validation (5-fold) on specialist prediction ...")
+    from sklearn.model_selection import StratifiedKFold
+    cv_pipeline = build_pipeline()
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    cv_f1_spec, cv_f1_sev = [], []
+    for fold_train_idx, fold_test_idx in skf.split(df, y_spec):
+        cv_pipeline.fit(df.iloc[fold_train_idx], y[fold_train_idx])
+        fold_pred = cv_pipeline.predict(df.iloc[fold_test_idx])
+        cv_f1_spec.append(f1_score(y[fold_test_idx, 0], fold_pred[:, 0], average="macro", zero_division=0))
+        cv_f1_sev.append( f1_score(y[fold_test_idx, 1], fold_pred[:, 1], average="macro", zero_division=0))
+    print(f"  CV Specialist macro F1 : {np.mean(cv_f1_spec):.3f} ± {np.std(cv_f1_spec):.3f}")
+    print(f"  CV Severity    macro F1 : {np.mean(cv_f1_sev):.3f} ± {np.std(cv_f1_sev):.3f}")
 
     # Confusion matrices
     print("[5/6] Generating visualisations ...")

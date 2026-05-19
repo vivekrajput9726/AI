@@ -1,52 +1,52 @@
 SYNORA HEALTH — SYMPTOM CLASSIFIER TRAINING REPORT
 ============================================================
 
-Dataset size : 520 samples
-Train / Test : 416 / 104
+Dataset size : 755 samples
+Train / Test : 604 / 151
 Model        : LogisticRegression (TF-IDF word+char n-grams + Age)
 
 SPECIALIST PREDICTION
-  Accuracy : 59.6%
-  F1-Score : 0.589
+  Accuracy : 68.9%
+  F1-Score : 0.681
 
 SEVERITY PREDICTION
-  Accuracy : 59.6%
-  F1-Score : 0.593
+  Accuracy : 60.3%
+  F1-Score : 0.606
 
 SAFETY METRIC
-  Emergency recall : 40.0%
+  Emergency recall : 61.9%
 
 --- Specialist Classification Report ---
                     precision    recall  f1-score   support
 
-      Cardiologist       0.75      1.00      0.86         9
-     Dermatologist       0.75      0.86      0.80         7
-    ENT Specialist       0.33      0.29      0.31         7
-   Endocrinologist       0.60      0.43      0.50         7
-Gastroenterologist       0.88      0.88      0.88         8
- General Physician       0.50      0.29      0.36         7
-      Gynecologist       0.45      0.71      0.56         7
-       Neurologist       0.22      0.22      0.22         9
-   Ophthalmologist       0.60      0.43      0.50         7
-       Orthopedist       0.62      0.71      0.67         7
-      Pediatrician       0.43      0.86      0.57         7
-      Psychiatrist       1.00      0.62      0.77         8
-     Pulmonologist       0.67      0.50      0.57         8
-         Urologist       1.00      0.50      0.67         6
+      Cardiologist       1.00      0.89      0.94         9
+     Dermatologist       1.00      0.45      0.62        11
+    ENT Specialist       0.67      0.50      0.57        12
+   Endocrinologist       0.75      0.82      0.78        11
+Gastroenterologist       0.80      1.00      0.89         8
+ General Physician       0.50      0.53      0.51        17
+      Gynecologist       1.00      0.25      0.40         8
+       Neurologist       0.80      0.57      0.67        14
+   Ophthalmologist       0.50      0.91      0.65        11
+       Orthopedist       0.59      0.91      0.71        11
+      Pediatrician       0.54      0.88      0.67         8
+      Psychiatrist       0.83      0.77      0.80        13
+     Pulmonologist       0.82      0.75      0.78        12
+         Urologist       0.75      0.50      0.60         6
 
-          accuracy                           0.60       104
-         macro avg       0.63      0.59      0.59       104
-      weighted avg       0.63      0.60      0.59       104
+          accuracy                           0.69       151
+         macro avg       0.75      0.69      0.69       151
+      weighted avg       0.74      0.69      0.68       151
 
 --- Severity Classification Report ---
               precision    recall  f1-score   support
 
-   Emergency       0.43      0.40      0.41        15
-        Mild       0.75      0.79      0.77        38
-    Moderate       0.48      0.55      0.52        29
-      Severe       0.59      0.45      0.51        22
+   Emergency       0.57      0.62      0.59        21
+        Mild       0.79      0.67      0.73        49
+    Moderate       0.52      0.61      0.56        41
+      Severe       0.53      0.50      0.51        40
 
-    accuracy                           0.60       104
-   macro avg       0.56      0.55      0.55       104
-weighted avg       0.60      0.60      0.59       104
+    accuracy                           0.60       151
+   macro avg       0.60      0.60      0.60       151
+weighted avg       0.61      0.60      0.61       151
 
