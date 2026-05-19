@@ -56,35 +56,38 @@ export default function VideoConsultation() {
   const [appointment, setAppointment] = useState(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
-  const [joining, setJoining] = useState(false)
   const [inRoom, setInRoom] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
 
   const isDoctor = user?.role === 'doctor'
 
+  // Generate Jitsi room URL directly from appointmentId — deterministic,
+  // so both doctor and patient always join the same room
+  const roomUrl = appointmentId
+    ? `https://meet.jit.si/Synora-Health-${appointmentId.slice(-12)}`
+    : null
+
   useEffect(() => {
-    api.get(`/appointments/${appointmentId}`)
-      .then(r => setAppointment(r.data))
+    api.get('/appointments/my')
+      .then(r => {
+        const list = Array.isArray(r.data) ? r.data : []
+        const apt = list.find(a => (a.id || a._id) === appointmentId)
+        if (apt) setAppointment(apt)
+      })
       .catch(() => toast.error('Could not load appointment'))
       .finally(() => setLoading(false))
   }, [appointmentId])
 
   const copyLink = () => {
-    if (!appointment?.meeting_link) return
-    navigator.clipboard.writeText(appointment.meeting_link)
+    if (!roomUrl) return
+    navigator.clipboard.writeText(roomUrl)
     setCopied(true)
     toast.success('Link copied!')
     setTimeout(() => setCopied(false), 2000)
   }
 
   const handleJoin = () => {
-    if (appointment?.meeting_link) {
-      setJoining(true)
-      setTimeout(() => {
-        window.open(appointment.meeting_link, '_blank')
-        setJoining(false)
-      }, 500)
-    }
+    if (roomUrl) window.open(roomUrl, '_blank')
   }
 
   if (loading) return (
@@ -112,8 +115,8 @@ export default function VideoConsultation() {
   const config = TYPE_CONFIG[aptType] || TYPE_CONFIG.video
   const Icon = config.icon
   const otherPerson = isDoctor ? appointment.patient_name : appointment.doctor_name
-  const hasLink = !!appointment.meeting_link
   const isConfirmed = appointment.status === 'confirmed'
+  const hasLink = !!roomUrl && isConfirmed
 
   return (
     <DashboardLayout>
@@ -209,7 +212,7 @@ export default function VideoConsultation() {
                     {/* Room link row */}
                     <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center gap-3">
                       <Video size={14} className="text-gray-400 flex-shrink-0" />
-                      <p className="text-xs text-gray-500 truncate flex-1 font-mono">{appointment.meeting_link}</p>
+                      <p className="text-xs text-gray-500 truncate flex-1 font-mono">{roomUrl}</p>
                       <button onClick={copyLink}
                         className={`flex-shrink-0 flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors ${copied ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}>
                         {copied ? <><CheckCircle size={12}/> Copied!</> : <><Copy size={12}/> Copy</>}
@@ -229,17 +232,17 @@ export default function VideoConsultation() {
                     </div>
 
                     {/* Open in new tab fallback */}
-                    <a href={appointment.meeting_link} target="_blank" rel="noopener noreferrer"
+                    <a href={roomUrl} target="_blank" rel="noopener noreferrer"
                       className="flex items-center justify-center gap-2 text-xs text-gray-400 hover:text-blue-600 transition-colors">
                       <ExternalLink size={12}/> Open in new tab instead
                     </a>
                   </>
                 )}
 
-                {!hasLink && isConfirmed && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
-                    <Loader size={15} className="text-blue-500 animate-spin flex-shrink-0 mt-0.5"/>
-                    <p className="text-sm text-blue-700">Generating meeting room… please refresh.</p>
+                {isConfirmed && !hasLink && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex gap-3">
+                    <AlertCircle size={15} className="text-yellow-600 flex-shrink-0 mt-0.5"/>
+                    <p className="text-sm text-yellow-700">Room could not be prepared. Please refresh the page.</p>
                   </div>
                 )}
               </div>
@@ -269,10 +272,11 @@ export default function VideoConsultation() {
                   </div>
                 </div>
 
-                {/* Jitsi iframe — video ON for video calls, OFF for voice */}
+                {/* Jitsi iframe — camera ON for video, OFF for voice */}
                 <iframe
-                  src={`${appointment.meeting_link}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=${aptType === 'voice' ? 'true' : 'false'}&config.toolbarButtons=["microphone","camera","chat","fullscreen","hangup"]&userInfo.displayName=${encodeURIComponent(user?.full_name || 'User')}`}
-                  allow="camera; microphone; fullscreen; display-capture; autoplay"
+                  src={`${roomUrl}#userInfo.displayName=${encodeURIComponent(user?.full_name || 'User')}&config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=${aptType === 'voice' ? 'true' : 'false'}&config.disableAudioLevels=false`}
+                  allow="camera *; microphone *; fullscreen *; display-capture *; autoplay *; speaker *"
+                  allowFullScreen
                   className={`w-full border-0 ${fullscreen ? 'h-screen' : 'rounded-b-2xl'}`}
                   style={{ height: fullscreen ? '100vh' : '580px' }}
                   title={aptType === 'voice' ? 'Voice Consultation' : 'Video Consultation'}
@@ -362,8 +366,9 @@ export default function VideoConsultation() {
                   </button>
                 </div>
                 <iframe
-                  src={`${appointment.meeting_link}#config.prejoinPageEnabled=false&config.startWithVideoMuted=true&config.startWithAudioMuted=false&userInfo.displayName=${encodeURIComponent(user?.full_name || 'User')}`}
-                  allow="camera; microphone; fullscreen; autoplay"
+                  src={`${roomUrl}#userInfo.displayName=${encodeURIComponent(user?.full_name || 'User')}&config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=true&config.disableAudioLevels=false`}
+                  allow="camera *; microphone *; fullscreen *; autoplay *; speaker *"
+                  allowFullScreen
                   className="w-full border-0"
                   style={{ height: '500px' }}
                   title="Voice Consultation"

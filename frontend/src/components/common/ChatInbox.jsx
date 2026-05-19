@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSelector } from 'react-redux'
-import { MessageCircle, X, ChevronDown, ChevronUp, Stethoscope, Users } from 'lucide-react'
+import { MessageCircle, X, ChevronDown, ChevronUp, Stethoscope, Users, Plus } from 'lucide-react'
 import api from '../../services/api'
 import Chat from './Chat'
 
@@ -13,6 +13,7 @@ export default function ChatInbox() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [open,        setOpen]        = useState(false)
   const [activeRoom,  setActiveRoom]  = useState(null)
+  const [myDoctors,   setMyDoctors]   = useState([])
   const prevUnread = useRef(0)
 
   const fetchRooms = useCallback(async () => {
@@ -21,22 +22,44 @@ export default function ChatInbox() {
       const data = res.data || []
       setRooms(data)
       const count = data.filter(r => r.unread).length
-      // Auto-open only when a NEW unread appears
       if (count > prevUnread.current) setOpen(true)
       prevUnread.current = count
       setUnreadCount(count)
     } catch { /* silent */ }
   }, [])
 
+  // For patients: fetch their booked appointments to start new chats
+  const fetchMyDoctors = useCallback(async () => {
+    if (!isPatient) return
+    try {
+      const res = await api.get('/appointments/my')
+      const apts = Array.isArray(res.data) ? res.data : []
+      const seen = new Set()
+      const docs = []
+      apts.forEach(a => {
+        const roomId = `appointment_${a.id || a._id}`
+        if (!seen.has(roomId)) {
+          seen.add(roomId)
+          docs.push({
+            id: a.doctor_id,
+            name: a.doctor_name,
+            roomId   // use appointment-based room ID
+          })
+        }
+      })
+      setMyDoctors(docs)
+    } catch { /* silent */ }
+  }, [isPatient])
+
   useEffect(() => {
     if (!isDoctor && !isPatient) return
     fetchRooms()
+    fetchMyDoctors()
     const id = setInterval(fetchRooms, 15000)
     return () => clearInterval(id)
-  }, [fetchRooms, isDoctor, isPatient])
+  }, [fetchRooms, fetchMyDoctors, isDoctor, isPatient])
 
   if (!user || (!isDoctor && !isPatient)) return null
-  if (rooms.length === 0) return null
 
   // ── Active chat window ──
   if (activeRoom) {
@@ -83,19 +106,13 @@ export default function ChatInbox() {
 
           {/* Room list */}
           <div className="max-h-64 overflow-y-auto divide-y divide-gray-50">
-            {rooms.length === 0 ? (
-              <div className="py-8 text-center text-gray-400">
-                <MessageCircle size={28} className="mx-auto mb-2 opacity-30" />
-                <p className="text-xs">{emptyText}</p>
-              </div>
-            ) : rooms.map(room => {
+            {rooms.map(room => {
               const displayName = isDoctor
                 ? (room.patient_name || 'Patient')
                 : `Dr. ${(room.doctor_name || 'Doctor').replace(/^Dr\.?\s*/i, '')}`
               const nameForChat = isDoctor
                 ? (room.patient_name || 'Patient')
                 : (room.doctor_name || 'Doctor')
-
               return (
                 <button key={room.room_id}
                   onClick={() => { setOpen(false); setActiveRoom({ room_id: room.room_id, name: nameForChat }) }}
@@ -118,6 +135,33 @@ export default function ChatInbox() {
                 </button>
               )
             })}
+
+            {/* New chat — show booked doctors patient hasn't chatted with yet */}
+            {isPatient && myDoctors.filter(d => !rooms.find(r => r.room_id === d.roomId)).map(doc => (
+              <button key={doc.roomId}
+                onClick={() => { setOpen(false); setActiveRoom({ room_id: doc.roomId, name: doc.name }) }}
+                className={`w-full flex items-start gap-3 px-4 py-3 ${hoverBg} transition-colors text-left`}>
+                <div className={`w-9 h-9 bg-gradient-to-br ${accentFrom} ${accentTo} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+                  {(doc.name || 'D').charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">
+                    Dr. {(doc.name || 'Doctor').replace(/^Dr\.?\s*/i, '')}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                    <Plus size={10}/> Start conversation
+                  </p>
+                </div>
+              </button>
+            ))}
+
+            {rooms.length === 0 && myDoctors.length === 0 && (
+              <div className="py-8 text-center text-gray-400">
+                <MessageCircle size={28} className="mx-auto mb-2 opacity-30" />
+                <p className="text-xs">{emptyText}</p>
+                <p className="text-xs mt-1 text-gray-300">Book an appointment to chat with a doctor</p>
+              </div>
+            )}
           </div>
         </div>
       )}

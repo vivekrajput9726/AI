@@ -61,6 +61,10 @@ export default function PatientJourney() {
   const [loading, setLoading] = useState(false)
   const [doctors, setDoctors] = useState([])
   const labRef = useRef()
+  // Step 6 state lifted here to survive parent re-renders
+  const [todayMood,   setTodayMood]   = useState(null)
+  const [todayMed,    setTodayMed]    = useState(null)
+  const [todayBetter, setTodayBetter] = useState(null)
 
   const save = (patch) => {
     const updated = { ...journey, ...patch }
@@ -246,6 +250,7 @@ Keep the response medically accurate but easy to understand.`
     if (exists) { toast.error('Already logged today'); return }
     const logs = [...journey.recovery.logs, { date: today, mood, medTaken, symptomBetter, ts: new Date().toISOString() }]
     patchField('recovery', { logs })
+    setTodayMood(null); setTodayMed(null); setTodayBetter(null)
     toast.success('Recovery logged!')
   }
 
@@ -559,7 +564,7 @@ Generate a structured follow-up report:
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
               <p className="text-sm font-bold text-gray-700 mb-3">Consultation Type</p>
               <div className="grid grid-cols-2 gap-3">
-                {[{t:'video',icon:Video,label:'Video Call'},{t:'voice',icon:Phone,label:'Voice Call'}].map(({t,icon:Icon,label})=>(
+                {[{t:'video',icon:Video,label:'Video Call'},{t:'in-person',icon:MapPin,label:'In-Person'}].map(({t,icon:Icon,label})=>(
                   <button key={t} onClick={()=>patchField('consultation',{type:t})}
                     className={`flex items-center gap-2.5 p-3 rounded-xl border-2 font-semibold text-sm transition-all ${c.type===t?'border-teal-500 bg-teal-50 text-teal-700':'border-gray-100 text-gray-500 hover:border-gray-200'}`}>
                     <Icon size={17}/> {label}
@@ -791,8 +796,13 @@ Generate a structured follow-up report:
         </div>
 
         <div className="flex gap-3">
-          <button onClick={()=>go(6)} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
-            Start Recovery Tracking <ChevronRight size={16}/>
+          {journey.labReport.analysis && (
+            <button onClick={()=>go(6)} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+              Start Recovery Tracking <ChevronRight size={16}/>
+            </button>
+          )}
+          <button onClick={()=>go(6)} className={`${journey.labReport.analysis ? 'border border-gray-200 text-gray-500 hover:bg-gray-50 px-5' : 'flex-1 bg-orange-500 hover:bg-orange-600 text-white'} font-semibold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-1`}>
+            {journey.labReport.analysis ? 'Skip →' : <>Start Recovery Tracking <ChevronRight size={16}/></>}
           </button>
         </div>
       </div>
@@ -801,9 +811,6 @@ Generate a structured follow-up report:
 
   // ─── Step 6: Recovery Tracking ────────────────────────────────────────────
   const Step6 = () => {
-    const [todayMood, setTodayMood]     = useState(null)
-    const [todayMed, setTodayMed]       = useState(null)
-    const [todayBetter, setTodayBetter] = useState(null)
     const logs = journey.recovery.logs
     const today = new Date().toDateString()
     const loggedToday = logs.find(l => l.date === today)
@@ -868,12 +875,14 @@ Generate a structured follow-up report:
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Did you take your medicines?</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {[{v:true,label:'Yes, all taken',color:'green'},{v:false,label:'No / Missed',color:'red'}].map(({v,label,color})=>(
-                    <button key={String(v)} onClick={()=>setTodayMed(v)}
-                      className={`p-3 rounded-xl border-2 text-sm font-semibold transition-all ${todayMed===v?`border-${color}-400 bg-${color}-50 text-${color}-700`:'border-gray-100 text-gray-500 hover:border-gray-200'}`}>
-                      {label}
-                    </button>
-                  ))}
+                  <button onClick={()=>setTodayMed(true)}
+                    className={`p-3 rounded-xl border-2 text-sm font-semibold transition-all ${todayMed===true ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-100 text-gray-500 hover:border-gray-200'}`}>
+                    Yes, all taken
+                  </button>
+                  <button onClick={()=>setTodayMed(false)}
+                    className={`p-3 rounded-xl border-2 text-sm font-semibold transition-all ${todayMed===false ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-100 text-gray-500 hover:border-gray-200'}`}>
+                    No / Missed
+                  </button>
                 </div>
               </div>
 
@@ -1012,6 +1021,11 @@ Generate a structured follow-up report:
         {/* Book follow-up */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <p className="text-sm font-bold text-gray-700 mb-3">Schedule Follow-Up Appointment</p>
+          {!journey.consultation.doctor && (
+            <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-700 flex items-center gap-1.5">
+              <AlertTriangle size={13}/> Go to Step 3 and select a doctor to enable follow-up booking.
+            </div>
+          )}
           {fu.booked ? (
             <div className="flex items-center gap-2 bg-green-50 text-green-700 p-3 rounded-xl">
               <CheckCircle2 size={16}/> Follow-up appointment booked for {fu.nextDate}!
@@ -1021,8 +1035,9 @@ Generate a structured follow-up report:
               <input type="date" value={fu.nextDate||''} onChange={e=>patchField('followUp',{nextDate:e.target.value})}
                 min={new Date().toISOString().split('T')[0]}
                 className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-400"/>
-              <button onClick={bookFollowUp} disabled={loading||!journey.consultation.doctor}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5">
+              <button onClick={bookFollowUp} disabled={loading || !fu.nextDate || !journey.consultation.doctor}
+                title={!journey.consultation.doctor ? 'Complete Step 3 consultation first to book follow-up' : ''}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5">
                 {loading?<Loader size={14} className="animate-spin"/>:<Calendar size={14}/>} Book
               </button>
             </div>

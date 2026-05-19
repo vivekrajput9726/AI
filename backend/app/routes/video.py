@@ -23,8 +23,9 @@ async def create_video_session(appointment_id: str, current_user: dict = Depends
     if existing:
         return serialize_doc(existing)
 
-    room_name = f"aihealthcare-{appointment_id}-{uuid.uuid4().hex[:8]}"
-    room_url = None
+    room_name = f"Synora-{appointment['doctor_id'][-6:]}-{appointment_id[-6:]}"
+    # Default: Jit.si free room (no API key needed)
+    room_url = f"https://meet.jit.si/{room_name}"
 
     if settings.DAILY_API_KEY:
         try:
@@ -36,7 +37,7 @@ async def create_video_session(appointment_id: str, current_user: dict = Depends
                     json={"name": room_name, "privacy": "private", "properties": {"enable_chat": True}}
                 )
                 if resp.status_code == 200:
-                    room_url = resp.json().get("url")
+                    room_url = resp.json().get("url") or room_url
         except Exception:
             pass
 

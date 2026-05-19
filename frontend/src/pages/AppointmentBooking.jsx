@@ -18,9 +18,8 @@ import toast from 'react-hot-toast'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const TYPES = [
-  { type: 'video',      label: 'Video Call', icon: <Video size={20} />, desc: 'Face-to-face online' },
-  { type: 'voice',      label: 'Voice Call', icon: <Phone size={20} />, desc: 'Audio consultation'  },
-  { type: 'in-person',  label: 'In-Person',  icon: <MapPin size={20} />, desc: 'Visit the clinic'  },
+  { type: 'video',     label: 'Video Call', icon: <Video size={20} />, desc: 'Face-to-face online' },
+  { type: 'in-person', label: 'In-Person',  icon: <MapPin size={20} />, desc: 'Visit the clinic'  },
 ]
 
 const PAYMENT_METHODS = [
