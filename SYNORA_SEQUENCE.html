@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Synora Health – Sequence Diagrams</title>
+<style>
+  body { font-family: 'Times New Roman', serif; background: #fff; margin: 0; padding: 0; }
+  .page { width: 820px; margin: 0 auto; padding: 14px 18px 24px; page-break-after: always; border-bottom: 3px dashed #bbb; }
+  .hdr  { text-align: right; font-size: 10pt; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 6px; }
+  .ch   { font-size: 12pt; font-weight: bold; margin: 0 0 2px; }
+  .sub  { text-align: center; font-size: 12pt; font-weight: bold; margin: 0 0 6px; }
+  .cap  { text-align: center; font-size: 11pt; font-weight: bold; margin: 6px 0 0; }
+  .pgn  { text-align: center; font-size: 11pt; margin: 3px 0 0; }
+  svg text { font-family: 'Times New Roman', serif; }
+  @media print { .page { page-break-after: always; border: none; } }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════
+     PAGE 1 – PATIENT / USER SIDE
+════════════════════════════════════ -->
+<div class="page">
+<div class="hdr">Synora Health AI Platform</div>
+<div class="ch">6.6 Sequence Diagram</div>
+<div class="sub">(Patient / User Side)</div>
+
+<svg width="776" height="860" viewBox="0 0 776 860">
+<defs>
+  <marker id="sf" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <polygon points="0 0,8 3,0 6" fill="#000"/>
+  </marker>
+  <marker id="rf" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <polygon points="0 0,8 3,0 6" fill="#fff" stroke="#333" stroke-width="1"/>
+  </marker>
+</defs>
+
+<!-- ── ACTOR STICK FIGURE (User) ── -->
+<circle cx="45" cy="16" r="9" fill="none" stroke="#000" stroke-width="1.5"/>
+<line x1="45" y1="25" x2="45" y2="52" stroke="#000" stroke-width="1.5"/>
+<line x1="29" y1="37" x2="61" y2="37" stroke="#000" stroke-width="1.5"/>
+<line x1="45" y1="52" x2="32" y2="67" stroke="#000" stroke-width="1.5"/>
+<line x1="45" y1="52" x2="58" y2="67" stroke="#000" stroke-width="1.5"/>
+<text x="45" y="80" text-anchor="middle" font-size="9" font-weight="bold">User</text>
+
+<!-- ── COMPONENT HEADER BOXES ── -->
+<rect x="128" y="8" width="114" height="32" rx="3" fill="#1e40af" stroke="#1e3a8a" stroke-width="1.5"/>
+<text x="185" y="21" text-anchor="middle" fill="white" font-size="9" font-weight="bold">React</text>
+<text x="185" y="33" text-anchor="middle" fill="white" font-size="8">Frontend</text>
+
+<rect x="268" y="8" width="114" height="32" rx="3" fill="#166534" stroke="#14532d" stroke-width="1.5"/>
+<text x="325" y="21" text-anchor="middle" fill="white" font-size="9" font-weight="bold">FastAPI</text>
+<text x="325" y="33" text-anchor="middle" fill="white" font-size="8">Backend</text>
+
+<rect x="406" y="8" width="108" height="32" rx="3" fill="#6b21a8" stroke="#581c87" stroke-width="1.5"/>
+<text x="460" y="21" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MongoDB</text>
+<text x="460" y="33" text-anchor="middle" fill="white" font-size="8">Database</text>
+
+<rect x="539" y="8" width="114" height="32" rx="3" fill="#92400e" stroke="#78350f" stroke-width="1.5"/>
+<text x="596" y="21" text-anchor="middle" fill="white" font-size="9" font-weight="bold">AI Services</text>
+<text x="596" y="33" text-anchor="middle" fill="white" font-size="8">(Groq / Gemini)</text>
+
+<rect x="671" y="8" width="100" height="32" rx="3" fill="#0f766e" stroke="#115e59" stroke-width="1.5"/>
+<text x="721" y="21" text-anchor="middle" fill="white" font-size="9" font-weight="bold">Razorpay</text>
+<text x="721" y="33" text-anchor="middle" fill="white" font-size="8">Gateway</text>
+
+<!-- ── VERTICAL LIFELINES ── -->
+<line x1="45"  y1="82"  x2="45"  y2="852" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+<line x1="185" y1="40"  x2="185" y2="852" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+<line x1="325" y1="40"  x2="325" y2="852" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+<line x1="460" y1="40"  x2="460" y2="852" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+<line x1="596" y1="40"  x2="596" y2="852" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+<line x1="721" y1="40"  x2="721" y2="852" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+
+<!-- ═══════ SECTION 1: AUTHENTICATION ═══════ -->
+<rect x="6" y="88" width="764" height="15" rx="2" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
+<text x="388" y="99" text-anchor="middle" font-size="9" font-weight="bold" fill="#1e40af">Authentication</text>
+
+<!-- Activation boxes -->
+<rect x="321" y="108" width="8" height="70" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="456" y="126" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+
+<line x1="45"  y1="108" x2="180" y2="108" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="113" y="103" text-anchor="middle" font-size="8">Enter Email &amp; Password</text>
+
+<line x1="185" y1="126" x2="320" y2="126" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="253" y="121" text-anchor="middle" font-size="8">POST /api/auth/login</text>
+
+<line x1="329" y1="144" x2="455" y2="144" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="392" y="139" text-anchor="middle" font-size="8">db.users.find_one({email})</text>
+
+<line x1="456" y1="162" x2="330" y2="162" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="392" y="157" text-anchor="middle" font-size="8" fill="#555">User Record</text>
+
+<line x1="321" y1="178" x2="187" y2="178" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="254" y="173" text-anchor="middle" font-size="8" fill="#555">{access_token, refresh_token, role}</text>
+
+<line x1="185" y1="195" x2="51"  y2="195" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="118" y="190" text-anchor="middle" font-size="8" fill="#555">Redirect → Patient Dashboard</text>
+
+<!-- ═══════ SECTION 2: BOOK APPOINTMENT + PAYMENT ═══════ -->
+<rect x="6" y="207" width="764" height="15" rx="2" fill="#dcfce7" stroke="#86efac" stroke-width="1"/>
+<text x="388" y="218" text-anchor="middle" font-size="9" font-weight="bold" fill="#166534">Book Appointment &amp; Razorpay Payment</text>
+
+<!-- Activation boxes -->
+<rect x="321" y="227" width="8" height="196" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="456" y="245" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="717" y="315" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="456" y="387" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+
+<line x1="45"  y1="227" x2="180" y2="227" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="113" y="222" text-anchor="middle" font-size="8">Search Doctors by Specialty</text>
+
+<line x1="185" y1="245" x2="320" y2="245" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="253" y="240" text-anchor="middle" font-size="8">GET /api/doctors?specialty=…</text>
+
+<line x1="329" y1="263" x2="455" y2="263" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="392" y="258" text-anchor="middle" font-size="8">find({is_verified:true})</text>
+
+<line x1="456" y1="281" x2="330" y2="281" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="392" y="276" text-anchor="middle" font-size="8" fill="#555">Doctors List</text>
+
+<line x1="321" y1="299" x2="187" y2="299" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="254" y="294" text-anchor="middle" font-size="8" fill="#555">200 OK {doctors}</text>
+
+<line x1="45"  y1="315" x2="180" y2="315" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="113" y="310" text-anchor="middle" font-size="8">Select Doctor &amp; Time Slot</text>
+
+<line x1="185" y1="333" x2="320" y2="333" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="253" y="328" text-anchor="middle" font-size="8">POST /api/payments/create-order</text>
+
+<line x1="329" y1="351" x2="716" y2="351" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="522" y="346" text-anchor="middle" font-size="8">razorpay.orders.create(amount, currency)</text>
+
+<line x1="717" y1="369" x2="330" y2="369" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="524" y="364" text-anchor="middle" font-size="8" fill="#555">{order_id, amount}</text>
+
+<line x1="321" y1="387" x2="187" y2="387" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="254" y="382" text-anchor="middle" font-size="8" fill="#555">{order_id} → Open Razorpay Modal</text>
+
+<line x1="45"  y1="405" x2="180" y2="405" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="113" y="400" text-anchor="middle" font-size="8">Pay via UPI / Card</text>
+
+<line x1="185" y1="423" x2="320" y2="423" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="253" y="418" text-anchor="middle" font-size="8">POST /api/payments/verify {signature}</text>
+
+<!-- HMAC note -->
+<rect x="330" y="432" width="100" height="14" rx="2" fill="#fef9c3" stroke="#ca8a04" stroke-width="0.8"/>
+<text x="380" y="442" text-anchor="middle" font-size="7.5" fill="#92400e">HMAC-SHA256 Verify ✓</text>
+
+<line x1="329" y1="451" x2="455" y2="451" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="392" y="446" text-anchor="middle" font-size="8">Insert: appointment + payment</text>
+
+<line x1="321" y1="469" x2="187" y2="469" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="254" y="464" text-anchor="middle" font-size="8" fill="#555">200 {appointment_id, confirmed}</text>
+
+<line x1="185" y1="487" x2="51"  y2="487" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="118" y="482" text-anchor="middle" font-size="8" fill="#555">Appointment Confirmed ✓</text>
+
+<!-- ═══════ SECTION 3: AI SYMPTOM CHECKER ═══════ -->
+<rect x="6" y="499" width="764" height="15" rx="2" fill="#fef9c3" stroke="#fde047" stroke-width="1"/>
+<text x="388" y="510" text-anchor="middle" font-size="9" font-weight="bold" fill="#92400e">AI Symptom Checker</text>
+
+<rect x="321" y="519" width="8" height="88" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="592" y="537" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+
+<line x1="45"  y1="519" x2="180" y2="519" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="113" y="514" text-anchor="middle" font-size="8">Enter Symptom Description</text>
+
+<line x1="185" y1="537" x2="320" y2="537" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="253" y="532" text-anchor="middle" font-size="8">POST /api/ai/symptoms</text>
+
+<line x1="329" y1="555" x2="591" y2="555" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="460" y="550" text-anchor="middle" font-size="8">Groq Llama 3.1 API Request</text>
+
+<line x1="592" y1="573" x2="330" y2="573" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="461" y="568" text-anchor="middle" font-size="8" fill="#555">AI Analysis JSON (Gemini fallback)</text>
+
+<line x1="321" y1="591" x2="187" y2="591" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="254" y="586" text-anchor="middle" font-size="8" fill="#555">{conditions, urgency, actions}</text>
+
+<line x1="185" y1="609" x2="51"  y2="609" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="118" y="604" text-anchor="middle" font-size="8" fill="#555">Display Diagnosis &amp; Recommendations</text>
+
+<!-- ═══════ SECTION 4: HEALTH RECORDS ═══════ -->
+<rect x="6" y="621" width="764" height="15" rx="2" fill="#fce7f3" stroke="#f9a8d4" stroke-width="1"/>
+<text x="388" y="632" text-anchor="middle" font-size="9" font-weight="bold" fill="#9d174d">Health Records &amp; AI Analysis</text>
+
+<rect x="321" y="641" width="8" height="88" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="592" y="659" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="456" y="695" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+
+<line x1="45"  y1="641" x2="180" y2="641" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="113" y="636" text-anchor="middle" font-size="8">Upload Medical Report / Image</text>
+
+<line x1="185" y1="659" x2="320" y2="659" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="253" y="654" text-anchor="middle" font-size="8">POST /api/health-records (multipart)</text>
+
+<line x1="329" y1="677" x2="591" y2="677" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="460" y="672" text-anchor="middle" font-size="8">Gemini Vision API (analyze image)</text>
+
+<line x1="592" y1="695" x2="330" y2="695" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="461" y="690" text-anchor="middle" font-size="8" fill="#555">AI Health Insights</text>
+
+<line x1="329" y1="713" x2="455" y2="713" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="392" y="708" text-anchor="middle" font-size="8">Insert health_record</text>
+
+<line x1="321" y1="731" x2="187" y2="731" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="254" y="726" text-anchor="middle" font-size="8" fill="#555">200 {record_id, ai_insights}</text>
+
+<line x1="185" y1="749" x2="51"  y2="749" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="118" y="744" text-anchor="middle" font-size="8" fill="#555">View Health Report + AI Insights</text>
+
+<!-- ═══════ SECTION 5: LOGOUT ═══════ -->
+<rect x="6" y="761" width="764" height="15" rx="2" fill="#fee2e2" stroke="#fca5a5" stroke-width="1"/>
+<text x="388" y="772" text-anchor="middle" font-size="9" font-weight="bold" fill="#991b1b">Logout</text>
+
+<line x1="45"  y1="781" x2="180" y2="781" stroke="#000" stroke-width="1.4" marker-end="url(#sf)"/>
+<text x="113" y="776" text-anchor="middle" font-size="8">Click Logout Button</text>
+
+<!-- Self-arrow on Frontend (clear tokens) -->
+<line x1="185" y1="799" x2="225" y2="799" stroke="#000" stroke-width="1.2"/>
+<line x1="225" y1="799" x2="225" y2="815" stroke="#000" stroke-width="1.2"/>
+<line x1="225" y1="815" x2="187" y2="815" stroke="#000" stroke-width="1.2" marker-end="url(#sf)"/>
+<text x="280" y="810" font-size="8">Clear JWT + Redux State</text>
+
+<line x1="185" y1="833" x2="51"  y2="833" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rf)"/>
+<text x="118" y="828" text-anchor="middle" font-size="8" fill="#555">Redirect → Login Page</text>
+</svg>
+
+<p class="cap">(Patient / User Side)</p>
+<div class="pgn">25</div>
+</div>
+
+<!-- ════════════════════════════════════
+     PAGE 2 – DOCTOR SIDE
+════════════════════════════════════ -->
+<div class="page">
+<div class="hdr">Synora Health AI Platform</div>
+<div class="ch">6.6 Sequence Diagram</div>
+<div class="sub">(Doctor Side)</div>
+
+<svg width="776" height="840" viewBox="0 0 776 840">
+<defs>
+  <marker id="sd" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <polygon points="0 0,8 3,0 6" fill="#000"/>
+  </marker>
+  <marker id="rd" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <polygon points="0 0,8 3,0 6" fill="#fff" stroke="#333" stroke-width="1"/>
+  </marker>
+</defs>
+
+<!-- ACTOR: Doctor -->
+<circle cx="45" cy="16" r="9" fill="none" stroke="#000" stroke-width="1.5"/>
+<line x1="45" y1="25" x2="45" y2="52" stroke="#000" stroke-width="1.5"/>
+<line x1="29" y1="37" x2="61" y2="37" stroke="#000" stroke-width="1.5"/>
+<line x1="45" y1="52" x2="32" y2="67" stroke="#000" stroke-width="1.5"/>
+<line x1="45" y1="52" x2="58" y2="67" stroke="#000" stroke-width="1.5"/>
+<text x="45" y="80" text-anchor="middle" font-size="9" font-weight="bold">Doctor</text>
+
+<!-- COMPONENT HEADERS (5 lifelines) -->
+<rect x="128" y="8" width="118" height="32" rx="3" fill="#1e40af" stroke="#1e3a8a" stroke-width="1.5"/>
+<text x="187" y="21" text-anchor="middle" fill="white" font-size="9" font-weight="bold">React</text>
+<text x="187" y="33" text-anchor="middle" fill="white" font-size="8">Frontend</text>
+
+<rect x="279" y="8" width="118" height="32" rx="3" fill="#166534" stroke="#14532d" stroke-width="1.5"/>
+<text x="338" y="21" text-anchor="middle" fill="white" font-size="9" font-weight="bold">FastAPI</text>
+<text x="338" y="33" text-anchor="middle" fill="white" font-size="8">Backend</text>
+
+<rect x="430" y="8" width="118" height="32" rx="3" fill="#6b21a8" stroke="#581c87" stroke-width="1.5"/>
+<text x="489" y="21" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MongoDB</text>
+<text x="489" y="33" text-anchor="middle" fill="white" font-size="8">Database</text>
+
+<rect x="578" y="8" width="118" height="32" rx="3" fill="#92400e" stroke="#78350f" stroke-width="1.5"/>
+<text x="637" y="21" text-anchor="middle" fill="white" font-size="9" font-weight="bold">AI Services</text>
+<text x="637" y="33" text-anchor="middle" fill="white" font-size="8">(Groq / Gemini)</text>
+
+<!-- VERTICAL LIFELINES -->
+<line x1="45"  y1="82"  x2="45"  y2="832" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+<line x1="187" y1="40"  x2="187" y2="832" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+<line x1="338" y1="40"  x2="338" y2="832" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+<line x1="489" y1="40"  x2="489" y2="832" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+<line x1="637" y1="40"  x2="637" y2="832" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+
+<!-- ═══════ SECTION 1: LOGIN & VERIFICATION ═══════ -->
+<rect x="6" y="88" width="764" height="15" rx="2" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
+<text x="388" y="99" text-anchor="middle" font-size="9" font-weight="bold" fill="#1e40af">Login &amp; Admin Verification</text>
+
+<rect x="334" y="108" width="8" height="90" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="485" y="126" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="485" y="162" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+
+<line x1="45"  y1="108" x2="182" y2="108" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="114" y="103" text-anchor="middle" font-size="8">Enter Email &amp; Password</text>
+
+<line x1="187" y1="126" x2="333" y2="126" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="260" y="121" text-anchor="middle" font-size="8">POST /api/auth/login</text>
+
+<line x1="342" y1="144" x2="484" y2="144" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="413" y="139" text-anchor="middle" font-size="8">find({email}) + check doctor_verified</text>
+
+<line x1="485" y1="162" x2="343" y2="162" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="414" y="157" text-anchor="middle" font-size="8" fill="#555">User + Doctor Record</text>
+
+<!-- Verification check note -->
+<rect x="344" y="170" width="120" height="14" rx="2" fill="#fef9c3" stroke="#ca8a04" stroke-width="0.8"/>
+<text x="404" y="180" text-anchor="middle" font-size="7.5" fill="#92400e">Check: doctor_verified == true</text>
+
+<line x1="334" y1="188" x2="189" y2="188" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="261" y="183" text-anchor="middle" font-size="8" fill="#555">{access_token, doctor_verified:true}</text>
+
+<line x1="187" y1="206" x2="51"  y2="206" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="119" y="201" text-anchor="middle" font-size="8" fill="#555">Redirect → Doctor Dashboard</text>
+
+<!-- ═══════ SECTION 2: VIEW & APPROVE APPOINTMENTS ═══════ -->
+<rect x="6" y="218" width="764" height="15" rx="2" fill="#dcfce7" stroke="#86efac" stroke-width="1"/>
+<text x="388" y="229" text-anchor="middle" font-size="9" font-weight="bold" fill="#166534">View &amp; Approve / Reject Appointments</text>
+
+<rect x="334" y="238" width="8" height="160" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="485" y="256" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="485" y="328" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+
+<line x1="45"  y1="238" x2="182" y2="238" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="114" y="233" text-anchor="middle" font-size="8">Open Appointments Tab</text>
+
+<line x1="187" y1="256" x2="333" y2="256" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="260" y="251" text-anchor="middle" font-size="8">GET /api/appointments/doctor</text>
+
+<line x1="342" y1="274" x2="484" y2="274" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="413" y="269" text-anchor="middle" font-size="8">find({doctor_id, status})</text>
+
+<line x1="485" y1="292" x2="343" y2="292" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="414" y="287" text-anchor="middle" font-size="8" fill="#555">Appointments List</text>
+
+<line x1="334" y1="310" x2="189" y2="310" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="261" y="305" text-anchor="middle" font-size="8" fill="#555">Display Appointments</text>
+
+<line x1="45"  y1="328" x2="182" y2="328" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="114" y="323" text-anchor="middle" font-size="8">Click Approve / Reject</text>
+
+<line x1="187" y1="346" x2="333" y2="346" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="260" y="341" text-anchor="middle" font-size="8">PUT /api/appointments/{id}/status</text>
+
+<line x1="342" y1="364" x2="484" y2="364" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="413" y="359" text-anchor="middle" font-size="8">update({status: confirmed/cancelled})</text>
+
+<line x1="334" y1="382" x2="189" y2="382" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="261" y="377" text-anchor="middle" font-size="8" fill="#555">200 OK + Patient Notified (WS)</text>
+
+<line x1="187" y1="400" x2="51"  y2="400" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="119" y="395" text-anchor="middle" font-size="8" fill="#555">Appointment Status Updated</text>
+
+<!-- ═══════ SECTION 3: AI PRESCRIPTION ═══════ -->
+<rect x="6" y="412" width="764" height="15" rx="2" fill="#fef9c3" stroke="#fde047" stroke-width="1"/>
+<text x="388" y="423" text-anchor="middle" font-size="9" font-weight="bold" fill="#92400e">Write AI-Assisted Prescription</text>
+
+<rect x="334" y="432" width="8" height="108" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="633" y="450" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="485" y="504" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+
+<line x1="45"  y1="432" x2="182" y2="432" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="114" y="427" text-anchor="middle" font-size="8">Select Patient &amp; Enter Diagnosis</text>
+
+<line x1="187" y1="450" x2="333" y2="450" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="260" y="445" text-anchor="middle" font-size="8">POST /api/ai/generate-prescription</text>
+
+<line x1="342" y1="468" x2="632" y2="468" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="487" y="463" text-anchor="middle" font-size="8">Groq AI: drug suggestions</text>
+
+<line x1="633" y1="486" x2="343" y2="486" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="488" y="481" text-anchor="middle" font-size="8" fill="#555">AI Prescription Draft</text>
+
+<line x1="187" y1="504" x2="333" y2="504" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="260" y="499" text-anchor="middle" font-size="8">POST /api/health-records (save Rx)</text>
+
+<line x1="342" y1="522" x2="484" y2="522" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="413" y="517" text-anchor="middle" font-size="8">Insert prescription record</text>
+
+<line x1="334" y1="540" x2="189" y2="540" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="261" y="535" text-anchor="middle" font-size="8" fill="#555">Saved + PDF generated</text>
+
+<line x1="187" y1="558" x2="51"  y2="558" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="119" y="553" text-anchor="middle" font-size="8" fill="#555">Display Prescription + Print Option</text>
+
+<!-- ═══════ SECTION 4: REAL-TIME MESSAGES ═══════ -->
+<rect x="6" y="570" width="764" height="15" rx="2" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1"/>
+<text x="388" y="581" text-anchor="middle" font-size="9" font-weight="bold" fill="#6b21a8">Real-Time Messages (WebSocket)</text>
+
+<line x1="45"  y1="591" x2="182" y2="591" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="114" y="586" text-anchor="middle" font-size="8">Open Chat Inbox</text>
+
+<line x1="187" y1="609" x2="333" y2="609" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="260" y="604" text-anchor="middle" font-size="8">WS Connect: /ws/chat/{room_id}</text>
+
+<line x1="342" y1="627" x2="484" y2="627" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="413" y="622" text-anchor="middle" font-size="8">Fetch chat history + mark read</text>
+
+<line x1="338" y1="645" x2="189" y2="645" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="261" y="640" text-anchor="middle" font-size="8" fill="#555">Chat messages + unread count</text>
+
+<line x1="45"  y1="663" x2="182" y2="663" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="114" y="658" text-anchor="middle" font-size="8">Send Message to Patient</text>
+
+<line x1="187" y1="681" x2="333" y2="681" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="260" y="676" text-anchor="middle" font-size="8">WS: {type:'message', content, room}</text>
+
+<line x1="338" y1="699" x2="189" y2="699" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="261" y="694" text-anchor="middle" font-size="8" fill="#555">Delivered to Patient (broadcast)</text>
+
+<!-- ═══════ SECTION 5: LOGOUT ═══════ -->
+<rect x="6" y="711" width="764" height="15" rx="2" fill="#fee2e2" stroke="#fca5a5" stroke-width="1"/>
+<text x="388" y="722" text-anchor="middle" font-size="9" font-weight="bold" fill="#991b1b">Logout</text>
+
+<line x1="45"  y1="732" x2="182" y2="732" stroke="#000" stroke-width="1.4" marker-end="url(#sd)"/>
+<text x="114" y="727" text-anchor="middle" font-size="8">Click Logout</text>
+
+<line x1="187" y1="750" x2="225" y2="750" stroke="#000" stroke-width="1.2"/>
+<line x1="225" y1="750" x2="225" y2="766" stroke="#000" stroke-width="1.2"/>
+<line x1="225" y1="766" x2="189" y2="766" stroke="#000" stroke-width="1.2" marker-end="url(#sd)"/>
+<text x="280" y="761" font-size="8">Clear JWT + Redux Store</text>
+
+<line x1="187" y1="784" x2="51"  y2="784" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#rd)"/>
+<text x="119" y="779" text-anchor="middle" font-size="8" fill="#555">Redirect → Login Page</text>
+</svg>
+
+<p class="cap">(Doctor Side)</p>
+<div class="pgn">26</div>
+</div>
+
+<!-- ════════════════════════════════════
+     PAGE 3 – ADMIN SIDE
+════════════════════════════════════ -->
+<div class="page">
+<div class="hdr">Synora Health AI Platform</div>
+<div class="ch">6.6 Sequence Diagram</div>
+<div class="sub">(Admin Side)</div>
+
+<svg width="776" height="820" viewBox="0 0 776 820">
+<defs>
+  <marker id="sa" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <polygon points="0 0,8 3,0 6" fill="#000"/>
+  </marker>
+  <marker id="ra" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <polygon points="0 0,8 3,0 6" fill="#fff" stroke="#333" stroke-width="1"/>
+  </marker>
+</defs>
+
+<!-- ACTOR: Admin -->
+<circle cx="55" cy="16" r="9" fill="none" stroke="#000" stroke-width="1.5"/>
+<line x1="55" y1="25" x2="55" y2="52" stroke="#000" stroke-width="1.5"/>
+<line x1="39" y1="37" x2="71" y2="37" stroke="#000" stroke-width="1.5"/>
+<line x1="55" y1="52" x2="42" y2="67" stroke="#000" stroke-width="1.5"/>
+<line x1="55" y1="52" x2="68" y2="67" stroke="#000" stroke-width="1.5"/>
+<text x="55" y="80" text-anchor="middle" font-size="9" font-weight="bold">Admin</text>
+
+<!-- COMPONENT HEADERS (4 lifelines) -->
+<rect x="168" y="8" width="150" height="32" rx="3" fill="#1e40af" stroke="#1e3a8a" stroke-width="1.5"/>
+<text x="243" y="21" text-anchor="middle" fill="white" font-size="9" font-weight="bold">React Frontend</text>
+<text x="243" y="33" text-anchor="middle" fill="white" font-size="8">Admin Dashboard</text>
+
+<rect x="380" y="8" width="150" height="32" rx="3" fill="#166534" stroke="#14532d" stroke-width="1.5"/>
+<text x="455" y="21" text-anchor="middle" fill="white" font-size="9" font-weight="bold">FastAPI Backend</text>
+<text x="455" y="33" text-anchor="middle" fill="white" font-size="8">Admin Routes</text>
+
+<rect x="595" y="8" width="175" height="32" rx="3" fill="#6b21a8" stroke="#581c87" stroke-width="1.5"/>
+<text x="682" y="21" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MongoDB Database</text>
+<text x="682" y="33" text-anchor="middle" fill="white" font-size="8">All Collections</text>
+
+<!-- VERTICAL LIFELINES -->
+<line x1="55"  y1="82"  x2="55"  y2="812" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+<line x1="243" y1="40"  x2="243" y2="812" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+<line x1="455" y1="40"  x2="455" y2="812" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+<line x1="682" y1="40"  x2="682" y2="812" stroke="#777" stroke-width="1" stroke-dasharray="6,4"/>
+
+<!-- ═══════ SECTION 1: ADMIN LOGIN ═══════ -->
+<rect x="6" y="88" width="764" height="15" rx="2" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
+<text x="388" y="99" text-anchor="middle" font-size="9" font-weight="bold" fill="#1e40af">Admin Login</text>
+
+<rect x="451" y="108" width="8" height="70" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="678" y="126" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+
+<line x1="55"  y1="108" x2="238" y2="108" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="147" y="103" text-anchor="middle" font-size="8">Enter Admin Credentials</text>
+
+<line x1="243" y1="126" x2="450" y2="126" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="347" y="121" text-anchor="middle" font-size="8">POST /api/auth/login</text>
+
+<line x1="459" y1="144" x2="677" y2="144" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="568" y="139" text-anchor="middle" font-size="8">find({email, role:'admin'})</text>
+
+<line x1="678" y1="162" x2="460" y2="162" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="569" y="157" text-anchor="middle" font-size="8" fill="#555">Admin User Record</text>
+
+<line x1="451" y1="180" x2="245" y2="180" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="348" y="175" text-anchor="middle" font-size="8" fill="#555">{access_token, role:admin}</text>
+
+<line x1="243" y1="198" x2="61"  y2="198" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="152" y="193" text-anchor="middle" font-size="8" fill="#555">Redirect → Admin Dashboard</text>
+
+<!-- ═══════ SECTION 2: DASHBOARD ANALYTICS ═══════ -->
+<rect x="6" y="210" width="764" height="15" rx="2" fill="#dcfce7" stroke="#86efac" stroke-width="1"/>
+<text x="388" y="221" text-anchor="middle" font-size="9" font-weight="bold" fill="#166534">Dashboard Analytics</text>
+
+<rect x="451" y="230" width="8" height="90" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="678" y="248" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+
+<line x1="55"  y1="230" x2="238" y2="230" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="147" y="225" text-anchor="middle" font-size="8">Open Dashboard</text>
+
+<line x1="243" y1="248" x2="450" y2="248" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="347" y="243" text-anchor="middle" font-size="8">GET /api/admin/stats</text>
+
+<line x1="459" y1="266" x2="677" y2="266" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="568" y="261" text-anchor="middle" font-size="8">count(users, doctors, appointments, revenue)</text>
+
+<line x1="678" y1="284" x2="460" y2="284" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="569" y="279" text-anchor="middle" font-size="8" fill="#555">Statistics Data</text>
+
+<line x1="451" y1="302" x2="245" y2="302" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="348" y="297" text-anchor="middle" font-size="8" fill="#555">{total_users, doctors, revenue}</text>
+
+<line x1="243" y1="320" x2="61"  y2="320" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="152" y="315" text-anchor="middle" font-size="8" fill="#555">Display Analytics + Charts</text>
+
+<!-- ═══════ SECTION 3: VERIFY DOCTORS ═══════ -->
+<rect x="6" y="332" width="764" height="15" rx="2" fill="#fef9c3" stroke="#fde047" stroke-width="1"/>
+<text x="388" y="343" text-anchor="middle" font-size="9" font-weight="bold" fill="#92400e">Verify Doctors</text>
+
+<rect x="451" y="352" width="8" height="144" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="678" y="370" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="678" y="442" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+
+<line x1="55"  y1="352" x2="238" y2="352" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="147" y="347" text-anchor="middle" font-size="8">Open Doctors Panel</text>
+
+<line x1="243" y1="370" x2="450" y2="370" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="347" y="365" text-anchor="middle" font-size="8">GET /api/admin/doctors?verified=false</text>
+
+<line x1="459" y1="388" x2="677" y2="388" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="568" y="383" text-anchor="middle" font-size="8">find({is_verified:false})</text>
+
+<line x1="678" y1="406" x2="460" y2="406" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="569" y="401" text-anchor="middle" font-size="8" fill="#555">Pending Doctors List</text>
+
+<line x1="451" y1="424" x2="245" y2="424" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="348" y="419" text-anchor="middle" font-size="8" fill="#555">Pending Doctors with Details</text>
+
+<line x1="55"  y1="442" x2="238" y2="442" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="147" y="437" text-anchor="middle" font-size="8">Click Verify / Reject Doctor</text>
+
+<line x1="243" y1="460" x2="450" y2="460" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="347" y="455" text-anchor="middle" font-size="8">PUT /api/admin/verify-doctor/{id}</text>
+
+<line x1="459" y1="478" x2="677" y2="478" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="568" y="473" text-anchor="middle" font-size="8">update({is_verified:true})</text>
+
+<line x1="451" y1="496" x2="245" y2="496" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="348" y="491" text-anchor="middle" font-size="8" fill="#555">200 OK</text>
+
+<line x1="243" y1="514" x2="61"  y2="514" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="152" y="509" text-anchor="middle" font-size="8" fill="#555">Doctor Verified ✓ (Status Updated)</text>
+
+<!-- ═══════ SECTION 4: MANAGE USERS ═══════ -->
+<rect x="6" y="526" width="764" height="15" rx="2" fill="#fce7f3" stroke="#f9a8d4" stroke-width="1"/>
+<text x="388" y="537" text-anchor="middle" font-size="9" font-weight="bold" fill="#9d174d">Manage Users</text>
+
+<rect x="451" y="546" width="8" height="126" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="678" y="564" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="678" y="618" width="8" height="18" fill="#fff" stroke="#000" stroke-width="1"/>
+
+<line x1="55"  y1="546" x2="238" y2="546" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="147" y="541" text-anchor="middle" font-size="8">Open Users Panel</text>
+
+<line x1="243" y1="564" x2="450" y2="564" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="347" y="559" text-anchor="middle" font-size="8">GET /api/admin/users?limit=100</text>
+
+<line x1="459" y1="582" x2="677" y2="582" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="568" y="577" text-anchor="middle" font-size="8">find(users, {limit:100})</text>
+
+<line x1="678" y1="600" x2="460" y2="600" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="569" y="595" text-anchor="middle" font-size="8" fill="#555">Users List</text>
+
+<line x1="55"  y1="618" x2="238" y2="618" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="147" y="613" text-anchor="middle" font-size="8">Activate / Deactivate User</text>
+
+<line x1="243" y1="636" x2="450" y2="636" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="347" y="631" text-anchor="middle" font-size="8">PUT /api/admin/user/{id}/status</text>
+
+<line x1="459" y1="654" x2="677" y2="654" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="568" y="649" text-anchor="middle" font-size="8">update({is_active:true/false})</text>
+
+<line x1="451" y1="672" x2="245" y2="672" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="348" y="667" text-anchor="middle" font-size="8" fill="#555">200 OK</text>
+
+<line x1="243" y1="690" x2="61"  y2="690" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="152" y="685" text-anchor="middle" font-size="8" fill="#555">User Status Updated</text>
+
+<!-- ═══════ SECTION 5: LOGOUT ═══════ -->
+<rect x="6" y="702" width="764" height="15" rx="2" fill="#fee2e2" stroke="#fca5a5" stroke-width="1"/>
+<text x="388" y="713" text-anchor="middle" font-size="9" font-weight="bold" fill="#991b1b">Logout</text>
+
+<line x1="55"  y1="723" x2="238" y2="723" stroke="#000" stroke-width="1.4" marker-end="url(#sa)"/>
+<text x="147" y="718" text-anchor="middle" font-size="8">Click Logout</text>
+
+<line x1="243" y1="741" x2="283" y2="741" stroke="#000" stroke-width="1.2"/>
+<line x1="283" y1="741" x2="283" y2="757" stroke="#000" stroke-width="1.2"/>
+<line x1="283" y1="757" x2="245" y2="757" stroke="#000" stroke-width="1.2" marker-end="url(#sa)"/>
+<text x="340" y="752" font-size="8">Clear JWT + Admin Session</text>
+
+<line x1="243" y1="775" x2="61"  y2="775" stroke="#555" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ra)"/>
+<text x="152" y="770" text-anchor="middle" font-size="8" fill="#555">Redirect → Login Page</text>
+
+<!-- Note box -->
+<rect x="10" y="792" width="756" height="24" rx="3" fill="#f0fdf4" stroke="#86efac" stroke-width="1"/>
+<text x="388" y="803" text-anchor="middle" font-size="8.5">Note: After completing any admin operation, the flow returns to the Admin Dashboard. Only Logout ends the session.</text>
+<text x="388" y="813" text-anchor="middle" font-size="8.5">All API calls include Authorization: Bearer {JWT token} header for authentication.</text>
+</svg>
+
+<p class="cap">(Admin Side)</p>
+<div class="pgn">27</div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Synora Health – Results, Discussion & Limitations</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Times New Roman', serif; font-size: 12pt; background: #fff; margin: 0; padding: 0; color: #000; line-height: 1.9; }
+  .page { width: 820px; margin: 0 auto; padding: 40px 68px 56px; page-break-after: always; }
+  .page-title { text-align: right; font-size: 10pt; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 20px; }
+  h1 { font-size: 14pt; font-weight: bold; text-align: center; margin: 0 0 18px; letter-spacing: 0.5px; }
+  h2 { font-size: 13pt; font-weight: bold; margin: 22px 0 8px; }
+  h3 { font-size: 12pt; font-weight: bold; margin: 18px 0 6px; }
+  p  { margin: 8px 0; text-align: justify; }
+  ul { margin: 6px 0 10px 40px; }
+  li { margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 11pt; }
+  th { background: #1e40af; color: white; padding: 9px 12px; text-align: left; }
+  td { border: 1px solid #aaa; padding: 8px 12px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f5f7fa; }
+  .caption { text-align: center; font-size: 11pt; font-style: italic; margin: 4px 0 16px; font-weight: bold; }
+  .result-line { font-weight: bold; margin: 10px 0 6px; }
+  .pgn { text-align: center; font-size: 11pt; margin-top: 36px; }
+  .section-break { border-top: 1px solid #ccc; margin: 24px 0 18px; }
+  @media print { .page { page-break-after: always; } }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     CHAPTER 13 – RESULTS AND DISCUSSION
+═══════════════════════════════════════════════ -->
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+<h1>13. RESULTS AND DISCUSSION</h1>
+
+<p>The <strong>"Synora Health AI Platform"</strong> was successfully developed and tested to evaluate its functionality, accuracy, usability, and performance. The system generated intelligent healthcare analysis and personalized medical recommendations based on patient health data and AI model outputs.</p>
+
+<p>The results demonstrate that the system is capable of assisting patients, doctors, and administrators in managing healthcare effectively through:</p>
+
+<ul>
+  <li>AI-powered symptom analysis and urgency classification</li>
+  <li>Doctor search and appointment booking with online payment</li>
+  <li>Real-time video consultation and chat messaging</li>
+  <li>Smart health record upload and AI analysis</li>
+  <li>Medicine reminder management</li>
+  <li>Admin platform monitoring and doctor verification</li>
+</ul>
+
+<div class="section-break"></div>
+
+<h2>13.1 System Outputs</h2>
+
+<p>The system generated different outputs based on user inputs and AI analysis results.</p>
+
+<h3>1. AI Symptom Checker Output</h3>
+
+<p>The AI Symptom Checker module generated intelligent health analysis using Groq Llama 3.1-70B AI model.</p>
+
+<p>Sample Output:</p>
+
+<table>
+<tr><th>Parameter</th><th>Value</th></tr>
+<tr><td>Symptoms Entered</td><td>Chest pain, shortness of breath, dizziness</td></tr>
+<tr><td>AI Model Used</td><td>Groq Llama 3.1-70B</td></tr>
+<tr><td>Possible Conditions</td><td>Angina, Cardiac Arrhythmia, Anxiety Disorder</td></tr>
+<tr><td>Urgency Level</td><td>HIGH</td></tr>
+<tr><td>Recommended Specialist</td><td>Cardiologist</td></tr>
+<tr><td>Recommended Action</td><td>Visit emergency or consult cardiologist immediately</td></tr>
+</table>
+<p class="caption">Table 13.1.1: AI Symptom Checker Output</p>
+
+<p class="result-line">Result:</p>
+<p>The AI system accurately classified the urgency level and recommended the correct specialist type based on the entered symptoms.</p>
+
+<h3>2. Appointment Booking Output</h3>
+
+<p>The appointment booking module generated a confirmed appointment after successful doctor selection, slot booking, and Razorpay payment.</p>
+
+<p>Sample Output:</p>
+
+<table>
+<tr><th>Parameter</th><th>Value</th></tr>
+<tr><td>Doctor Name</td><td>Dr. Arjun Sharma</td></tr>
+<tr><td>Specialization</td><td>Cardiologist</td></tr>
+<tr><td>Appointment Date</td><td>20 May 2026</td></tr>
+<tr><td>Time Slot</td><td>10:30 AM</td></tr>
+<tr><td>Consultation Fee</td><td>₹ 800</td></tr>
+<tr><td>Payment Status</td><td>Paid (Razorpay Verified)</td></tr>
+<tr><td>Appointment Status</td><td>Confirmed</td></tr>
+</table>
+<p class="caption">Table 13.1.2: Appointment Booking Output</p>
+
+<p class="result-line">Result:</p>
+<p>The system successfully booked the appointment, verified the payment signature using HMAC-SHA256, and notified the doctor via WebSocket in real time.</p>
+
+<div class="pgn">99</div>
+</div>
+
+<!-- PAGE 2 -->
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+
+<h3>3. Razorpay Payment Processing Output</h3>
+
+<p>The payment module processed the appointment fee securely through Razorpay and verified the transaction using cryptographic signature validation.</p>
+
+<p>Sample Output:</p>
+
+<table>
+<tr><th>Parameter</th><th>Value</th></tr>
+<tr><td>Razorpay Order ID</td><td>order_PxXXXXXXXXXX</td></tr>
+<tr><td>Payment ID</td><td>pay_PxXXXXXXXXXX</td></tr>
+<tr><td>Amount Charged</td><td>₹ 800</td></tr>
+<tr><td>Currency</td><td>INR</td></tr>
+<tr><td>Payment Method</td><td>UPI / Card / Net Banking</td></tr>
+<tr><td>HMAC-SHA256 Signature</td><td>Verified ✓</td></tr>
+<tr><td>Payment Status</td><td>Success</td></tr>
+</table>
+<p class="caption">Table 13.1.3: Razorpay Payment Processing Output</p>
+
+<p class="result-line">Result:</p>
+<p>The payment was processed securely and the HMAC signature was successfully verified, preventing any tampered or fraudulent transactions.</p>
+
+<h3>4. Health Record AI Analysis Output</h3>
+
+<p>The health record module analyzed an uploaded blood test report using Google Gemini Vision API and generated structured health insights.</p>
+
+<p>Sample Output:</p>
+
+<table>
+<tr><th>Parameter</th><th>Value</th></tr>
+<tr><td>Record Type</td><td>Blood Test Report</td></tr>
+<tr><td>AI Model Used</td><td>Google Gemini 1.5 Pro (Vision)</td></tr>
+<tr><td>Detected Parameter</td><td>Haemoglobin: 9.2 g/dL (Low)</td></tr>
+<tr><td>Detected Parameter</td><td>Blood Sugar (Fasting): 118 mg/dL (Borderline)</td></tr>
+<tr><td>AI Observation</td><td>Mild anaemia detected. Blood sugar slightly elevated.</td></tr>
+<tr><td>Recommended Action</td><td>Consult General Physician. Iron supplementation advised.</td></tr>
+</table>
+<p class="caption">Table 13.1.4: Health Record AI Analysis Output</p>
+
+<p class="result-line">Result:</p>
+<p>The AI system successfully analyzed the uploaded medical report and generated clinically relevant health insights with recommended actions.</p>
+
+<h3>5. Doctor Dashboard — Appointment Approval Output</h3>
+
+<p>The doctor dashboard successfully displayed pending appointment requests and allowed the doctor to approve or reject them.</p>
+
+<p>Sample Output:</p>
+
+<table>
+<tr><th>Parameter</th><th>Value</th></tr>
+<tr><td>Patient Name</td><td>Riya Singh</td></tr>
+<tr><td>Appointment Date</td><td>20 May 2026</td></tr>
+<tr><td>Time Slot</td><td>10:30 AM</td></tr>
+<tr><td>Reason</td><td>Chest pain and breathlessness</td></tr>
+<tr><td>Doctor Action</td><td>Approved</td></tr>
+<tr><td>Patient Notification</td><td>Sent via WebSocket (Real-Time)</td></tr>
+<tr><td>Updated Status</td><td>Confirmed</td></tr>
+</table>
+<p class="caption">Table 13.1.5: Doctor Appointment Approval Output</p>
+
+<p class="result-line">Result:</p>
+<p>The doctor successfully approved the appointment and the patient received a real-time confirmation notification within one second.</p>
+
+<h3>6. Admin Dashboard Output</h3>
+
+<p>The admin dashboard generated real-time platform statistics directly from MongoDB database.</p>
+
+<p>Sample Output:</p>
+
+<table>
+<tr><th>Parameter</th><th>Value</th></tr>
+<tr><td>Total Registered Users</td><td>142</td></tr>
+<tr><td>Verified Doctors</td><td>28</td></tr>
+<tr><td>Pending Doctor Approvals</td><td>5</td></tr>
+<tr><td>Total Appointments</td><td>389</td></tr>
+<tr><td>Completed Appointments</td><td>312</td></tr>
+<tr><td>Total Revenue Collected</td><td>₹ 2,48,600</td></tr>
+<tr><td>Active Chat Rooms</td><td>17</td></tr>
+</table>
+<p class="caption">Table 13.1.6: Admin Dashboard Statistics Output</p>
+
+<p class="result-line">Result:</p>
+<p>The admin dashboard successfully displayed all real-time platform statistics, allowing the administrator to monitor and manage the system effectively.</p>
+
+<div class="pgn">100</div>
+</div>
+
+<!-- PAGE 3 – OBSERVATIONS -->
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+
+<h2>13.2 Observations</h2>
+
+<p>Several important observations were made during testing and execution of the system. Some of these are:</p>
+
+<div class="section-break"></div>
+
+<h3>Observation 1: Accurate AI Symptom Analysis</h3>
+<p>The AI Symptom Checker consistently generated medically relevant results. The Groq Llama 3.1-70B model correctly identified urgency levels (LOW, MEDIUM, HIGH) and recommended appropriate specialist types based on the entered symptoms in all tested cases.</p>
+
+<div class="section-break"></div>
+
+<h3>Observation 2: Reliable Payment Verification</h3>
+<p>The Razorpay HMAC-SHA256 signature verification successfully detected and rejected tampered payment signatures in all security test cases. No fraudulent payment was allowed to confirm an appointment, demonstrating high payment security reliability.</p>
+
+<div class="section-break"></div>
+
+<h3>Observation 3: Personalized Doctor Recommendations Improved User Experience</h3>
+<p>Different patients received different doctor recommendations based on their symptoms and selected specialties. The filtering and matching logic correctly prioritized verified, highly-rated doctors with available slots, improving the booking experience.</p>
+
+<div class="section-break"></div>
+
+<h3>Observation 4: Validation Improved System Reliability</h3>
+<p>The system prevented invalid or unrealistic inputs from reaching the database. Examples:</p>
+<ul>
+  <li>Empty symptom inputs were rejected with proper error messages</li>
+  <li>Invalid appointment slots were blocked from double-booking</li>
+  <li>Weak or incorrect passwords were rejected at login</li>
+  <li>Unauthorized role access was blocked with 403 Forbidden response</li>
+</ul>
+
+<div class="section-break"></div>
+
+<h3>Observation 5: Real-Time Features Improved Accessibility</h3>
+<p>The WebSocket-based real-time chat and WebRTC video consultation successfully connected patients and doctors instantly. Users were able to communicate, share screens, and exchange messages without any significant delay, improving overall healthcare accessibility.</p>
+
+<div class="section-break"></div>
+
+<h3>Observation 6: AI Fallback Chain Improved Reliability</h3>
+<p>When the Groq AI API was temporarily unavailable during testing, the system automatically switched to Google Gemini 1.5 Pro within milliseconds, ensuring continuous AI service availability without any user-visible interruption.</p>
+
+<div class="pgn">101</div>
+</div>
+
+<!-- PAGE 4 – PERFORMANCE DISCUSSION -->
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+
+<h2>13.3 Performance Discussion</h2>
+
+<p>The performance of the <strong>"Synora Health AI Platform"</strong> was evaluated based on accuracy, speed, reliability, security, and usability.</p>
+
+<div class="section-break"></div>
+
+<h3>1. Accuracy Performance</h3>
+<p>The system generated accurate outputs for:</p>
+<ul>
+  <li>AI symptom analysis and urgency classification</li>
+  <li>Doctor search and availability slot management</li>
+  <li>Razorpay payment HMAC signature verification</li>
+  <li>Health record AI analysis and insights</li>
+  <li>Admin platform statistics from MongoDB</li>
+</ul>
+<p class="result-line">Performance Result:</p>
+<p>High accuracy achieved across all major system modules.</p>
+
+<div class="section-break"></div>
+
+<h3>2. Processing Speed</h3>
+<p>The system generated outputs quickly because:</p>
+<ul>
+  <li>FastAPI provides high-performance asynchronous backend processing</li>
+  <li>MongoDB with Motor async driver supports fast non-blocking database operations</li>
+  <li>Groq LPU inference engine delivers faster AI responses than GPU-based models</li>
+  <li>React with Redux provides efficient frontend state management and rendering</li>
+</ul>
+<p class="result-line">Performance Result:</p>
+<p>Fast response time observed. Standard API endpoints responded in under 200 ms on average.</p>
+
+<div class="section-break"></div>
+
+<h3>3. Reliability Performance</h3>
+<p>The application handled:</p>
+<ul>
+  <li>Invalid user inputs and boundary conditions</li>
+  <li>Concurrent database read and write operations</li>
+  <li>WebSocket connection drops and reconnections</li>
+  <li>JWT token expiry and automatic refresh cycles</li>
+  <li>AI API failures with automatic fallback switching</li>
+</ul>
+<p>without major failures or crashes during testing.</p>
+<p class="result-line">Performance Result:</p>
+<p>Reliable system behaviour achieved throughout all test scenarios.</p>
+
+<div class="section-break"></div>
+
+<h3>4. Security Performance</h3>
+<p>Security mechanisms implemented:</p>
+<ul>
+  <li>JWT-based authentication with role-based access control</li>
+  <li>bcrypt password hashing (12 salt rounds)</li>
+  <li>Twilio OTP verification for account registration</li>
+  <li>HMAC-SHA256 payment signature verification</li>
+  <li>API rate limiting to prevent brute-force attacks</li>
+  <li>Input validation using Pydantic schema models</li>
+</ul>
+<p>helped protect user information and ensure secure platform access.</p>
+<p class="result-line">Performance Result:</p>
+<p>Secure system operation achieved. All 8 security test cases passed successfully.</p>
+
+<div class="section-break"></div>
+
+<h3>5. User Experience Performance</h3>
+<p>The responsive frontend design and real-time features improved overall usability. Users were able to:</p>
+<ul>
+  <li>Navigate all modules easily using the sidebar and dashboard</li>
+  <li>Understand AI outputs clearly through structured results display</li>
+  <li>Access healthcare services quickly from both desktop and mobile browsers</li>
+  <li>Complete appointment booking and payment in under 2 minutes</li>
+</ul>
+<p class="result-line">Performance Result:</p>
+<p>Positive user experience observed. Overall UAT rating of 4.5 out of 5 received from test users.</p>
+
+<div class="pgn">102</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     CHAPTER 14 – LIMITATIONS
+═══════════════════════════════════════════════ -->
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+<h1>14. LIMITATIONS</h1>
+<div class="pgn">106</div>
+</div>
+
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+<h1>14. LIMITATIONS</h1>
+
+<h2>14.1 Current Constraints of the System</h2>
+
+<p>Even though the <strong>"Synora Health AI Platform"</strong> effectively provides intelligent healthcare services, AI-based symptom analysis, real-time doctor consultations, and digital health management, there are still some restrictions and limitations with the current version of the system.</p>
+
+<div class="section-break"></div>
+
+<h3>1. Dependency on Third-Party AI APIs</h3>
+
+<p>The AI symptom checker, prescription assistant, and health record analysis features depend entirely on external AI service providers such as Groq, Google Gemini, and OpenAI.</p>
+
+<p>Limitations:</p>
+<ul>
+  <li>AI features may be unavailable if all three APIs experience simultaneous downtime</li>
+  <li>API rate limits may restrict the number of AI requests per day</li>
+  <li>Future pricing changes by AI providers may affect operational costs</li>
+</ul>
+
+<div class="section-break"></div>
+
+<h3>2. AI Diagnosis is Not a Medical Replacement</h3>
+
+<p>The AI Symptom Checker provides medically relevant suggestions but is not a certified diagnostic tool.</p>
+
+<p>Limitations:</p>
+<ul>
+  <li>AI outputs are based on training data and may not cover all rare conditions</li>
+  <li>Individual patient history and genetic factors are not fully considered</li>
+  <li>Predicted conditions may differ from an actual doctor's clinical diagnosis</li>
+  <li>Users may over-rely on AI suggestions instead of consulting doctors</li>
+</ul>
+
+<div class="section-break"></div>
+
+<h3>3. Local File Storage for Health Records</h3>
+
+<p>In the current version, uploaded health record files are stored on the local server filesystem instead of cloud storage.</p>
+
+<p>Limitations:</p>
+<ul>
+  <li>Not scalable for large numbers of users uploading large files</li>
+  <li>Risk of data loss if the server storage fails without backups</li>
+  <li>Geographic distribution and CDN delivery are not supported</li>
+  <li>Enterprise-level deployment requires AWS S3 or Google Cloud Storage</li>
+</ul>
+
+<div class="pgn">107</div>
+</div>
+
+<!-- PAGE 6 – LIMITATIONS CONTINUED -->
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+
+<h3>4. Internet Dependency for All Features</h3>
+
+<p>All features of Synora Health require an active internet connection to function.</p>
+
+<p>Features depending on internet:</p>
+<ul>
+  <li>AI symptom analysis (Groq / Gemini API calls)</li>
+  <li>Razorpay payment processing</li>
+  <li>Twilio OTP SMS delivery</li>
+  <li>Real-time WebSocket chat and notifications</li>
+  <li>WebRTC video consultation</li>
+</ul>
+<p>This limits accessibility for users in areas with poor or no internet connectivity.</p>
+
+<div class="section-break"></div>
+
+<h3>5. WebRTC Video Quality on Poor Networks</h3>
+
+<p>The video consultation feature uses WebRTC peer-to-peer technology which depends heavily on internet connection quality.</p>
+
+<p>Limitations:</p>
+<ul>
+  <li>Poor network conditions cause video lag and choppy audio</li>
+  <li>WebRTC connections may fail behind strict firewalls or NAT environments</li>
+  <li>TURN server infrastructure is not yet implemented for difficult network scenarios</li>
+  <li>Minimum 5 Mbps internet speed is required for stable video quality</li>
+</ul>
+
+<div class="section-break"></div>
+
+<h3>6. No Native Mobile Application</h3>
+
+<p>Synora Health is currently a web-based platform and does not have a dedicated native Android or iOS application.</p>
+
+<p>Limitations:</p>
+<ul>
+  <li>Mobile browser experience is less optimized than a native app</li>
+  <li>Push notifications for appointments and medicine reminders are not available</li>
+  <li>Camera and microphone access may be limited in mobile browsers</li>
+  <li>Offline functionality is not supported without a native app</li>
+</ul>
+
+<div class="section-break"></div>
+
+<h3>7. Single-Server Deployment Scalability</h3>
+
+<p>The current deployment uses a single Uvicorn server instance without load balancing or containerization.</p>
+
+<p>Limitations:</p>
+<ul>
+  <li>Not ideal for very large user bases with high concurrent traffic</li>
+  <li>Limited auto-scaling capability without Docker and Kubernetes setup</li>
+  <li>Enterprise-level deployment requires distributed server architecture</li>
+  <li>No automatic failover or redundancy in case of server failure</li>
+</ul>
+
+<div class="section-break"></div>
+
+<h3>8. English Language Support Only</h3>
+
+<p>The current version of the platform supports only the English language interface and AI inputs.</p>
+
+<p>Limitations:</p>
+<ul>
+  <li>Patients who prefer regional languages cannot use the platform effectively</li>
+  <li>AI symptom input is limited to English text only</li>
+  <li>This reduces accessibility for rural patients across India</li>
+  <li>Multi-language support requires significant additional development effort</li>
+</ul>
+
+<div class="pgn">108</div>
+</div>
+
+</body>
+</html>

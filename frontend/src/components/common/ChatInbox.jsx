@@ -36,6 +36,7 @@ export default function ChatInbox() {
   }, [fetchRooms, isDoctor, isPatient])
 
   if (!user || (!isDoctor && !isPatient)) return null
+  if (rooms.length === 0) return null
 
   // ── Active chat window ──
   if (activeRoom) {

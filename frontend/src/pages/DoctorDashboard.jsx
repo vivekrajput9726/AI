@@ -1577,6 +1577,13 @@ export default function DoctorDashboard() {
   }, [])
 
   const [refreshing, setRefreshing] = useState(false)
+  const [approvalStatus, setApprovalStatus] = useState(user?.is_verified)
+
+  useEffect(() => {
+    api.get('/doctors/profile/me')
+      .then(r => setApprovalStatus(r.data?.is_verified))
+      .catch(() => {})
+  }, [])
 
   const loadAppointments = async (showFeedback = false) => {
     if (showFeedback) setRefreshing(true)
@@ -1641,6 +1648,36 @@ export default function DoctorDashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-5 animate-fade-in">
+
+        {/* ── Approval Pending Banner ── */}
+        {approvalStatus !== true && (
+          <div className={`rounded-2xl p-4 flex items-start gap-4 border-2 ${
+            approvalStatus === false
+              ? 'bg-red-50 border-red-200'
+              : 'bg-amber-50 border-amber-200'
+          }`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              approvalStatus === false ? 'bg-red-100' : 'bg-amber-100'
+            }`}>
+              <AlertCircle size={22} className={approvalStatus === false ? 'text-red-500' : 'text-amber-500'} />
+            </div>
+            <div className="flex-1">
+              <p className={`font-bold text-sm ${approvalStatus === false ? 'text-red-800' : 'text-amber-800'}`}>
+                {approvalStatus === false ? 'Profile Rejected' : 'Approval Pending'}
+              </p>
+              <p className={`text-xs mt-0.5 leading-relaxed ${approvalStatus === false ? 'text-red-600' : 'text-amber-600'}`}>
+                {approvalStatus === false
+                  ? 'Your doctor profile was rejected by the admin. Please update your profile details and contact support.'
+                  : 'Your profile is under review. Once the admin approves it, patients will be able to see your profile and book appointments. You can update your profile details in the meantime.'}
+              </p>
+            </div>
+            <span className={`text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0 ${
+              approvalStatus === false ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+            }`}>
+              {approvalStatus === false ? 'Rejected' : 'Pending'}
+            </span>
+          </div>
+        )}
 
         {/* ── DASHBOARD ── */}
         {activeTab === 'dashboard' && (

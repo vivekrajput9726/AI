@@ -4,7 +4,10 @@ import { logout, setTokens } from '../redux/slices/authSlice'
 let store
 export const injectStore = (_store) => { store = _store }
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const BASE_URL = import.meta.env.VITE_API_URL ||
+  (window.location.hostname === 'localhost'
+    ? 'http://localhost:8000/api'
+    : `http://${window.location.hostname}:8000/api`)
 
 const api = axios.create({
   baseURL: BASE_URL,

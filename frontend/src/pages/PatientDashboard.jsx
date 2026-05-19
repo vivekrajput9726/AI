@@ -44,10 +44,11 @@ export default function PatientDashboard() {
   const navigate = useNavigate()
   const { user } = useSelector(s => s.auth)
   const { list: appointments = [] } = useSelector(s => s.appointments || { list: [] })
-  const [records, setRecords]       = useState([])
-  const [timePeriod, setTimePeriod] = useState('This Week')
-  const [showPeriod, setShowPeriod] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
+  const [records, setRecords]         = useState([])
+  const [timePeriod, setTimePeriod]   = useState('This Week')
+  const [showPeriod, setShowPeriod]   = useState(false)
+  const [refreshing, setRefreshing]   = useState(false)
+  const [aptDoctorInfo, setAptDoctorInfo] = useState(null)
 
   const [healthScore, setHealthScore]   = useState(null)
   const [healthLoading, setHealthLoading] = useState(true)
@@ -107,7 +108,17 @@ export default function PatientDashboard() {
   const firstName   = user?.full_name?.split(' ')[0] || 'there'
   const h           = new Date().getHours()
   const greeting    = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening'
-  const upcomingApt = appointments.find(a => a.status === 'confirmed') || appointments[0]
+  const upcomingApt = appointments.find(a => a.status === 'confirmed') ||
+                      appointments.find(a => a.status === 'pending') ||
+                      appointments[0]
+
+  // Fetch doctor info for upcoming appointment
+  useEffect(() => {
+    if (!upcomingApt?.doctor_id) { setAptDoctorInfo(null); return }
+    api.get(`/doctors/${upcomingApt.doctor_id}`)
+      .then(r => setAptDoctorInfo(r.data))
+      .catch(() => setAptDoctorInfo(null))
+  }, [upcomingApt?.doctor_id])
 
   const quickActions = [
     { icon: Stethoscope,  label: 'AI Symptom\nChecker',   bg: 'bg-blue-100',   text: 'text-blue-600',   path: '/patient/symptoms' },
@@ -301,44 +312,68 @@ export default function PatientDashboard() {
           </div>
 
           {/* ── Health Overview ── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="font-bold text-gray-800">Health Overview</p>
-              <div className="relative">
-                <button onClick={() => setShowPeriod(v => !v)}
-                  className="flex items-center gap-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors font-medium">
-                  {timePeriod} <ChevronDown size={14} />
-                </button>
-                {showPeriod && (
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg z-10 overflow-hidden w-36">
-                    {['This Week', 'This Month', 'This Year'].map(opt => (
-                      <button key={opt} onClick={() => { setTimePeriod(opt); setShowPeriod(false) }}
-                        className={`w-full px-4 py-2.5 text-sm text-left transition-colors ${timePeriod === opt ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
-                        {opt}
-                      </button>
-                    ))}
+          {(() => {
+            const overviewData = {
+              'This Week': [
+                { emoji: '🚶', label: 'Steps',        value: '6,842',   sub: '/10,000', subColor: 'text-gray-400' },
+                { emoji: '🌙', label: 'Sleep',        value: '6h 45m',  sub: 'Good',    subColor: 'text-green-500' },
+                { emoji: '💧', label: 'Water Intake', value: '5/8',     sub: 'Glasses', subColor: 'text-blue-400' },
+                { emoji: '🔥', label: 'Calories',     value: '1,450',   sub: 'kcal',    subColor: 'text-orange-400' },
+                { emoji: '⚖️', label: 'Weight',       value: '65 kg',   sub: 'Normal',  subColor: 'text-green-500' },
+                { emoji: '📊', label: 'BMI',          value: '22.5',    sub: 'Normal',  subColor: 'text-green-500' },
+              ],
+              'This Month': [
+                { emoji: '🚶', label: 'Avg Steps',    value: '7,210',   sub: '/10,000', subColor: 'text-gray-400' },
+                { emoji: '🌙', label: 'Avg Sleep',    value: '7h 10m',  sub: 'Good',    subColor: 'text-green-500' },
+                { emoji: '💧', label: 'Avg Water',    value: '6/8',     sub: 'Glasses', subColor: 'text-blue-400' },
+                { emoji: '🔥', label: 'Avg Calories', value: '1,520',   sub: 'kcal',    subColor: 'text-orange-400' },
+                { emoji: '⚖️', label: 'Weight',       value: '64.8 kg', sub: 'Normal',  subColor: 'text-green-500' },
+                { emoji: '📊', label: 'BMI',          value: '22.4',    sub: 'Normal',  subColor: 'text-green-500' },
+              ],
+              'This Year': [
+                { emoji: '🚶', label: 'Avg Steps',    value: '6,540',   sub: '/10,000', subColor: 'text-gray-400' },
+                { emoji: '🌙', label: 'Avg Sleep',    value: '6h 55m',  sub: 'Good',    subColor: 'text-green-500' },
+                { emoji: '💧', label: 'Avg Water',    value: '5.5/8',   sub: 'Glasses', subColor: 'text-blue-400' },
+                { emoji: '🔥', label: 'Avg Calories', value: '1,490',   sub: 'kcal',    subColor: 'text-orange-400' },
+                { emoji: '⚖️', label: 'Weight',       value: '66 kg',   sub: 'Normal',  subColor: 'text-green-500' },
+                { emoji: '📊', label: 'BMI',          value: '22.8',    sub: 'Normal',  subColor: 'text-green-500' },
+              ],
+            }
+            const metrics = overviewData[timePeriod] || overviewData['This Week']
+            return (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="font-bold text-gray-800">Health Overview</p>
+                  <div className="relative">
+                    <button onClick={() => setShowPeriod(v => !v)}
+                      className="flex items-center gap-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors font-medium">
+                      {timePeriod} <ChevronDown size={14} />
+                    </button>
+                    {showPeriod && (
+                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg z-10 overflow-hidden w-36">
+                        {['This Week', 'This Month', 'This Year'].map(opt => (
+                          <button key={opt} onClick={() => { setTimePeriod(opt); setShowPeriod(false) }}
+                            className={`w-full px-4 py-2.5 text-sm text-left transition-colors ${timePeriod === opt ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-              {[
-                { emoji: '🚶', label: 'Steps',        value: '6,842',  sub: '/10,000', subColor: 'text-gray-400' },
-                { emoji: '🌙', label: 'Sleep',        value: '6h 45m', sub: 'Good',    subColor: 'text-green-500' },
-                { emoji: '💧', label: 'Water Intake', value: '5/8',    sub: 'Glasses', subColor: 'text-blue-400' },
-                { emoji: '🔥', label: 'Calories',     value: '1,450',  sub: 'kcal',    subColor: 'text-orange-400' },
-                { emoji: '⚖️', label: 'Weight',       value: '65 kg',  sub: 'Normal',  subColor: 'text-green-500' },
-                { emoji: '📊', label: 'BMI',          value: '22.5',   sub: 'Normal',  subColor: 'text-green-500' },
-              ].map((m, i) => (
-                <div key={i} className="flex flex-col items-center gap-1 p-3 bg-gray-50 rounded-2xl">
-                  <span className="text-2xl mb-0.5">{m.emoji}</span>
-                  <p className="text-sm font-bold text-gray-900 leading-tight">{m.value}</p>
-                  <p className={`text-[11px] font-medium ${m.subColor}`}>{m.sub}</p>
-                  <p className="text-[10px] text-gray-400">{m.label}</p>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                  {metrics.map((m, i) => (
+                    <div key={i} className="flex flex-col items-center gap-1 p-3 bg-gray-50 rounded-2xl">
+                      <span className="text-2xl mb-0.5">{m.emoji}</span>
+                      <p className="text-sm font-bold text-gray-900 leading-tight">{m.value}</p>
+                      <p className={`text-[11px] font-medium ${m.subColor}`}>{m.sub}</p>
+                      <p className="text-[10px] text-gray-400">{m.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* ── Feature Cards ── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -484,37 +519,71 @@ export default function PatientDashboard() {
               <p className="font-bold text-gray-800">Upcoming Appointment</p>
               <button onClick={() => navigate('/patient/doctors')} className="text-xs text-blue-600 font-medium hover:underline">View All</button>
             </div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-300 to-rose-400 flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
-                {upcomingApt ? upcomingApt.doctor_name?.charAt(0) : 'A'}
+
+            {upcomingApt ? (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-300 to-rose-400 flex items-center justify-center text-white text-xl font-bold flex-shrink-0 overflow-hidden">
+                    {aptDoctorInfo?.profile_image
+                      ? <img src={aptDoctorInfo.profile_image} alt="" className="w-full h-full object-cover" />
+                      : upcomingApt.doctor_name?.charAt(0)
+                    }
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900 text-sm">{upcomingApt.doctor_name}</p>
+                    <p className="text-xs text-gray-500">{aptDoctorInfo?.specialization || upcomingApt.appointment_type || 'Consultation'}</p>
+                    <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      upcomingApt.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                      upcomingApt.status === 'pending'   ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>
+                      {upcomingApt.status?.charAt(0).toUpperCase() + upcomingApt.status?.slice(1)}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <Calendar size={13} className="text-gray-400 flex-shrink-0" />
+                    {formatDate(upcomingApt.appointment_date)}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <Clock size={13} className="text-gray-400 flex-shrink-0" />
+                    {upcomingApt.appointment_time}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <Video size={13} className="text-gray-400 flex-shrink-0" />
+                    {upcomingApt.appointment_type === 'in_person' ? 'In-Person Visit' : 'Video Consultation'}
+                  </div>
+                </div>
+                {upcomingApt.status === 'confirmed' ? (
+                  <button onClick={() => navigate(`/patient/video/${upcomingApt.id}`)}
+                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
+                    <Video size={14} /> Join Call
+                  </button>
+                ) : (
+                  <button disabled
+                    className="w-full py-2.5 bg-gray-100 text-gray-400 font-semibold rounded-xl text-sm cursor-not-allowed">
+                    Awaiting Confirmation
+                  </button>
+                )}
+                <button onClick={() => navigate('/patient/doctors')}
+                  className="mt-3 text-xs text-blue-600 font-medium hover:underline flex items-center gap-1">
+                  See all appointments <ArrowRight size={11} />
+                </button>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-5 text-center">
+                <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-3">
+                  <Calendar size={22} className="text-blue-300" />
+                </div>
+                <p className="text-sm font-medium text-gray-500">No upcoming appointments</p>
+                <p className="text-xs text-gray-400 mt-0.5 mb-3">Book a consultation with one of our doctors</p>
+                <button onClick={() => navigate('/patient/doctors')}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors flex items-center gap-1">
+                  Book Appointment <ArrowRight size={11} />
+                </button>
               </div>
-              <div>
-                <p className="font-bold text-gray-900 text-sm">{upcomingApt?.doctor_name || 'Dr. Ananya Sharma'}</p>
-                <p className="text-xs text-gray-500">Cardiologist</p>
-              </div>
-            </div>
-            <div className="space-y-2 mb-4">
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <Calendar size={13} className="text-gray-400 flex-shrink-0" />
-                {upcomingApt ? formatDate(upcomingApt.appointment_date) : '16 May 2024'}
-              </div>
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <Clock size={13} className="text-gray-400 flex-shrink-0" />
-                {upcomingApt?.appointment_time || '10:30 AM'}
-              </div>
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <Video size={13} className="text-gray-400 flex-shrink-0" />
-                Video Consultation
-              </div>
-            </div>
-            <button onClick={() => navigate('/patient/doctors')}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors">
-              Join Call
-            </button>
-            <button onClick={() => navigate('/patient/doctors')}
-              className="mt-3 text-xs text-blue-600 font-medium hover:underline flex items-center gap-1">
-              See all appointments <ArrowRight size={11} />
-            </button>
+            )}
           </div>
 
           {/* Recent Reports */}
@@ -524,21 +593,40 @@ export default function PatientDashboard() {
               <button onClick={() => navigate('/patient/my-records')} className="text-xs text-blue-600 font-medium hover:underline">View All</button>
             </div>
             <div className="space-y-3">
-              {(records.length > 0 ? records.slice(0, 3) : [
-                { title: 'Blood Test Report', date: '12 May 2024' },
-                { title: 'X-Ray Chest',       date: '10 May 2024' },
-                { title: 'ECG Report',         date: '05 May 2024' },
-              ]).map((r, i) => (
-                <div key={i} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl transition-colors">
-                  <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <FileText size={15} className="text-blue-500" />
+              {records.length > 0 ? records.slice(0, 3).map((r, i) => {
+                const typeMap = {
+                  prescription: { bg: 'bg-blue-50',   icon: 'text-blue-500',   emoji: '💊' },
+                  lab_report:   { bg: 'bg-green-50',  icon: 'text-green-500',  emoji: '🧪' },
+                  diagnosis:    { bg: 'bg-purple-50', icon: 'text-purple-500', emoji: '🩺' },
+                  other:        { bg: 'bg-gray-50',   icon: 'text-gray-500',   emoji: '📁' },
+                }
+                const t = typeMap[r.record_type] || typeMap.other
+                const displayDate = r.date || (r.created_at ? r.created_at.split('T')[0] : '')
+                return (
+                  <div key={i} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer"
+                    onClick={() => navigate('/patient/my-records')}>
+                    <div className={`w-9 h-9 ${t.bg} rounded-xl flex items-center justify-center flex-shrink-0 text-base`}>
+                      {t.emoji}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{r.title || 'Report'}</p>
+                      <p className="text-xs text-gray-400">{displayDate}</p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{r.title || r.name || 'Report'}</p>
-                    <p className="text-xs text-gray-400">{r.date || r.created_at || ''}</p>
+                )
+              }) : (
+                <div className="flex flex-col items-center justify-center py-5 text-center">
+                  <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center mb-3">
+                    <FileText size={20} className="text-gray-300" />
                   </div>
+                  <p className="text-sm font-medium text-gray-500">No reports yet</p>
+                  <p className="text-xs text-gray-400 mt-0.5 mb-3">Upload your health records to track them here</p>
+                  <button onClick={() => navigate('/patient/my-records')}
+                    className="text-xs text-blue-600 font-semibold hover:underline flex items-center gap-1">
+                    Upload Report <ArrowRight size={11} />
+                  </button>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 

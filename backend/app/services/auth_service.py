@@ -56,7 +56,7 @@ async def register_user(data: UserRegisterRequest) -> dict:
                 "profile_image": "",
                 "availability": [],
                 "languages": ["English"],
-                "is_verified": False,
+                "is_verified": None,
                 "is_active": True,
                 "is_static": False,
                 "created_at": datetime.utcnow(),

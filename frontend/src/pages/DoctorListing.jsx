@@ -15,10 +15,15 @@ function DoctorListing() {
   const [maxFee, setMaxFee] = useState('')
   const [page, setPage] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
+  const [totalDoctors, setTotalDoctors] = useState(0)
   const limit = 12
 
   useEffect(() => {
     dispatch(fetchSpecializations())
+    // fetch unfiltered total for the header
+    dispatch(fetchDoctors({ page: 1, limit: 1 })).then(r => {
+      if (r.payload?.total) setTotalDoctors(r.payload.total)
+    })
   }, [dispatch])
 
   useEffect(() => {
@@ -30,8 +35,17 @@ function DoctorListing() {
     dispatch(fetchDoctors(params))
   }, [dispatch, page, search, selectedSpec, minRating, maxFee])
 
+  // When user types, clear specialization filter so results aren't double-filtered
   const handleSearch = (e) => {
     setSearch(e.target.value)
+    setSelectedSpec('')
+    setPage(1)
+  }
+
+  // When user picks a specialization chip, clear text search
+  const handleSpecClick = (spec) => {
+    setSelectedSpec(spec === selectedSpec ? '' : spec)
+    setSearch('')
     setPage(1)
   }
 
@@ -52,7 +66,7 @@ function DoctorListing() {
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Find Doctors</h1>
-          <p className="text-gray-500 mt-1 text-sm">Browse and connect with {total} verified medical specialists</p>
+          <p className="text-gray-500 mt-1 text-sm">Browse and connect with {totalDoctors || specializations.length > 0 ? totalDoctors : '...'} verified medical specialists</p>
         </div>
 
         {/* Search & Filter Bar */}
@@ -91,7 +105,7 @@ function DoctorListing() {
                 <label className="label">Specialization</label>
                 <select
                   value={selectedSpec}
-                  onChange={e => { setSelectedSpec(e.target.value); setPage(1) }}
+                  onChange={e => { setSelectedSpec(e.target.value); setSearch(''); setPage(1) }}
                   className="input-field"
                 >
                   <option value="">All Specializations</option>
@@ -140,7 +154,7 @@ function DoctorListing() {
           {specializations.slice(0, 8).map(spec => (
             <button
               key={spec}
-              onClick={() => { setSelectedSpec(spec === selectedSpec ? '' : spec); setPage(1) }}
+              onClick={() => handleSpecClick(spec)}
               className={`text-sm px-4 py-1.5 rounded-full border transition-colors ${selectedSpec === spec ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
             >
               {spec}
