@@ -134,10 +134,10 @@ export default function AIHealthCopilot() {
   }
 
   // ── Chat with copilot ─────────────────────────────────────────────
-  const sendChat = async () => {
-    if (!chatInput.trim() || chatLoading) return
-    const msg = chatInput.trim()
-    setChatInput('')
+  const sendChat = async (forcedMsg) => {
+    const msg = (forcedMsg ?? chatInput).trim()
+    if (!msg || chatLoading) return
+    if (!forcedMsg) setChatInput('')
     const newHistory = [...chatMessages, { role:'user', content:msg }]
     setChatMessages(newHistory)
     setChatLoading(true)
@@ -535,7 +535,7 @@ export default function AIHealthCopilot() {
                 {chatMessages.length > 0 && (
                   <div className="px-3 pb-1 flex flex-wrap gap-1 flex-shrink-0">
                     {['What should I eat?','How serious is this?','Any home remedies?'].map(q=>(
-                      <button key={q} onClick={()=>{setChatInput(q);setTimeout(()=>sendChat(),50)}}
+                      <button key={q} onClick={()=>sendChat(q)}
                         className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-full font-medium">{q}</button>
                     ))}
                   </div>
