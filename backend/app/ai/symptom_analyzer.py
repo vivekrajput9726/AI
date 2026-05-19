@@ -4,6 +4,14 @@ from typing import List, Optional
 from loguru import logger
 from app.config.settings import settings
 
+# Local trained models (loaded lazily so server starts even before training)
+try:
+    from ml.symptom_classifier import predict as ml_predict_symptoms, age_to_group
+    from ml.intent_classifier import classify as ml_classify_intent, is_emergency as ml_is_emergency
+    ML_AVAILABLE = True
+except ImportError:
+    ML_AVAILABLE = False
+
 
 SYSTEM_PROMPT = """You are an expert medical AI assistant integrated into a healthcare platform.
 Your role is to analyze patient symptoms and provide helpful health information.
@@ -292,6 +300,30 @@ async def analyze_symptoms(
     if report_context:
         patient_context += f"\n\nPatient has also uploaded a medical report. Use this data to refine your analysis:\n{report_context}"
 
+    # ── Run our trained ML model first to pre-classify symptoms ──────────────
+    ml_hint = ""
+    ml_prediction = None
+    if ML_AVAILABLE:
+        try:
+            age_group = age_to_group(patient_age)
+            ml_prediction = ml_predict_symptoms(symptoms, age_group)
+            if ml_prediction:
+                ml_hint = (
+                    f"\n\n⚙ SYNORA ML PRE-CLASSIFICATION (trained Random Forest model):\n"
+                    f"  Predicted Specialist : {ml_prediction['specialist']} "
+                    f"(confidence {ml_prediction['specialist_confidence']}%)\n"
+                    f"  Predicted Severity   : {ml_prediction['severity']} "
+                    f"(confidence {ml_prediction['severity_confidence']}%)\n"
+                    f"Use these as strong priors. Override only if clinical evidence clearly suggests otherwise."
+                )
+                patient_context += ml_hint
+                logger.info(
+                    f"ML pre-classification: specialist={ml_prediction['specialist']}, "
+                    f"severity={ml_prediction['severity']}"
+                )
+        except Exception as e:
+            logger.warning(f"ML symptom classifier skipped: {e}")
+
     # Try Groq first (free, fast)
     if settings.GROQ_API_KEY:
         try:
@@ -308,7 +340,10 @@ async def analyze_symptoms(
             content = response.choices[0].message.content.strip()
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
+                result = json.loads(json_match.group())
+                if ml_prediction:
+                    result["ml_pre_classification"] = ml_prediction
+                return result
         except Exception as e:
             logger.warning(f"Groq analysis failed: {e}")
 
@@ -323,7 +358,10 @@ async def analyze_symptoms(
             content = response.text.strip()
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
+                result = json.loads(json_match.group())
+                if ml_prediction:
+                    result["ml_pre_classification"] = ml_prediction
+                return result
         except Exception as e:
             logger.warning(f"Gemini symptom analysis failed: {e}")
 
@@ -344,11 +382,17 @@ async def analyze_symptoms(
             content = response.choices[0].message.content.strip()
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
+                result = json.loads(json_match.group())
+                if ml_prediction:
+                    result["ml_pre_classification"] = ml_prediction
+                return result
         except Exception as e:
             logger.warning(f"OpenAI analysis failed: {e}")
 
-    return rule_based_analysis(symptoms, patient_age)
+    result = rule_based_analysis(symptoms, patient_age)
+    if ml_prediction:
+        result["ml_pre_classification"] = ml_prediction
+    return result
 
 
 async def chat_with_ai(
@@ -434,6 +478,25 @@ SYNORA PLATFORM FEATURES YOU CAN GUIDE USERS TO:
 - "Health Goals" — to track weight, sleep, steps etc.
 - "Nearby Hospitals" — to find hospitals and clinics near them
 - "Book Appointment" — to book with a specialist doctor"""
+
+    # ── Intent classification with our fine-tuned DistilBERT model ───────────
+    intent_result = None
+    if ML_AVAILABLE:
+        try:
+            intent_result = ml_classify_intent(message)
+            logger.info(
+                f"Intent classified: {intent_result['intent']} "
+                f"(confidence {intent_result['confidence']}%, source={intent_result['source']})"
+            )
+            # If emergency is detected, prepend a strong warning to the system prompt
+            if intent_result["intent"] == "emergency":
+                system = (
+                    "⚠ EMERGENCY ALERT — Our trained intent classifier has detected this as an EMERGENCY query.\n"
+                    "Respond IMMEDIATELY with emergency guidance. Tell the user to call emergency services NOW.\n"
+                    "Do NOT give a general health answer. Life may be at risk.\n\n"
+                ) + system
+        except Exception as e:
+            logger.warning(f"Intent classifier skipped: {e}")
 
     messages = [{"role": "system", "content": system}]
     for h in history[-12:]:

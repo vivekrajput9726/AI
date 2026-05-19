@@ -1,0 +1,49 @@
+SYNORA HEALTH — SYMPTOM CLASSIFIER TRAINING REPORT
+============================================================
+
+Dataset size : 280 samples
+Train / Test : 224 / 56
+Model        : Random Forest (n_estimators=300, TF-IDF + Age features)
+
+SPECIALIST PREDICTION
+  Accuracy : 48.2%
+  F1-Score : 0.499
+
+SEVERITY PREDICTION
+  Accuracy : 55.4%
+  F1-Score : 0.509
+
+--- Specialist Classification Report ---
+                    precision    recall  f1-score   support
+
+      Cardiologist       0.75      0.75      0.75         4
+     Dermatologist       1.00      0.50      0.67         4
+    ENT Specialist       1.00      0.50      0.67         4
+   Endocrinologist       0.40      0.50      0.44         4
+Gastroenterologist       1.00      0.50      0.67         4
+ General Physician       0.50      0.50      0.50         4
+      Gynecologist       0.17      0.75      0.27         4
+       Neurologist       0.00      0.00      0.00         4
+   Ophthalmologist       0.67      0.50      0.57         4
+       Orthopedist       1.00      0.50      0.67         4
+      Pediatrician       0.43      0.75      0.55         4
+      Psychiatrist       0.50      0.25      0.33         4
+     Pulmonologist       0.50      0.25      0.33         4
+         Urologist       0.67      0.50      0.57         4
+
+          accuracy                           0.48        56
+         macro avg       0.61      0.48      0.50        56
+      weighted avg       0.61      0.48      0.50        56
+
+--- Severity Classification Report ---
+              precision    recall  f1-score   support
+
+   Emergency       0.00      0.00      0.00         4
+        Mild       1.00      0.27      0.43        11
+    Moderate       0.51      0.85      0.64        26
+      Severe       0.60      0.40      0.48        15
+
+    accuracy                           0.55        56
+   macro avg       0.53      0.38      0.39        56
+weighted avg       0.59      0.55      0.51        56
+
