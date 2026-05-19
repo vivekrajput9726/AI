@@ -4,6 +4,14 @@ from typing import List, Optional
 from loguru import logger
 from app.config.settings import settings
 
+# Local trained models (loaded lazily so server starts even before training)
+try:
+    from ml.symptom_classifier import predict as ml_predict_symptoms, age_to_group
+    from ml.intent_classifier import classify as ml_classify_intent, is_emergency as ml_is_emergency
+    ML_AVAILABLE = True
+except ImportError:
+    ML_AVAILABLE = False
+
 
 SYSTEM_PROMPT = """You are an expert medical AI assistant integrated into a healthcare platform.
 Your role is to analyze patient symptoms and provide helpful health information.
@@ -292,6 +300,30 @@ async def analyze_symptoms(
     if report_context:
         patient_context += f"\n\nPatient has also uploaded a medical report. Use this data to refine your analysis:\n{report_context}"
 
+    # ── Run our trained ML model first to pre-classify symptoms ──────────────
+    ml_hint = ""
+    ml_prediction = None
+    if ML_AVAILABLE:
+        try:
+            age_group = age_to_group(patient_age)
+            ml_prediction = ml_predict_symptoms(symptoms, age_group)
+            if ml_prediction:
+                ml_hint = (
+                    f"\n\n⚙ SYNORA ML PRE-CLASSIFICATION (trained Random Forest model):\n"
+                    f"  Predicted Specialist : {ml_prediction['specialist']} "
+                    f"(confidence {ml_prediction['specialist_confidence']}%)\n"
+                    f"  Predicted Severity   : {ml_prediction['severity']} "
+                    f"(confidence {ml_prediction['severity_confidence']}%)\n"
+                    f"Use these as strong priors. Override only if clinical evidence clearly suggests otherwise."
+                )
+                patient_context += ml_hint
+                logger.info(
+                    f"ML pre-classification: specialist={ml_prediction['specialist']}, "
+                    f"severity={ml_prediction['severity']}"
+                )
+        except Exception as e:
+            logger.warning(f"ML symptom classifier skipped: {e}")
+
     # Try Groq first (free, fast)
     if settings.GROQ_API_KEY:
         try:
@@ -308,7 +340,10 @@ async def analyze_symptoms(
             content = response.choices[0].message.content.strip()
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
+                result = json.loads(json_match.group())
+                if ml_prediction:
+                    result["ml_pre_classification"] = ml_prediction
+                return result
         except Exception as e:
             logger.warning(f"Groq analysis failed: {e}")
 
@@ -323,7 +358,10 @@ async def analyze_symptoms(
             content = response.text.strip()
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
+                result = json.loads(json_match.group())
+                if ml_prediction:
+                    result["ml_pre_classification"] = ml_prediction
+                return result
         except Exception as e:
             logger.warning(f"Gemini symptom analysis failed: {e}")
 
@@ -344,11 +382,17 @@ async def analyze_symptoms(
             content = response.choices[0].message.content.strip()
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
+                result = json.loads(json_match.group())
+                if ml_prediction:
+                    result["ml_pre_classification"] = ml_prediction
+                return result
         except Exception as e:
             logger.warning(f"OpenAI analysis failed: {e}")
 
-    return rule_based_analysis(symptoms, patient_age)
+    result = rule_based_analysis(symptoms, patient_age)
+    if ml_prediction:
+        result["ml_pre_classification"] = ml_prediction
+    return result
 
 
 async def chat_with_ai(
@@ -435,6 +479,25 @@ SYNORA PLATFORM FEATURES YOU CAN GUIDE USERS TO:
 - "Nearby Hospitals" — to find hospitals and clinics near them
 - "Book Appointment" — to book with a specialist doctor"""
 
+    # ── Intent classification with our fine-tuned DistilBERT model ───────────
+    intent_result = None
+    if ML_AVAILABLE:
+        try:
+            intent_result = ml_classify_intent(message)
+            logger.info(
+                f"Intent classified: {intent_result['intent']} "
+                f"(confidence {intent_result['confidence']}%, source={intent_result['source']})"
+            )
+            # If emergency is detected, prepend a strong warning to the system prompt
+            if intent_result["intent"] == "emergency":
+                system = (
+                    "⚠ EMERGENCY ALERT — Our trained intent classifier has detected this as an EMERGENCY query.\n"
+                    "Respond IMMEDIATELY with emergency guidance. Tell the user to call emergency services NOW.\n"
+                    "Do NOT give a general health answer. Life may be at risk.\n\n"
+                ) + system
+        except Exception as e:
+            logger.warning(f"Intent classifier skipped: {e}")
+
     messages = [{"role": "system", "content": system}]
     for h in history[-12:]:
         messages.append({"role": h["role"], "content": h["content"]})
@@ -482,4 +545,184 @@ SYNORA PLATFORM FEATURES YOU CAN GUIDE USERS TO:
         except Exception as e:
             logger.warning(f"Gemini chat failed: {e}")
 
-    return "I'm having trouble connecting to my AI service right now. Please try again in a moment, or use the **AI Symptom Checker** on the platform for a detailed analysis."
+    return _local_chat_fallback(message, patient_name, patient_age, report_context)
+
+
+def _local_chat_fallback(
+    message: str,
+    patient_name: Optional[str] = None,
+    patient_age: Optional[int] = None,
+    report_context: Optional[str] = None,
+) -> str:
+    """Rule-based fallback when all AI providers are unavailable."""
+    name = patient_name or "there"
+    msg = message.lower()
+
+    # Greetings
+    if any(w in msg for w in ["hello", "hi ", "hey", "namaste", "good morning", "good evening", "good afternoon"]):
+        return f"Hello {name}! I'm Synora AI, your health assistant. How can I help you today? You can ask me about symptoms, medicines, diet tips, or your lab reports."
+
+    # Serious / emergency keywords
+    emergency_words = ["chest pain", "heart attack", "can't breathe", "cannot breathe", "stroke", "unconscious", "fainted", "severe bleeding", "overdose", "suicide"]
+    if any(w in msg for w in emergency_words):
+        return f"⚠️ **This sounds like a medical emergency, {name}.** Please **call 112 (India emergency)** or go to the nearest hospital immediately. Do not wait — emergencies need immediate in-person care."
+
+    # Fever
+    if any(w in msg for w in ["fever", "temperature", "bukhar"]):
+        age_note = " For children, even a mild fever should be monitored closely." if patient_age and patient_age < 15 else (" For elderly patients, fever can escalate quickly — don't delay." if patient_age and patient_age >= 60 else "")
+        return (
+            f"Fever can be caused by infections (viral or bacterial), inflammation, or heat exhaustion, {name}.\n\n"
+            "• **Mild fever (99–100.4°F / 37.2–38°C):** Rest, drink fluids, try paracetamol (500 mg for adults).\n"
+            "• **High fever (above 103°F / 39.4°C):** See a doctor promptly.\n"
+            "• **With rash, stiff neck, or severe headache:** Go to a doctor immediately — could be dengue or meningitis.\n\n"
+            f"{age_note} Use the **AI Symptom Checker** on this platform for a more detailed analysis."
+        )
+
+    # Headache
+    if any(w in msg for w in ["headache", "head pain", "migraine", "sir dard"]):
+        return (
+            f"Headaches are very common, {name}, and usually not serious.\n\n"
+            "• **Tension headache:** Stress, dehydration, or eye strain — rest, hydrate, take paracetamol.\n"
+            "• **Migraine:** Throbbing pain, nausea, light sensitivity — rest in a dark quiet room.\n"
+            "• **Sudden severe headache (worst of your life):** See a doctor immediately.\n\n"
+            "If headaches are frequent or worsening, consult a **neurologist**."
+        )
+
+    # Cold / cough
+    if any(w in msg for w in ["cold", "cough", "runny nose", "sore throat", "sneezing", "khasi", "zukam"]):
+        return (
+            f"Sounds like a common cold or upper respiratory infection, {name}.\n\n"
+            "• Stay warm, rest, and drink warm fluids (ginger tea, turmeric milk).\n"
+            "• Steam inhalation can relieve congestion.\n"
+            "• **Cough with fever > 3 days or breathing difficulty:** See a doctor — could be flu or pneumonia.\n\n"
+            "Over-the-counter options: cetirizine for runny nose, cough syrup for dry cough. Always check with a pharmacist."
+        )
+
+    # Stomach / digestion
+    if any(w in msg for w in ["stomach", "abdomen", "nausea", "vomit", "diarrhea", "loose motion", "constipation", "acidity", "gas", "bloating", "pet dard"]):
+        return (
+            f"Digestive issues are very common, {name}.\n\n"
+            "• **Acidity/gas:** Avoid spicy/oily food, eat smaller meals, try antacids (Gelusil or Digene).\n"
+            "• **Diarrhea:** Stay well hydrated — ORS (oral rehydration salts) is very important.\n"
+            "• **Vomiting + diarrhea for > 24 hours:** See a doctor to prevent dehydration.\n"
+            "• **Severe abdominal pain (especially right side):** Could be appendicitis — go to hospital.\n\n"
+            "Consult a **gastroenterologist** if symptoms are recurring."
+        )
+
+    # Diabetes / blood sugar
+    if any(w in msg for w in ["diabetes", "blood sugar", "sugar level", "insulin", "hba1c", "glucose"]):
+        return (
+            f"Managing diabetes well is very achievable, {name}.\n\n"
+            "• **Normal fasting sugar:** 70–100 mg/dL. **Pre-diabetic:** 100–125. **Diabetic:** 126+.\n"
+            "• Key tips: Low-GI diet (less white rice/bread), 30 min daily walk, regular medication.\n"
+            "• **HbA1c below 7%** is the general target for diabetics.\n\n"
+            "Upload your lab report using the **Lab Reports** feature for a personalised AI analysis."
+        )
+
+    # Blood pressure
+    if any(w in msg for w in ["blood pressure", "bp", "hypertension", "bp high", "bp low"]):
+        return (
+            f"Blood pressure management is important, {name}.\n\n"
+            "• **Normal BP:** 120/80 mmHg. **High (hypertension):** 140/90+. **Low:** below 90/60.\n"
+            "• High BP: reduce salt, avoid stress, exercise regularly, take prescribed medicines consistently.\n"
+            "• Low BP: stay hydrated, eat small frequent meals, avoid standing up suddenly.\n\n"
+            "Monitor your BP regularly and consult a **cardiologist** if readings are consistently high."
+        )
+
+    # Sleep
+    if any(w in msg for w in ["sleep", "insomnia", "can't sleep", "neend nahi"]):
+        return (
+            f"Sleep issues are increasingly common, {name}.\n\n"
+            "• Maintain a fixed sleep schedule — sleep and wake at the same time daily.\n"
+            "• Avoid screens (phone/TV) at least 30 minutes before bed.\n"
+            "• Avoid caffeine after 4 PM. Try warm milk or chamomile tea at night.\n"
+            "• Chronic insomnia may signal anxiety or depression — consult a **psychiatrist or sleep specialist**.\n\n"
+            "Track your sleep with the **Health Goals** feature on this platform."
+        )
+
+    # Anxiety / stress / mental health
+    if any(w in msg for w in ["anxiety", "stress", "depression", "mental", "panic", "worried", "sad", "crying"]):
+        return (
+            f"I hear you, {name} — mental health is just as important as physical health.\n\n"
+            "• Breathing exercises (4-7-8 breathing) can help calm anxiety quickly.\n"
+            "• Regular exercise, good sleep, and social connection make a big difference.\n"
+            "• **Persistent sadness or anxiety lasting > 2 weeks:** Please consult a **psychiatrist or counsellor** — there is no shame in asking for help.\n\n"
+            "You're not alone. Seeking support is a sign of strength."
+        )
+
+    # Medicine / dosage
+    if any(w in msg for w in ["medicine", "tablet", "capsule", "dosage", "dose", "drug", "paracetamol", "ibuprofen", "antibiotic"]):
+        return (
+            f"Happy to help with medicine information, {name}.\n\n"
+            "• **Paracetamol (500 mg):** Safe for fever/pain — max 4 doses/day, avoid with alcohol.\n"
+            "• **Ibuprofen:** Good for inflammation/pain — take after food, avoid with kidney issues.\n"
+            "• **Antibiotics:** Always complete the full course even if you feel better — never self-prescribe.\n\n"
+            "For specific medicine queries, always verify with a **pharmacist or doctor**. I can give general guidance but prescriptions require professional advice."
+        )
+
+    # Diet / food / nutrition
+    if any(w in msg for w in ["diet", "food", "eat", "nutrition", "weight", "obese", "lose weight", "calories"]):
+        return (
+            f"Good nutrition is the foundation of good health, {name}.\n\n"
+            "• Eat plenty of vegetables, whole grains (brown rice, roti), pulses, and fruits.\n"
+            "• Limit sugar, processed foods, fried snacks, and excess salt.\n"
+            "• Drink **8–10 glasses of water** daily.\n"
+            "• For weight loss: aim for 500 calorie deficit/day through diet + exercise — safe rate is 0.5 kg/week.\n\n"
+            "Use the **Health Goals** feature to track your weight and progress."
+        )
+
+    # Lab reports
+    if any(w in msg for w in ["report", "lab", "blood test", "test result", "cbc", "hemoglobin", "thyroid", "cholesterol"]):
+        if report_context:
+            return (
+                f"I can see your report data, {name}. Here's a quick overview:\n\n"
+                "• Values outside normal range are worth discussing with your doctor.\n"
+                "• Use the **Lab Reports** section to upload your full report for a detailed AI analysis.\n\n"
+                "For personalised interpretation, consult your doctor with the printed report."
+            )
+        return (
+            f"To analyse your lab report, {name}, please upload it using the **Lab Reports** feature on this platform. "
+            "Our AI can interpret blood counts (CBC), sugar, thyroid (TSH/T3/T4), cholesterol, liver/kidney function, and more."
+        )
+
+    # How serious / severity
+    if any(w in msg for w in ["how serious", "serious", "dangerous", "should i worry", "is it bad"]):
+        return (
+            f"That's an important question, {name}. Seriousness depends on several factors:\n\n"
+            "• **Duration:** Symptoms lasting more than a week without improvement need medical attention.\n"
+            "• **Severity:** Severe pain, high fever (>103°F), or difficulty breathing always warrants a doctor visit.\n"
+            "• **Age:** Children and elderly patients need earlier medical evaluation.\n\n"
+            "Use the **AI Symptom Checker** on this platform to get a more specific severity assessment based on your symptoms."
+        )
+
+    # Home remedies
+    if any(w in msg for w in ["home remedy", "home remedies", "gharelu", "natural remedy", "ayurvedic"]):
+        return (
+            f"Here are some well-known home remedies used in Indian households, {name}:\n\n"
+            "• **Ginger + honey + lemon:** Great for cold, cough, and sore throat.\n"
+            "• **Turmeric milk (haldi doodh):** Anti-inflammatory, helps with minor infections.\n"
+            "• **Ajwain (carom seeds) with warm water:** Relieves acidity and bloating.\n"
+            "• **Tulsi leaves:** Boosts immunity, helps with fever and respiratory issues.\n\n"
+            "Home remedies support recovery but should not replace medical treatment for serious conditions."
+        )
+
+    # Doctor / appointment
+    if any(w in msg for w in ["doctor", "appointment", "specialist", "consult", "hospital"]):
+        return (
+            f"Seeing the right doctor makes all the difference, {name}.\n\n"
+            "• Use the **Book Appointment** feature on this platform to find and book with specialist doctors.\n"
+            "• Use **Nearby Hospitals** to find clinics and hospitals close to you.\n\n"
+            "Common specialists: **General Physician** for routine issues, **Cardiologist** for heart, **Orthopedist** for bones/joints, **Dermatologist** for skin, **Gynecologist** for women's health."
+        )
+
+    # Default helpful response
+    return (
+        f"Thanks for your question, {name}. I'm Synora AI and I'm here to help with health queries.\n\n"
+        "You can ask me about:\n"
+        "• **Symptoms** — possible causes and when to see a doctor\n"
+        "• **Medicines** — dosage, side effects, and interactions\n"
+        "• **Diet & nutrition** — for specific conditions\n"
+        "• **Lab reports** — upload yours for AI analysis\n"
+        "• **Mental health** — stress, anxiety, sleep issues\n\n"
+        "For a detailed symptom analysis, try the **AI Symptom Checker** on this platform."
+    )

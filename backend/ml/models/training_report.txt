@@ -1,0 +1,55 @@
+SYNORA HEALTH — SYMPTOM CLASSIFIER TRAINING REPORT
+============================================================
+
+Dataset size     : 1205 samples
+Train / Test     : 964 / 241
+Augmented train  : 3856
+Model            : VotingClassifier (LR + LinearSVC) + TF-IDF
+
+SPECIALIST PREDICTION
+  Accuracy       : 71.8%
+  F1-Score       : 0.718
+  CV macro F1    : 0.725 +/- 0.031
+
+SEVERITY PREDICTION
+  Accuracy       : 63.1%
+  F1-Score       : 0.632
+  CV macro F1    : 0.591 +/- 0.011
+
+SAFETY METRIC
+  Emergency recall : 64.9%
+
+--- Specialist Classification Report ---
+                    precision    recall  f1-score   support
+
+      Cardiologist       0.75      0.67      0.71        18
+     Dermatologist       0.73      0.65      0.69        17
+    ENT Specialist       0.73      0.65      0.69        17
+   Endocrinologist       0.77      0.67      0.71        15
+Gastroenterologist       0.73      0.89      0.80        18
+ General Physician       0.64      0.70      0.67        20
+      Gynecologist       0.67      0.78      0.72        18
+       Neurologist       0.75      0.67      0.71        18
+   Ophthalmologist       1.00      0.80      0.89        15
+       Orthopedist       0.58      0.69      0.63        16
+      Pediatrician       0.70      0.74      0.72        19
+      Psychiatrist       0.74      0.78      0.76        18
+     Pulmonologist       0.75      0.75      0.75        16
+         Urologist       0.67      0.62      0.65        16
+
+          accuracy                           0.72       241
+         macro avg       0.73      0.72      0.72       241
+      weighted avg       0.73      0.72      0.72       241
+
+--- Severity Classification Report ---
+              precision    recall  f1-score   support
+
+   Emergency       0.69      0.65      0.67        37
+        Mild       0.77      0.61      0.68        59
+    Moderate       0.61      0.70      0.65        83
+      Severe       0.53      0.55      0.54        62
+
+    accuracy                           0.63       241
+   macro avg       0.65      0.63      0.63       241
+weighted avg       0.64      0.63      0.63       241
+
