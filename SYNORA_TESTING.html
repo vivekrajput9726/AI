@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Synora Health – Testing Chapter</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Times New Roman', serif; font-size: 12pt; background: #fff; margin: 0; padding: 0; color: #000; line-height: 1.9; }
+  .page { width: 820px; margin: 0 auto; padding: 40px 68px 56px; page-break-after: always; }
+  .page-title { text-align: right; font-size: 10pt; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 20px; }
+  h1 { font-size: 14pt; font-weight: bold; text-align: left; margin: 0 0 14px; }
+  h2 { font-size: 13pt; font-weight: bold; margin: 22px 0 8px; }
+  h3 { font-size: 12pt; font-weight: bold; margin: 16px 0 6px; }
+  p  { margin: 8px 0; text-align: justify; }
+  ul { margin: 6px 0 10px 40px; }
+  li { margin: 4px 0; }
+  .result-line { font-weight: bold; margin: 10px 0 4px; }
+  .screen-box { border: 2px dashed #94a3b8; border-radius: 6px; padding: 38px 16px; text-align: center; color: #475569; margin: 14px auto; background: #f8fafc; font-size: 11pt; width: 90%; }
+  .screen-box strong { display: block; font-size: 11pt; color: #1e40af; margin-bottom: 4px; }
+  .two-col { display: flex; gap: 20px; margin: 14px 0; }
+  .two-col .screen-box { flex: 1; margin: 0; }
+  .caption { text-align: center; font-size: 11pt; font-style: italic; margin: 4px 0 14px; }
+  .section-break { border-top: 1px solid #ccc; margin: 22px 0 16px; }
+  .pgn { text-align: center; font-size: 11pt; margin-top: 36px; }
+  @media print { .page { page-break-after: always; } }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     CHAPTER 12 – TESTING
+═══════════════════════════════════════════════ -->
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+<h1>12. TESTING</h1>
+
+<p>Testing is an important phase of software development that ensures the <strong>"Synora Health AI Platform"</strong> functions accurately, securely, and efficiently under different operating conditions. The system was tested using multiple testing methods to verify functionality, integration, reliability, and user satisfaction.</p>
+
+<h2>12.1 Unit Testing</h2>
+
+<p>Unit testing was performed to verify the functionality of individual modules independently. Each module was tested separately to ensure correct processing, validation, and output generation. The testing process confirmed that all modules were functioning accurately under different input conditions.</p>
+
+<p>The following authentication modules were tested individually:</p>
+<ol>
+  <li>Login Module</li>
+  <li>Registration Module</li>
+  <li>OTP Verification Module</li>
+</ol>
+
+<div class="section-break"></div>
+
+<h3>1. Login Module Testing</h3>
+
+<p>The login module was tested using both valid and invalid login credentials to verify authentication functionality and validation handling. Some test scenarios performed are:</p>
+<ul>
+  <li>Login with incorrect email or wrong password</li>
+  <li>Login with a deactivated account</li>
+  <li>Validation of authentication error messages</li>
+  <li>Successful dashboard redirection after login</li>
+  <li>Quick Demo Login buttons for Patient, Doctor, and Admin roles</li>
+</ul>
+
+<p class="result-line">Expected Result:</p>
+<ul>
+  <li>Valid users should be successfully redirected to their role-based dashboard</li>
+  <li>Invalid users should receive an appropriate error message</li>
+  <li>Deactivated accounts should be blocked from accessing the system</li>
+</ul>
+
+<p class="result-line">Result:</p>
+<p>The system successfully authenticated valid users and redirected them to the correct dashboard page based on their role (Patient, Doctor, or Admin). Invalid login attempts were correctly detected, and the system displayed an <em>"Invalid credentials"</em> error message. Deactivated accounts were blocked with an appropriate account status message.</p>
+
+<p><strong>Screenshots:</strong></p>
+
+<div class="two-col">
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.1.1: Successful Login</strong>
+      [ Screenshot: Login page with valid credentials entered — patient@demo.com / Demo@1234 — and successful redirect to Patient Dashboard ]
+    </div>
+    <p class="caption">Figure 12.1.1: Successful Login</p>
+  </div>
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.1.2: Invalid Login Validation</strong>
+      [ Screenshot: Login page showing red error toast — "Invalid credentials" — after entering wrong password ]
+    </div>
+    <p class="caption">Figure 12.1.2: Invalid Login Validation</p>
+  </div>
+</div>
+
+<div class="pgn">90</div>
+</div>
+
+<!-- PAGE 2 -->
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+
+<h3>2. Registration Module Testing</h3>
+
+<p>The registration module was tested by creating a new user account with valid details including name, email, phone number, password, and role selection.</p>
+
+<p class="result-line">Expected Result:</p>
+<p>Successful user account creation with OTP verification and auto-login to the dashboard.</p>
+
+<p class="result-line">Result:</p>
+<p>The system successfully created and stored new user accounts in the MongoDB database. The OTP was delivered via Twilio SMS to the registered phone number and verified correctly. After verification, the user was automatically redirected to their role-based dashboard.</p>
+
+<div class="screen-box">
+  <strong>Figure 12.1.3: Registration Module Testing</strong>
+  [ Screenshot: Registration page showing Name, Email, Phone, Password fields with Role selection (Patient / Doctor) and Submit button ]
+</div>
+<p class="caption">Figure 12.1.3: Registration Module Testing</p>
+
+<div class="section-break"></div>
+
+<h3>3. OTP Verification Module Testing</h3>
+
+<p>The OTP verification module was tested by entering both valid and invalid OTP codes to verify the phone number confirmation process.</p>
+
+<p class="result-line">Expected Result:</p>
+<ul>
+  <li>Valid OTP should verify the account and redirect to dashboard</li>
+  <li>Invalid or expired OTP should display an appropriate error message</li>
+</ul>
+
+<p class="result-line">Result:</p>
+<p>The system correctly verified accounts when a valid OTP was entered. Incorrect OTP entries were rejected with a proper validation message. Expired OTPs (after 10 minutes) were correctly identified and the user was prompted to request a new OTP.</p>
+
+<div class="two-col">
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.1.4: OTP Verification — Success</strong>
+      [ Screenshot: OTP input screen showing 6-digit field with correct OTP entered and "Account Verified" success message ]
+    </div>
+    <p class="caption">Figure 12.1.4: OTP Verification Success</p>
+  </div>
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.1.5: OTP Verification — Invalid OTP</strong>
+      [ Screenshot: OTP screen showing error message "Invalid or expired OTP. Please try again." ]
+    </div>
+    <p class="caption">Figure 12.1.5: OTP Verification — Invalid</p>
+  </div>
+</div>
+
+<div class="pgn">91</div>
+</div>
+
+<!-- PAGE 3 – INTEGRATION TESTING -->
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+
+<h2>12.2 Integration Testing</h2>
+
+<p>Integration testing was performed to verify communication and data flow between connected modules of the system. The integrated modules were tested together to ensure smooth interaction, correct data transfer, successful backend processing, and proper storage of generated healthcare information.</p>
+
+<div class="section-break"></div>
+
+<h3>1. AI Symptom Checker and Database Integration Testing</h3>
+
+<p>The AI Symptom Checker module was tested together with the database management module to verify that the generated AI analysis results were processed correctly and stored successfully in the patient's health history after analysis.</p>
+
+<p>During testing, different symptom descriptions such as chest pain, fever, joint pain, and breathing difficulty were entered into the system. The Groq Llama 3.1-70B AI model analyzed these symptoms and generated condition predictions, urgency levels, and specialist recommendations. After analysis, the system automatically stored the generated results in the patient profile connected to the MongoDB database.</p>
+
+<p class="result-line">Expected Result:</p>
+<p>The generated AI symptom analysis should be successfully saved in the MongoDB database and displayed correctly in the patient's health history records.</p>
+
+<p class="result-line">Result:</p>
+<p>The AI model successfully generated medically relevant symptom analysis based on patient input. The generated results were transferred correctly between the AI analysis module and the database system and stored successfully in the health history without data loss or processing errors.</p>
+
+<div class="two-col">
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.2.1: AI Symptom Analysis Output</strong>
+      [ Screenshot: AI Symptom Checker showing entered symptoms, AI analysis result with conditions, urgency level (HIGH/MEDIUM/LOW), and recommended doctor type ]
+    </div>
+    <p class="caption">Figure 12.2.1: AI Symptom Analysis Output</p>
+  </div>
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.2.2: Analysis Record Stored in History</strong>
+      [ Screenshot: Patient health history page showing saved AI symptom analysis record with date and details ]
+    </div>
+    <p class="caption">Figure 12.2.2: Analysis Stored in History</p>
+  </div>
+</div>
+
+<div class="pgn">92</div>
+</div>
+
+<!-- PAGE 4 -->
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+
+<h3>2. Appointment Booking and Payment Integration Testing</h3>
+
+<p>The appointment booking module was tested together with the Razorpay payment module and the database module to verify that appointments were correctly created, payments were securely verified, and all records were stored successfully in the system after confirmation.</p>
+
+<p>During testing, a patient selected a doctor, chose an available time slot, and completed the Razorpay payment. The backend performed HMAC-SHA256 cryptographic signature verification of the payment before confirming the appointment. After successful verification, the appointment record and payment record were both saved in MongoDB, and the doctor received a real-time WebSocket notification.</p>
+
+<p class="result-line">Expected Result:</p>
+<p>The appointment should be confirmed only after successful payment verification. Both appointment and payment records should be saved in the database and the doctor should be notified in real time.</p>
+
+<p class="result-line">Result:</p>
+<p>The system successfully processed the payment, verified the HMAC signature, saved both records in the database, and delivered the real-time notification to the doctor within one second of payment confirmation.</p>
+
+<div class="two-col">
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.2.3: Razorpay Payment Processing</strong>
+      [ Screenshot: Razorpay payment modal showing amount ₹800, UPI / Card / Net Banking options, and Pay button ]
+    </div>
+    <p class="caption">Figure 12.2.3: Razorpay Payment Processing</p>
+  </div>
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.2.4: Appointment Confirmed and Stored</strong>
+      [ Screenshot: Appointment confirmation screen showing doctor name, date, time slot, payment status: Paid, appointment status: Confirmed ]
+    </div>
+    <p class="caption">Figure 12.2.4: Appointment Confirmed</p>
+  </div>
+</div>
+
+<div class="section-break"></div>
+
+<h3>3. Health Record Upload and AI Analysis Integration Testing</h3>
+
+<p>The health record upload module was tested together with the Google Gemini Vision AI module to verify that uploaded medical reports were correctly analyzed and the AI insights were stored in the patient's health records.</p>
+
+<p class="result-line">Result:</p>
+<p>The health record was uploaded successfully, Gemini Vision AI analyzed the document and generated structured health insights, and the complete record with AI analysis was saved in the MongoDB database and displayed correctly in the patient's health records section.</p>
+
+<div class="two-col">
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.2.5: Health Record Upload</strong>
+      [ Screenshot: Health records upload form showing file picker, record type dropdown, description field, and Upload button ]
+    </div>
+    <p class="caption">Figure 12.2.5: Health Record Upload</p>
+  </div>
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.2.6: AI Analysis Result Stored</strong>
+      [ Screenshot: Health records page showing uploaded record with AI insights panel — key findings, abnormal values, recommended actions ]
+    </div>
+    <p class="caption">Figure 12.2.6: AI Analysis Result Stored</p>
+  </div>
+</div>
+
+<div class="pgn">93</div>
+</div>
+
+<!-- PAGE 5 – SYSTEM TESTING -->
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+
+<h2>12.3 System Testing</h2>
+
+<p>System testing was performed on the complete integrated application to verify overall system functionality, reliability, and performance under real operating conditions. The complete workflow of the application was tested from registration and login through to AI analysis, doctor consultation, payment, and admin management.</p>
+
+<p>The following functionalities were tested:</p>
+<ul>
+  <li>Patient registration and OTP verification</li>
+  <li>Doctor search and appointment booking</li>
+  <li>Razorpay payment processing and verification</li>
+  <li>AI symptom analysis with urgency classification</li>
+  <li>Video consultation (WebRTC)</li>
+  <li>Real-time chat messaging (WebSocket)</li>
+  <li>Health record upload and AI analysis</li>
+  <li>Admin doctor verification workflow</li>
+  <li>Medicine reminder management</li>
+</ul>
+
+<p class="result-line">Expected Result:</p>
+<p>The system should perform all operations successfully and generate accurate healthcare analysis without major functional errors or system failures.</p>
+
+<p class="result-line">Result:</p>
+<p>The application successfully executed all major functionalities and generated accurate AI symptom analysis, appointment confirmations, payment verifications, health record insights, and real-time communications. All modules interacted smoothly and the system provided a reliable and user-friendly healthcare experience during testing.</p>
+
+<div class="screen-box">
+  <strong>Figure 12.3.1: Patient Dashboard — Complete System View</strong>
+  [ Screenshot: Patient Dashboard showing all quick action tiles — Book Appointment, AI Symptom Checker, Health Records, Video Consultation, Medicine Reminders, Emergency SOS ]
+</div>
+<p class="caption">Figure 12.3.1: Patient Dashboard — Complete System View</p>
+
+<div class="section-break"></div>
+
+<p><strong>Supporting Figures Referenced:</strong></p>
+<p>The following figures already included in the Front-End Screens section were used to verify complete system functionality during system testing:</p>
+
+<ul>
+  <li>Figure 7.1.1: Patient Registration Screen</li>
+  <li>Figure 7.1.2: Login Screen with Quick Demo Buttons</li>
+  <li>Figure 7.1.3: Patient Dashboard Overview</li>
+  <li>Figure 7.1.4: Doctor Search and Filter Module</li>
+  <li>Figure 7.1.5: Appointment Booking and Slot Selection</li>
+  <li>Figure 7.1.6: AI Symptom Checker Module</li>
+  <li>Figure 7.1.7: Video Consultation Room (WebRTC)</li>
+  <li>Figure 7.1.8: Real-Time Chat Interface (WebSocket)</li>
+  <li>Figure 7.1.9: Health Records and AI Analysis Module</li>
+  <li>Figure 7.1.10: Doctor Dashboard Overview</li>
+  <li>Figure 7.1.11: Admin Dashboard and Statistics Panel</li>
+  <li>Figure 7.1.12: Admin Doctor Verification Panel</li>
+</ul>
+
+<div class="pgn">94</div>
+</div>
+
+<!-- PAGE 6 – UAT -->
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+
+<h2>12.4 User Acceptance Testing (UAT)</h2>
+
+<p>User Acceptance Testing (UAT) was performed to verify whether the system satisfies user requirements and provides a simple, user-friendly, and effective healthcare management experience. The system was tested under practical conditions to evaluate usability, navigation, functionality, and overall user satisfaction.</p>
+
+<p>During testing, users interacted with different modules such as:</p>
+<ul>
+  <li>Patient Registration and OTP Verification</li>
+  <li>Doctor Search and Appointment Booking</li>
+  <li>AI Symptom Checker</li>
+  <li>Razorpay Payment Processing</li>
+  <li>Health Record Upload and AI Analysis</li>
+  <li>Video Consultation and Real-Time Chat</li>
+  <li>Doctor Dashboard and Appointment Approval</li>
+  <li>Admin Doctor Verification and User Management</li>
+</ul>
+
+<p>Users found the registration process easy to complete and the OTP verification quick and straightforward. The AI Symptom Checker provided detailed and helpful medical suggestions that users found informative and easy to understand. The appointment booking module helped users find and book doctors efficiently with a smooth payment experience through Razorpay. The health record upload feature with AI analysis was found highly useful for understanding medical reports.</p>
+
+<p>The video consultation feature successfully connected patients and doctors in real time using WebRTC. The real-time chat module was found responsive and reliable. Doctors found the appointment approval workflow and AI-assisted prescription feature easy to use. Administrators were satisfied with the real-time statistics dashboard and the doctor verification workflow.</p>
+
+<p class="result-line">Result:</p>
+<p>The system successfully satisfied the expected user requirements and provided a smooth, reliable, and user-friendly healthcare management experience across all three user roles — Patient, Doctor, and Administrator.</p>
+
+<div class="two-col">
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.4.1: UAT — Patient Using AI Symptom Checker</strong>
+      [ Screenshot: Patient Portal — AI Symptom Checker showing symptom input and AI analysis result with urgency level and recommendations ]
+    </div>
+    <p class="caption">Figure 12.4.1: Patient — AI Symptom Checker</p>
+  </div>
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.4.2: UAT — Doctor Approving Appointment</strong>
+      [ Screenshot: Doctor Dashboard — Appointments tab showing pending appointment with Approve and Reject buttons ]
+    </div>
+    <p class="caption">Figure 12.4.2: Doctor — Appointment Approval</p>
+  </div>
+</div>
+
+<div class="two-col">
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.4.3: UAT — Admin Verifying Doctor</strong>
+      [ Screenshot: Admin Dashboard — Doctors panel showing pending doctor with profile details and Verify / Reject buttons ]
+    </div>
+    <p class="caption">Figure 12.4.3: Admin — Doctor Verification</p>
+  </div>
+  <div>
+    <div class="screen-box">
+      <strong>Figure 12.4.4: UAT — Video Consultation</strong>
+      [ Screenshot: Video Consultation Room showing doctor and patient video streams with chat panel on right side ]
+    </div>
+    <p class="caption">Figure 12.4.4: Video Consultation Testing</p>
+  </div>
+</div>
+
+<div class="pgn">95</div>
+</div>
+
+</body>
+</html>

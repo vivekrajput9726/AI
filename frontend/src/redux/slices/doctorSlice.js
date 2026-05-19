@@ -3,7 +3,7 @@ import api from '../../services/api'
 
 export const fetchDoctors = createAsyncThunk('doctors/fetchAll', async (params = {}) => {
   const query = new URLSearchParams(params).toString()
-  const res = await api.get(`/doctors?${query}`)
+  const res = await api.get(`/doctors/?${query}`)
   return res.data
 })
 
@@ -13,7 +13,7 @@ export const fetchDoctorById = createAsyncThunk('doctors/fetchOne', async (id) =
 })
 
 export const fetchSpecializations = createAsyncThunk('doctors/fetchSpecializations', async () => {
-  const res = await api.get('/doctors/specializations')
+  const res = await api.get('/doctors/specializations/')
   return res.data.specializations
 })
 

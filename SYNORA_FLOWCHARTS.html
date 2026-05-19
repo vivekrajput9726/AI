@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Synora Health – System Flowcharts</title>
+<style>
+  body { font-family: 'Times New Roman', serif; background: #fff; margin: 0; padding: 20px; }
+  h2 { text-align: center; font-size: 16pt; font-weight: bold; margin: 30px 0 10px; text-decoration: underline; }
+  h3 { text-align: center; font-size: 13pt; font-weight: bold; margin: 6px 0 16px; }
+  .chart-wrap { display: flex; justify-content: center; margin: 10px 0 30px; }
+  svg text { font-family: 'Times New Roman', serif; }
+  .fig-label { text-align: center; font-weight: bold; font-size: 12pt; margin: 8px 0 40px; }
+  .page-break { border-top: 2px dashed #aaa; margin: 40px 0; padding-top: 10px; }
+
+  /* Shape helpers */
+  .terminal   { fill: #1a5276; stroke: #000; stroke-width: 1.5; }
+  .process    { fill: #d6eaf8; stroke: #1a5276; stroke-width: 1.5; }
+  .decision   { fill: #fef9e7; stroke: #f39c12; stroke-width: 1.5; }
+  .io         { fill: #d5f5e3; stroke: #1e8449; stroke-width: 1.5; }
+  .sub        { fill: #f9ebea; stroke: #c0392b; stroke-width: 1.5; }
+  .db         { fill: #f4ecf7; stroke: #8e44ad; stroke-width: 1.5; }
+  .arrow      { stroke: #333; stroke-width: 1.8; fill: none; marker-end: url(#arrowhead); }
+  .arrow-yes  { stroke: #1e8449; stroke-width: 1.8; fill: none; marker-end: url(#arrowheadG); }
+  .arrow-no   { stroke: #c0392b; stroke-width: 1.8; fill: none; marker-end: url(#arrowheadR); }
+  .label      { font-size: 10px; fill: #555; font-style: italic; }
+  .yes-label  { font-size: 10px; fill: #1e8449; font-weight: bold; }
+  .no-label   { font-size: 10px; fill: #c0392b; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     FLOWCHART 1: PATIENT SIDE
+═══════════════════════════════════════════════════════════════════ -->
+<h2>6.1 FLOWCHART</h2>
+<h3>(Patient Side)</h3>
+<div class="chart-wrap">
+<svg width="900" height="1180" viewBox="0 0 900 1180">
+<defs>
+  <marker id="arrowhead"  markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#333"/></marker>
+  <marker id="arrowheadG" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#1e8449"/></marker>
+  <marker id="arrowheadR" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#c0392b"/></marker>
+</defs>
+
+<!-- START -->
+<ellipse cx="450" cy="35" rx="70" ry="25" class="terminal"/>
+<text x="450" y="40" text-anchor="middle" fill="white" font-weight="bold" font-size="13">START</text>
+<line x1="450" y1="60" x2="450" y2="85" class="arrow"/>
+
+<!-- Is User Registered? -->
+<polygon points="450,85 560,120 450,155 340,120" class="decision"/>
+<text x="450" y="116" text-anchor="middle" font-size="12">Is User</text>
+<text x="450" y="130" text-anchor="middle" font-size="12">Registered?</text>
+
+<!-- NO branch → left -->
+<line x1="340" y1="120" x2="210" y2="120" class="arrow-no"/>
+<text x="272" y="113" class="no-label">No</text>
+
+<!-- Register box -->
+<rect x="110" y="100" width="100" height="40" rx="4" class="process"/>
+<text x="160" y="123" text-anchor="middle" font-size="11">Register</text>
+<text x="160" y="135" text-anchor="middle" font-size="11">Account</text>
+
+<line x1="160" y1="140" x2="160" y2="175" class="arrow"/>
+
+<!-- Enter Details -->
+<rect x="100" y="175" width="120" height="40" rx="4" class="io"/>
+<text x="160" y="196" text-anchor="middle" font-size="11">Enter Details</text>
+<text x="160" y="208" text-anchor="middle" font-size="10">(Name, Email, Phone)</text>
+<line x1="160" y1="215" x2="160" y2="248" class="arrow"/>
+
+<!-- OTP Sent -->
+<rect x="100" y="248" width="120" height="40" rx="4" class="sub"/>
+<text x="160" y="267" text-anchor="middle" font-size="11">OTP Sent</text>
+<text x="160" y="279" text-anchor="middle" font-size="10">(SMS / Email)</text>
+<line x1="160" y1="288" x2="160" y2="318" class="arrow"/>
+
+<!-- Verify OTP -->
+<polygon points="160,318 240,348 160,378 80,348" class="decision"/>
+<text x="160" y="344" text-anchor="middle" font-size="11">OTP</text>
+<text x="160" y="358" text-anchor="middle" font-size="11">Valid?</text>
+
+<!-- OTP Valid → Yes down -->
+<line x1="160" y1="378" x2="160" y2="415" class="arrow-yes"/>
+<text x="168" y="400" class="yes-label">Yes</text>
+<rect x="100" y="415" width="120" height="38" rx="4" class="io"/>
+<text x="160" y="434" text-anchor="middle" font-size="11">Account Created</text>
+<text x="160" y="446" text-anchor="middle" font-size="10">Auto-Login (JWT)</text>
+<line x1="160" y1="453" x2="160" y2="490" class="arrow"/>
+<line x1="160" y1="490" x2="450" y2="490" class="arrow"/>
+
+<!-- OTP Invalid → left loop -->
+<line x1="80" y1="348" x2="50" y2="348" class="arrow-no"/>
+<line x1="50" y1="348" x2="50" y2="263" stroke="#c0392b" stroke-width="1.8" fill="none"/>
+<line x1="50" y1="263" x2="100" y2="263" class="arrow-no"/>
+<text x="28" y="308" class="no-label" font-size="9">Resend</text>
+
+<!-- YES branch → down from diamond -->
+<line x1="450" y1="155" x2="450" y2="490" class="arrow-yes"/>
+<text x="458" y="175" class="yes-label">Yes</text>
+
+<!-- LOGIN -->
+<rect x="350" y="490" width="200" height="42" rx="4" class="process"/>
+<text x="450" y="508" text-anchor="middle" font-size="12" font-weight="bold">LOGIN</text>
+<text x="450" y="522" text-anchor="middle" font-size="11">(Email + Password → JWT)</text>
+<line x1="450" y1="532" x2="450" y2="562" class="arrow"/>
+
+<!-- PATIENT DASHBOARD -->
+<rect x="310" y="562" width="280" height="42" rx="4" class="process"/>
+<text x="450" y="580" text-anchor="middle" font-size="13" font-weight="bold">PATIENT DASHBOARD</text>
+<text x="450" y="596" text-anchor="middle" font-size="11">Health Overview • Quick Actions</text>
+<line x1="450" y1="604" x2="450" y2="634" class="arrow"/>
+
+<!-- SELECT FEATURE -->
+<rect x="350" y="634" width="200" height="34" rx="4" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+<text x="450" y="655" text-anchor="middle" font-size="12" font-weight="bold">Select Feature</text>
+
+<!-- Feature branches fan out -->
+<!-- Book Appointment -->
+<line x1="450" y1="668" x2="100" y2="720" class="arrow"/>
+<rect x="20" y="720" width="155" height="38" rx="4" class="sub"/>
+<text x="97" y="737" text-anchor="middle" font-size="11" font-weight="bold">Book Appointment</text>
+<text x="97" y="749" text-anchor="middle" font-size="10">Select Doctor → Slot → Pay</text>
+<line x1="97" y1="758" x2="97" y2="790" class="arrow"/>
+<rect x="27" y="790" width="140" height="30" rx="4" class="io"/>
+<text x="97" y="807" text-anchor="middle" font-size="10">Razorpay Payment</text>
+<text x="97" y="817" text-anchor="middle" font-size="9">HMAC Verified</text>
+<line x1="97" y1="820" x2="97" y2="848" class="arrow"/>
+<rect x="27" y="848" width="140" height="28" rx="4" class="process"/>
+<text x="97" y="865" text-anchor="middle" font-size="10">Appointment Confirmed</text>
+<text x="97" y="876" text-anchor="middle" font-size="9">Doctor Notified (WS)</text>
+
+<!-- AI Symptom -->
+<line x1="450" y1="668" x2="260" y2="720" class="arrow"/>
+<rect x="180" y="720" width="155" height="38" rx="4" class="sub"/>
+<text x="257" y="737" text-anchor="middle" font-size="11" font-weight="bold">AI Symptom</text>
+<text x="257" y="749" text-anchor="middle" font-size="11" font-weight="bold">Checker</text>
+<line x1="257" y1="758" x2="257" y2="790" class="arrow"/>
+<rect x="187" y="790" width="140" height="30" rx="4" class="io"/>
+<text x="257" y="807" text-anchor="middle" font-size="10">Groq Llama 3.1 AI</text>
+<text x="257" y="817" text-anchor="middle" font-size="9">→ Gemini Fallback</text>
+<line x1="257" y1="820" x2="257" y2="848" class="arrow"/>
+<rect x="187" y="848" width="140" height="28" rx="4" class="process"/>
+<text x="257" y="862" text-anchor="middle" font-size="10">Show: Conditions,</text>
+<text x="257" y="875" text-anchor="middle" font-size="10">Urgency, Actions</text>
+
+<!-- Health Records -->
+<line x1="450" y1="668" x2="450" y2="720" class="arrow"/>
+<rect x="375" y="720" width="150" height="38" rx="4" class="sub"/>
+<text x="450" y="737" text-anchor="middle" font-size="11" font-weight="bold">Health Records</text>
+<text x="450" y="749" text-anchor="middle" font-size="10">Lab/Rx/Diagnosis/Other</text>
+<line x1="450" y1="758" x2="450" y2="790" class="arrow"/>
+<rect x="375" y="790" width="150" height="30" rx="4" class="process"/>
+<text x="450" y="807" text-anchor="middle" font-size="10">Smart Report Analyzer</text>
+<text x="450" y="817" text-anchor="middle" font-size="9">(Gemini Vision API)</text>
+
+<!-- Video Consult -->
+<line x1="450" y1="668" x2="625" y2="720" class="arrow"/>
+<rect x="545" y="720" width="155" height="38" rx="4" class="sub"/>
+<text x="622" y="737" text-anchor="middle" font-size="11" font-weight="bold">Video Consultation</text>
+<text x="622" y="749" text-anchor="middle" font-size="10">WebRTC Peer-to-Peer</text>
+<line x1="622" y1="758" x2="622" y2="790" class="arrow"/>
+<rect x="557" y="790" width="130" height="30" rx="4" class="process"/>
+<text x="622" y="807" text-anchor="middle" font-size="10">Doctor ↔ Patient</text>
+<text x="622" y="817" text-anchor="middle" font-size="9">Video + Chat + Screen Share</text>
+
+<!-- Medicine + More -->
+<line x1="450" y1="668" x2="800" y2="720" class="arrow"/>
+<rect x="720" y="720" width="160" height="38" rx="4" class="sub"/>
+<text x="800" y="737" text-anchor="middle" font-size="11" font-weight="bold">More Features</text>
+<text x="800" y="749" text-anchor="middle" font-size="10">Medicine • Goals • Insurance</text>
+<line x1="800" y1="758" x2="800" y2="790" class="arrow"/>
+<rect x="720" y="790" width="160" height="46" rx="4" class="process"/>
+<text x="800" y="808" text-anchor="middle" font-size="10">Medicine Reminder + Calendar</text>
+<text x="800" y="820" text-anchor="middle" font-size="10">Health Goals Tracker</text>
+<text x="800" y="832" text-anchor="middle" font-size="10">Emergency SOS • Nearby Hosp.</text>
+
+<!-- Return arrow back -->
+<line x1="450" y1="900" x2="450" y2="930" class="arrow"/>
+<rect x="350" y="930" width="200" height="34" rx="4" fill="#fdfefe" stroke="#555" stroke-width="1.5"/>
+<text x="450" y="952" text-anchor="middle" font-size="12">Continue / Logout</text>
+<line x1="450" y1="964" x2="450" y2="990" class="arrow"/>
+
+<!-- END -->
+<ellipse cx="450" cy="1010" rx="70" ry="25" class="terminal"/>
+<text x="450" y="1015" text-anchor="middle" fill="white" font-weight="bold" font-size="13">END</text>
+
+<!-- connecting lines from features back to continue -->
+<line x1="97" y1="876" x2="97" y2="912" stroke="#333" stroke-width="1.2" stroke-dasharray="4"/>
+<line x1="97" y1="912" x2="450" y2="912" stroke="#333" stroke-width="1.2" stroke-dasharray="4" marker-end="url(#arrowhead)"/>
+<line x1="257" y1="875" x2="257" y2="912" stroke="#333" stroke-width="1.2" stroke-dasharray="4"/>
+<line x1="622" y1="820" x2="622" y2="912" stroke="#333" stroke-width="1.2" stroke-dasharray="4"/>
+<line x1="622" y1="912" x2="450" y2="912" stroke="#333" stroke-width="1.2" stroke-dasharray="4"/>
+<line x1="800" y1="836" x2="800" y2="912" stroke="#333" stroke-width="1.2" stroke-dasharray="4"/>
+<line x1="800" y1="912" x2="450" y2="912" stroke="#333" stroke-width="1.2" stroke-dasharray="4"/>
+
+<!-- LEGEND -->
+<rect x="20" y="1040" width="860" height="120" rx="6" fill="#f8f9fa" stroke="#ccc"/>
+<text x="450" y="1060" text-anchor="middle" font-size="11" font-weight="bold">LEGEND</text>
+<ellipse cx="60" cy="1078" rx="22" ry="12" fill="#1a5276"/><text x="90" y="1083" font-size="10" fill="#333">Terminal (Start/End)</text>
+<rect x="170" y="1066" width="50" height="22" rx="3" class="process"/><text x="270" y="1083" font-size="10" fill="#333">Process</text>
+<polygon points="340,1077 380,1063 420,1077 380,1091" class="decision"/><text x="430" y="1083" font-size="10" fill="#333">Decision</text>
+<rect x="520" y="1066" width="50" height="22" rx="3" class="io"/><text x="578" y="1083" font-size="10" fill="#333">Input/Output</text>
+<rect x="660" y="1066" width="50" height="22" rx="3" class="sub"/><text x="718" y="1083" font-size="10" fill="#333">Sub-Process</text>
+<line x1="40" y1="1106" x2="80" y2="1106" class="arrow"/><text x="90" y="1110" font-size="10" fill="#333">Flow</text>
+<line x1="170" y1="1106" x2="210" y2="1106" class="arrow-yes"/><text x="218" y="1110" font-size="10" fill="#1e8449">Yes / Valid</text>
+<line x1="310" y1="1106" x2="350" y2="1106" class="arrow-no"/><text x="358" y="1110" font-size="10" fill="#c0392b">No / Invalid</text>
+<line x1="450" y1="1106" x2="490" y2="1106" stroke="#333" stroke-width="1.2" stroke-dasharray="4" marker-end="url(#arrowhead)"/><text x="498" y="1110" font-size="10" fill="#333">Return path</text>
+</svg>
+</div>
+<p class="fig-label">Figure 6.1.1: System Flowchart – Patient Side</p>
+
+<div class="page-break"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     FLOWCHART 2: DOCTOR SIDE
+═══════════════════════════════════════════════════════════════════ -->
+<h3>(Doctor Side)</h3>
+<div class="chart-wrap">
+<svg width="900" height="1020" viewBox="0 0 900 1020">
+<defs>
+  <marker id="arr2"  markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#333"/></marker>
+  <marker id="arrG2" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#1e8449"/></marker>
+  <marker id="arrR2" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#c0392b"/></marker>
+</defs>
+
+<!-- START -->
+<ellipse cx="450" cy="35" rx="70" ry="25" fill="#154360" stroke="#000" stroke-width="1.5"/>
+<text x="450" y="40" text-anchor="middle" fill="white" font-weight="bold" font-size="13">START</text>
+<line x1="450" y1="60" x2="450" y2="88" stroke="#333" stroke-width="1.8" marker-end="url(#arr2)"/>
+
+<!-- Doctor Login -->
+<rect x="330" y="88" width="240" height="42" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="450" y="107" text-anchor="middle" font-size="12" font-weight="bold">DOCTOR LOGIN</text>
+<text x="450" y="121" text-anchor="middle" font-size="11">(Email + Password → JWT Token)</text>
+<line x1="450" y1="130" x2="450" y2="158" stroke="#333" stroke-width="1.8" marker-end="url(#arr2)"/>
+
+<!-- Credentials Valid? -->
+<polygon points="450,158 560,193 450,228 340,193" fill="#fef9e7" stroke="#f39c12" stroke-width="1.5"/>
+<text x="450" y="189" text-anchor="middle" font-size="12">Credentials</text>
+<text x="450" y="203" text-anchor="middle" font-size="12">Valid?</text>
+
+<!-- No → error -->
+<line x1="340" y1="193" x2="220" y2="193" stroke="#c0392b" stroke-width="1.8" marker-end="url(#arrR2)"/>
+<text x="278" y="186" font-size="10" fill="#c0392b" font-weight="bold">No</text>
+<rect x="110" y="175" width="110" height="36" rx="4" fill="#fadbd8" stroke="#c0392b" stroke-width="1.5"/>
+<text x="165" y="194" text-anchor="middle" font-size="11">Show Error</text>
+<text x="165" y="206" text-anchor="middle" font-size="11">Try Again</text>
+<line x1="165" y1="175" x2="165" y2="130" stroke="#c0392b" stroke-width="1.5" fill="none"/>
+<line x1="165" y1="130" x2="330" y2="107" stroke="#c0392b" stroke-width="1.5" marker-end="url(#arrR2)" fill="none"/>
+
+<!-- Yes → Dashboard -->
+<line x1="450" y1="228" x2="450" y2="258" stroke="#1e8449" stroke-width="1.8" marker-end="url(#arrG2)"/>
+<text x="458" y="247" font-size="10" fill="#1e8449" font-weight="bold">Yes</text>
+
+<!-- Doctor Dashboard -->
+<rect x="290" y="258" width="320" height="48" rx="4" fill="#d5f5e3" stroke="#1e8449" stroke-width="1.5"/>
+<text x="450" y="278" text-anchor="middle" font-size="13" font-weight="bold">DOCTOR DASHBOARD</text>
+<text x="450" y="295" text-anchor="middle" font-size="11">Good Morning/Afternoon/Evening Greeting • Real Stats</text>
+<line x1="450" y1="306" x2="450" y2="334" stroke="#333" stroke-width="1.8" marker-end="url(#arr2)"/>
+
+<!-- Select Feature -->
+<rect x="355" y="334" width="190" height="32" rx="4" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+<text x="450" y="355" text-anchor="middle" font-size="12" font-weight="bold">Select Feature (Sidebar)</text>
+
+<!-- 6 feature columns -->
+<!-- Appointments -->
+<line x1="450" y1="366" x2="75" y2="410" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="10" y="410" width="130" height="36" rx="4" fill="#f9ebea" stroke="#c0392b" stroke-width="1.5"/>
+<text x="75" y="429" text-anchor="middle" font-size="11" font-weight="bold">Appointments</text>
+<text x="75" y="441" text-anchor="middle" font-size="10">(Pending / Confirmed)</text>
+<line x1="75" y1="446" x2="75" y2="472" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<polygon points="75,472 135,497 75,522 15,497" fill="#fef9e7" stroke="#f39c12" stroke-width="1.5"/>
+<text x="75" y="494" text-anchor="middle" font-size="10">Action?</text>
+<line x1="15" y1="497" x2="0" y2="497" stroke="#1e8449" stroke-width="1.5"/>
+<text x="-10" y="494" font-size="9" fill="#1e8449">Approve</text>
+<line x1="135" y1="497" x2="155" y2="497" stroke="#c0392b" stroke-width="1.5"/>
+<text x="157" y="494" font-size="9" fill="#c0392b">Reject</text>
+<line x1="75" y1="522" x2="75" y2="546" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="15" y="546" width="120" height="28" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="75" y="562" text-anchor="middle" font-size="10">Status Updated</text>
+
+<!-- Patients -->
+<line x1="450" y1="366" x2="225" y2="410" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="150" y="410" width="150" height="36" rx="4" fill="#f9ebea" stroke="#c0392b" stroke-width="1.5"/>
+<text x="225" y="429" text-anchor="middle" font-size="11" font-weight="bold">Patients</text>
+<text x="225" y="441" text-anchor="middle" font-size="10">(Patient List)</text>
+<line x1="225" y1="446" x2="225" y2="472" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="153" y="472" width="144" height="44" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="225" y="490" text-anchor="middle" font-size="10">Open Patient Modal</text>
+<text x="225" y="502" text-anchor="middle" font-size="10">Insights / Records /</text>
+<text x="225" y="514" text-anchor="middle" font-size="10">Insurance</text>
+
+<!-- Prescriptions -->
+<line x1="450" y1="366" x2="390" y2="410" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="315" y="410" width="150" height="36" rx="4" fill="#f9ebea" stroke="#c0392b" stroke-width="1.5"/>
+<text x="390" y="429" text-anchor="middle" font-size="11" font-weight="bold">Prescriptions</text>
+<text x="390" y="441" text-anchor="middle" font-size="10">(Digital + AI Assisted)</text>
+<line x1="390" y1="446" x2="390" y2="472" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="318" y="472" width="144" height="44" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="390" y="490" text-anchor="middle" font-size="10">Select Patient</text>
+<text x="390" y="502" text-anchor="middle" font-size="10">Add Medications</text>
+<text x="390" y="514" text-anchor="middle" font-size="10">Save / Print / Download</text>
+
+<!-- Video Call -->
+<line x1="450" y1="366" x2="545" y2="410" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="470" y="410" width="150" height="36" rx="4" fill="#f9ebea" stroke="#c0392b" stroke-width="1.5"/>
+<text x="545" y="429" text-anchor="middle" font-size="11" font-weight="bold">Video Consultation</text>
+<text x="545" y="441" text-anchor="middle" font-size="10">(WebRTC)</text>
+<line x1="545" y1="446" x2="545" y2="472" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="473" y="472" width="144" height="44" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="545" y="490" text-anchor="middle" font-size="10">Join Video Room</text>
+<text x="545" y="502" text-anchor="middle" font-size="10">Audio/Video Controls</text>
+<text x="545" y="514" text-anchor="middle" font-size="10">In-Call Chat</text>
+
+<!-- Messages -->
+<line x1="450" y1="366" x2="700" y2="410" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="625" y="410" width="150" height="36" rx="4" fill="#f9ebea" stroke="#c0392b" stroke-width="1.5"/>
+<text x="700" y="429" text-anchor="middle" font-size="11" font-weight="bold">Messages</text>
+<text x="700" y="441" text-anchor="middle" font-size="10">(WebSocket Chat)</text>
+<line x1="700" y1="446" x2="700" y2="472" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="628" y="472" width="144" height="44" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="700" y="490" text-anchor="middle" font-size="10">Real-Time Chat</text>
+<text x="700" y="502" text-anchor="middle" font-size="10">Unread Badge</text>
+<text x="700" y="514" text-anchor="middle" font-size="10">Chat Inbox Floating Btn</text>
+
+<!-- Schedule/Tasks -->
+<line x1="450" y1="366" x2="840" y2="410" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="765" y="410" width="125" height="36" rx="4" fill="#f9ebea" stroke="#c0392b" stroke-width="1.5"/>
+<text x="827" y="429" text-anchor="middle" font-size="11" font-weight="bold">Schedule /</text>
+<text x="827" y="441" text-anchor="middle" font-size="11" font-weight="bold">Tasks</text>
+<line x1="827" y1="446" x2="827" y2="472" stroke="#333" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="765" y="472" width="125" height="44" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="827" y="490" text-anchor="middle" font-size="10">Set Availability</text>
+<text x="827" y="502" text-anchor="middle" font-size="10">Days + Time Slots</text>
+<text x="827" y="514" text-anchor="middle" font-size="10">Task & Reminders</text>
+
+<!-- Earnings box below features -->
+<rect x="330" y="600" width="240" height="36" rx="4" fill="#fdebd0" stroke="#e67e22" stroke-width="1.5"/>
+<text x="450" y="619" text-anchor="middle" font-size="12" font-weight="bold">Earnings & Analytics</text>
+<text x="450" y="631" text-anchor="middle" font-size="10">View Payment History • Reports • Referrals</text>
+
+<!-- Connect features to earnings -->
+<line x1="75" y1="575" x2="75" y2="618" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+<line x1="75" y1="618" x2="330" y2="618" stroke="#aaa" stroke-width="1" stroke-dasharray="4" marker-end="url(#arr2)"/>
+<line x1="545" y1="516" x2="545" y2="618" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+<line x1="700" y1="516" x2="700" y2="618" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+<line x1="700" y1="618" x2="570" y2="618" stroke="#aaa" stroke-width="1" stroke-dasharray="4" marker-end="url(#arr2)"/>
+<line x1="827" y1="516" x2="827" y2="618" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+<line x1="827" y1="618" x2="570" y2="618" stroke="#aaa" stroke-width="1" stroke-dasharray="4" marker-end="url(#arr2)"/>
+
+<line x1="450" y1="636" x2="450" y2="666" stroke="#333" stroke-width="1.8" marker-end="url(#arr2)"/>
+
+<!-- Logout -->
+<rect x="350" y="666" width="200" height="34" rx="4" fill="#fdfefe" stroke="#555" stroke-width="1.5"/>
+<text x="450" y="689" text-anchor="middle" font-size="12">Logout / Continue Session</text>
+<line x1="450" y1="700" x2="450" y2="728" stroke="#333" stroke-width="1.8" marker-end="url(#arr2)"/>
+
+<!-- END -->
+<ellipse cx="450" cy="748" rx="70" ry="25" fill="#154360" stroke="#000" stroke-width="1.5"/>
+<text x="450" y="753" text-anchor="middle" fill="white" font-weight="bold" font-size="13">END</text>
+
+<!-- Notifications badge note -->
+<rect x="10" y="780" width="880" height="60" rx="6" fill="#fef9e7" stroke="#f39c12" stroke-width="1"/>
+<text x="450" y="800" text-anchor="middle" font-size="11" font-weight="bold">Doctor Sidebar Navigation includes:</text>
+<text x="450" y="816" text-anchor="middle" font-size="10" fill="#555">Dashboard • Appointments (🔴 pending count) • Patients • Consultations • Prescriptions • Medical Records • Analytics</text>
+<text x="450" y="830" text-anchor="middle" font-size="10" fill="#555">Schedule • Messages (🟢 unread count) • Earnings • Payments • Notifications (🔴 count) • Referrals • Task &amp; Reminders • Settings</text>
+</svg>
+</div>
+<p class="fig-label">Figure 6.1.2: System Flowchart – Doctor Side</p>
+
+<div class="page-break"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     FLOWCHART 3: ADMIN SIDE
+═══════════════════════════════════════════════════════════════════ -->
+<h3>(Admin Side)</h3>
+<div class="chart-wrap">
+<svg width="900" height="980" viewBox="0 0 900 980">
+<defs>
+  <marker id="arr3"  markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#333"/></marker>
+  <marker id="arrG3" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#1e8449"/></marker>
+  <marker id="arrR3" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#c0392b"/></marker>
+</defs>
+
+<!-- START -->
+<ellipse cx="450" cy="35" rx="70" ry="25" fill="#512e5f" stroke="#000" stroke-width="1.5"/>
+<text x="450" y="40" text-anchor="middle" fill="white" font-weight="bold" font-size="13">START</text>
+<line x1="450" y1="60" x2="450" y2="88" stroke="#333" stroke-width="1.8" marker-end="url(#arr3)"/>
+
+<!-- Admin Login -->
+<rect x="320" y="88" width="260" height="42" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="450" y="107" text-anchor="middle" font-size="12" font-weight="bold">ADMIN LOGIN</text>
+<text x="450" y="121" text-anchor="middle" font-size="11">(admin@aihealthcare.com / Admin@123)</text>
+<line x1="450" y1="130" x2="450" y2="158" stroke="#333" stroke-width="1.8" marker-end="url(#arr3)"/>
+
+<!-- Valid? -->
+<polygon points="450,158 560,193 450,228 340,193" fill="#fef9e7" stroke="#f39c12" stroke-width="1.5"/>
+<text x="450" y="189" text-anchor="middle" font-size="12">Admin</text>
+<text x="450" y="203" text-anchor="middle" font-size="12">Valid?</text>
+
+<!-- No → show error -->
+<line x1="340" y1="193" x2="200" y2="193" stroke="#c0392b" stroke-width="1.8" marker-end="url(#arrR3)"/>
+<text x="268" y="186" font-size="10" fill="#c0392b" font-weight="bold">No</text>
+<rect x="100" y="175" width="100" height="36" rx="4" fill="#fadbd8" stroke="#c0392b" stroke-width="1.5"/>
+<text x="150" y="194" text-anchor="middle" font-size="11">Auth Error</text>
+<text x="150" y="206" text-anchor="middle" font-size="11">Try Again</text>
+
+<!-- Yes → -->
+<line x1="450" y1="228" x2="450" y2="260" stroke="#1e8449" stroke-width="1.8" marker-end="url(#arrG3)"/>
+<text x="458" y="248" font-size="10" fill="#1e8449" font-weight="bold">Yes</text>
+
+<!-- Open Admin Dashboard -->
+<rect x="270" y="260" width="360" height="48" rx="4" fill="#d2b4de" stroke="#8e44ad" stroke-width="1.5"/>
+<text x="450" y="280" text-anchor="middle" font-size="13" font-weight="bold">ADMIN DASHBOARD</text>
+<text x="450" y="297" text-anchor="middle" font-size="11">Good Morning/Afternoon/Evening • Real-Time Stats</text>
+<line x1="450" y1="308" x2="450" y2="336" stroke="#333" stroke-width="1.8" marker-end="url(#arr3)"/>
+
+<!-- Stats Row -->
+<rect x="100" y="336" width="660" height="40" rx="4" fill="#f4ecf7" stroke="#8e44ad" stroke-width="1.5"/>
+<text x="430" y="356" text-anchor="middle" font-size="11" font-weight="bold">Stats Cards (Real MongoDB Data — Clickable → Navigate to Tab)</text>
+<text x="430" y="369" text-anchor="middle" font-size="10">Total Patients • Total Doctors • Total Appointments • Pending • Verified Doctors</text>
+<line x1="450" y1="376" x2="450" y2="404" stroke="#333" stroke-width="1.8" marker-end="url(#arr3)"/>
+
+<!-- Select Admin Feature -->
+<rect x="340" y="404" width="220" height="32" rx="4" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+<text x="450" y="425" text-anchor="middle" font-size="12" font-weight="bold">Select Admin Feature</text>
+
+<!-- Feature boxes -->
+<!-- Users/Patients -->
+<line x1="450" y1="436" x2="70" y2="480" stroke="#333" stroke-width="1.5" marker-end="url(#arr3)"/>
+<rect x="10" y="480" width="120" height="36" rx="4" fill="#d5f5e3" stroke="#1e8449" stroke-width="1.5"/>
+<text x="70" y="499" text-anchor="middle" font-size="11" font-weight="bold">Users / Patients</text>
+<text x="70" y="511" text-anchor="middle" font-size="10">(Search / Filter)</text>
+<line x1="70" y1="516" x2="70" y2="542" stroke="#333" stroke-width="1.5" marker-end="url(#arr3)"/>
+<rect x="10" y="542" width="120" height="44" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="70" y="559" text-anchor="middle" font-size="10">Activate / Deactivate</text>
+<text x="70" y="571" text-anchor="middle" font-size="10">Delete User</text>
+<text x="70" y="583" text-anchor="middle" font-size="10">View Details</text>
+
+<!-- Doctors Verification -->
+<line x1="450" y1="436" x2="225" y2="480" stroke="#333" stroke-width="1.5" marker-end="url(#arr3)"/>
+<rect x="150" y="480" width="150" height="36" rx="4" fill="#d5f5e3" stroke="#1e8449" stroke-width="1.5"/>
+<text x="225" y="499" text-anchor="middle" font-size="11" font-weight="bold">Doctors</text>
+<text x="225" y="511" text-anchor="middle" font-size="10">Verification Panel</text>
+<line x1="225" y1="516" x2="225" y2="542" stroke="#333" stroke-width="1.5" marker-end="url(#arr3)"/>
+<rect x="153" y="542" width="144" height="56" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="225" y="559" text-anchor="middle" font-size="10">Pending (Yellow Border)</text>
+<text x="225" y="571" text-anchor="middle" font-size="10">→ Verify / Reject</text>
+<text x="225" y="583" text-anchor="middle" font-size="10">Verified (Teal) → Revoke</text>
+<text x="225" y="595" text-anchor="middle" font-size="10">Delete Doctor</text>
+
+<!-- Appointments -->
+<line x1="450" y1="436" x2="390" y2="480" stroke="#333" stroke-width="1.5" marker-end="url(#arr3)"/>
+<rect x="315" y="480" width="150" height="36" rx="4" fill="#d5f5e3" stroke="#1e8449" stroke-width="1.5"/>
+<text x="390" y="499" text-anchor="middle" font-size="11" font-weight="bold">Appointments</text>
+<text x="390" y="511" text-anchor="middle" font-size="10">(All / Filter by Status)</text>
+<line x1="390" y1="516" x2="390" y2="542" stroke="#333" stroke-width="1.5" marker-end="url(#arr3)"/>
+<rect x="318" y="542" width="144" height="44" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="390" y="559" text-anchor="middle" font-size="10">Cancel → Restore</text>
+<text x="390" y="571" text-anchor="middle" font-size="10">View Patient/Doctor</text>
+<text x="390" y="583" text-anchor="middle" font-size="10">Names &amp; Details</text>
+
+<!-- Notifications -->
+<line x1="450" y1="436" x2="555" y2="480" stroke="#333" stroke-width="1.5" marker-end="url(#arr3)"/>
+<rect x="480" y="480" width="150" height="36" rx="4" fill="#d5f5e3" stroke="#1e8449" stroke-width="1.5"/>
+<text x="555" y="499" text-anchor="middle" font-size="11" font-weight="bold">Notifications</text>
+<text x="555" y="511" text-anchor="middle" font-size="10">(8 Platform Alerts)</text>
+<line x1="555" y1="516" x2="555" y2="542" stroke="#333" stroke-width="1.5" marker-end="url(#arr3)"/>
+<rect x="483" y="542" width="144" height="44" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="555" y="559" text-anchor="middle" font-size="10">Click → Mark Read</text>
+<text x="555" y="571" text-anchor="middle" font-size="10">Mark All as Read</text>
+<text x="555" y="583" text-anchor="middle" font-size="10">Saved in localStorage</text>
+
+<!-- Activity + Tickets -->
+<line x1="450" y1="436" x2="710" y2="480" stroke="#333" stroke-width="1.5" marker-end="url(#arr3)"/>
+<rect x="635" y="480" width="150" height="36" rx="4" fill="#d5f5e3" stroke="#1e8449" stroke-width="1.5"/>
+<text x="710" y="499" text-anchor="middle" font-size="11" font-weight="bold">Activity / Tickets</text>
+<text x="710" y="511" text-anchor="middle" font-size="10">Logs / Support</text>
+<line x1="710" y1="516" x2="710" y2="542" stroke="#333" stroke-width="1.5" marker-end="url(#arr3)"/>
+<rect x="638" y="542" width="144" height="44" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="710" y="559" text-anchor="middle" font-size="10">Real Activity Log</text>
+<text x="710" y="571" text-anchor="middle" font-size="10">Support Ticket Manage</text>
+<text x="710" y="583" text-anchor="middle" font-size="10">AI Analytics / Reports</text>
+
+<!-- Settings / Finance -->
+<line x1="450" y1="436" x2="855" y2="480" stroke="#333" stroke-width="1.5" marker-end="url(#arr3)"/>
+<rect x="790" y="480" width="100" height="36" rx="4" fill="#d5f5e3" stroke="#1e8449" stroke-width="1.5"/>
+<text x="840" y="499" text-anchor="middle" font-size="11" font-weight="bold">Settings</text>
+<text x="840" y="511" text-anchor="middle" font-size="10">/Finance</text>
+<line x1="840" y1="516" x2="840" y2="542" stroke="#333" stroke-width="1.5" marker-end="url(#arr3)"/>
+<rect x="778" y="542" width="124" height="44" rx="4" fill="#d6eaf8" stroke="#1a5276" stroke-width="1.5"/>
+<text x="840" y="559" text-anchor="middle" font-size="10">Admin Profile Card</text>
+<text x="840" y="571" text-anchor="middle" font-size="10">Payment Gateway</text>
+<text x="840" y="583" text-anchor="middle" font-size="10">AI Config / System</text>
+
+<!-- Return arrows to continue -->
+<line x1="70" y1="586" x2="70" y2="650" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+<line x1="70" y1="650" x2="450" y2="650" stroke="#aaa" stroke-width="1" stroke-dasharray="4" marker-end="url(#arr3)"/>
+<line x1="225" y1="598" x2="225" y2="650" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+<line x1="555" y1="586" x2="555" y2="650" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+<line x1="555" y1="650" x2="450" y2="650" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+<line x1="710" y1="586" x2="710" y2="650" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+<line x1="710" y1="650" x2="450" y2="650" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+<line x1="840" y1="586" x2="840" y2="650" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+<line x1="840" y1="650" x2="450" y2="650" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+
+<line x1="450" y1="650" x2="450" y2="680" stroke="#333" stroke-width="1.8" marker-end="url(#arr3)"/>
+
+<!-- Continue/Logout -->
+<rect x="330" y="680" width="240" height="34" rx="4" fill="#fdfefe" stroke="#555" stroke-width="1.5"/>
+<text x="450" y="702" text-anchor="middle" font-size="12">Return to Dashboard / Logout</text>
+<line x1="450" y1="714" x2="450" y2="742" stroke="#333" stroke-width="1.8" marker-end="url(#arr3)"/>
+
+<!-- END -->
+<ellipse cx="450" cy="762" rx="70" ry="25" fill="#512e5f" stroke="#000" stroke-width="1.5"/>
+<text x="450" y="767" text-anchor="middle" fill="white" font-weight="bold" font-size="13">END</text>
+
+<!-- Note box -->
+<rect x="10" y="800" width="880" height="70" rx="6" fill="#fef9e7" stroke="#f39c12" stroke-width="1"/>
+<text x="450" y="820" text-anchor="middle" font-size="11" font-weight="bold">Admin Panel Sidebar Navigation:</text>
+<text x="450" y="836" text-anchor="middle" font-size="10" fill="#555">Dashboard • Users (Patients) • Doctors (Verification) • Appointments • AI Analytics • Finance &amp; Billing • Emergency Alerts</text>
+<text x="450" y="852" text-anchor="middle" font-size="10" fill="#555">System Management • Notifications • Activity Log • Support Tickets • Reports &amp; Monitoring • Settings</text>
+<text x="450" y="864" text-anchor="middle" font-size="10" fill="#888">All stats fetched from: GET /api/admin/stats (MongoDB real-time counts)</text>
+</svg>
+</div>
+<p class="fig-label">Figure 6.1.3: System Flowchart – Admin Side</p>
+
+<div class="page-break"></div>
+
+<!-- PRINT BUTTON -->
+<div style="text-align:center;padding:20px;background:#f0f4f8;border-radius:10px;margin:20px auto;max-width:500px;">
+  <p style="font-size:13pt;font-weight:bold;color:#1a56db;margin-bottom:10px;">Synora Health – System Flowcharts</p>
+  <p style="font-size:10pt;color:#555;margin-bottom:12px;">Take screenshot of each chart OR click Print to save as PDF</p>
+  <button onclick="window.print()"
+    style="background:#1a56db;color:white;border:none;padding:10px 24px;
+    font-size:12pt;font-family:Arial;font-weight:bold;border-radius:8px;cursor:pointer;">
+    🖨️ Print / Save as PDF
+  </button>
+</div>
+
+</body>
+</html>

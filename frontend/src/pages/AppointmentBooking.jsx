@@ -18,9 +18,8 @@ import toast from 'react-hot-toast'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const TYPES = [
-  { type: 'video',      label: 'Video Call', icon: <Video size={20} />, desc: 'Face-to-face online' },
-  { type: 'voice',      label: 'Voice Call', icon: <Phone size={20} />, desc: 'Audio consultation'  },
-  { type: 'in-person',  label: 'In-Person',  icon: <MapPin size={20} />, desc: 'Visit the clinic'  },
+  { type: 'video',     label: 'Video Call', icon: <Video size={20} />, desc: 'Face-to-face online' },
+  { type: 'in-person', label: 'In-Person',  icon: <MapPin size={20} />, desc: 'Visit the clinic'  },
 ]
 
 const PAYMENT_METHODS = [
@@ -307,7 +306,7 @@ function AppointmentBooking() {
   const getMaxDate = () => { const d = new Date(); d.setDate(d.getDate() + 30); return toLocalDateStr(d) }
 
   const availableDays = doctor?.availability?.length
-    ? doctor.availability.filter(a => a.slots?.length > 0).map(a => a.day)
+    ? doctor.availability.filter(a => a.is_available !== false).map(a => a.day)
     : DAYS
 
   const isDateAvailable = (ds) => {
@@ -468,8 +467,11 @@ function AppointmentBooking() {
         {/* Doctor Card */}
         <div className="card mb-5">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-teal-400 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
-              {doctor.name?.charAt(0)}
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-teal-400 flex items-center justify-center text-white font-bold text-xl flex-shrink-0 overflow-hidden">
+              {doctor.profile_image
+                ? <img src={doctor.profile_image} alt={doctor.name} className="w-full h-full object-cover" onError={e => { e.target.style.display='none'; e.target.parentElement.innerHTML = `<span class="text-white font-bold text-xl">${doctor.name?.charAt(0)}</span>` }} />
+                : doctor.name?.charAt(0)
+              }
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="font-bold text-gray-900">{doctor.name}</h2>

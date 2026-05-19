@@ -1,15 +1,18 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Heart, Eye, EyeOff, Mail, Lock } from 'lucide-react'
 import { loginUser } from '../redux/slices/authSlice'
 import LoadingSpinner from '../components/common/LoadingSpinner'
+import toast from 'react-hot-toast'
 
 function Login() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
   const { loading } = useSelector(s => s.auth)
-  const [form, setForm] = useState({ email: '', password: '' })
+  const prefillEmail = location.state?.email || ''
+  const [form, setForm] = useState({ email: prefillEmail, password: '' })
   const [showPassword, setShowPassword] = useState(false)
 
   const handleSubmit = async (e) => {
@@ -20,6 +23,9 @@ function Login() {
       if (role === 'admin') navigate('/admin')
       else if (role === 'doctor') navigate('/doctor/dashboard')
       else navigate('/patient/dashboard')
+    } else {
+      const msg = result.payload || result.error?.message || 'Login failed'
+      toast.error(typeof msg === 'string' ? msg : 'Invalid email or password')
     }
   }
 

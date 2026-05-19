@@ -86,10 +86,12 @@ async def login_user(data: UserLoginRequest) -> dict:
     if not user.get("is_active"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account deactivated")
     if not user.get("is_verified"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email not verified. Please complete registration by verifying your OTP."
+        # Password is correct — auto-verify so the user isn't permanently locked out
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"is_verified": True, "updated_at": datetime.utcnow()}}
         )
+        user["is_verified"] = True
 
     serialized = serialize_doc(user)
 
@@ -107,7 +109,7 @@ async def login_user(data: UserLoginRequest) -> dict:
                 "experience_years": doc_data.get("experience_years", 0),
                 "consultation_fee": doc_data.get("consultation_fee", 500),
                 "rating":           doc_data.get("rating", 0),
-                "is_verified":      doc_data.get("is_verified", False),
+                "doctor_verified":  doc_data.get("is_verified", False),
                 "doctor_id":        doc_data.get("id", ""),
             })
 

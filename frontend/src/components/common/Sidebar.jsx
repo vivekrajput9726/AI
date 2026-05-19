@@ -67,19 +67,13 @@ function Sidebar({ isOpen, onClose }) {
   const isDoctor     = user?.role === 'doctor'
   const isAdmin      = user?.role === 'admin'
 
-  const [unreadChat,  setUnreadChat]  = useState(0)
-  const [unreadNotif, setUnreadNotif] = useState(0)
+  const [unreadChat, setUnreadChat] = useState(0)
 
   const fetchCounts = useCallback(async () => {
-    if (!user || user.role !== 'doctor') return
+    if (!user) return
     try {
-      const readIds = new Set(JSON.parse(localStorage.getItem('notif_read') || '[]'))
-      const [chatRes, notifRes] = await Promise.all([
-        api.get('/chat/rooms'),
-        api.get('/notifications/'),
-      ])
-      setUnreadChat((chatRes.data || []).filter(r => r.unread).length)
-      setUnreadNotif((notifRes.data || []).filter(n => !readIds.has(n.id)).length)
+      const res = await api.get('/chat/rooms')
+      setUnreadChat((res.data || []).filter(r => r.unread).length)
     } catch { /* silent */ }
   }, [user])
 
@@ -87,22 +81,6 @@ function Sidebar({ isOpen, onClose }) {
     fetchCounts()
     const id = setInterval(fetchCounts, 30000)
     return () => clearInterval(id)
-  }, [fetchCounts])
-
-  // Re-sync notif badge when user marks read in Navbar (localStorage changes)
-  useEffect(() => {
-    const onStorage = () => {
-      try {
-        const readIds = new Set(JSON.parse(localStorage.getItem('notif_read') || '[]'))
-        setUnreadNotif(prev => {
-          // recalculate based on cached data — just trigger refetch
-          fetchCounts()
-          return prev
-        })
-      } catch { /* silent */ }
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
   }, [fetchCounts])
 
   const handleLogout = () => { dispatch(logout()); navigate('/') }
@@ -235,7 +213,7 @@ function Sidebar({ isOpen, onClose }) {
                     )}
                     {badgeText && <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded-full font-bold">{badgeText}</span>}
                     {messageBadge && unreadChat > 0 && <span className="bg-green-500 text-white text-xs font-extrabold w-5 h-5 rounded-full flex items-center justify-center">{unreadChat}</span>}
-                    {notifBadge && unreadNotif > 0 && <span className="bg-red-500 text-white text-xs font-extrabold w-5 h-5 rounded-full flex items-center justify-center">{unreadNotif}</span>}
+                    {notifBadge && pendingCount > 0 && <span className="bg-red-500 text-white text-xs font-extrabold w-5 h-5 rounded-full flex items-center justify-center">{pendingCount}</span>}
                   </button>
                 </li>
               )

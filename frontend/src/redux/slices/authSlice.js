@@ -58,6 +58,7 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase('persist/REHYDRATE', (state) => { state.loading = false; state.error = null })
       .addCase(registerUser.pending, (state) => { state.loading = true; state.error = null })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false

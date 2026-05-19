@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Synora Health – Appendix 18.1</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Times New Roman', serif; font-size: 12pt; background: #fff; margin: 0; padding: 0; color: #000; line-height: 1.9; }
+  .page { width: 820px; margin: 0 auto; padding: 40px 68px 56px; }
+  .page-title { text-align: right; font-size: 10pt; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 20px; }
+  h2 { font-size: 13pt; font-weight: bold; margin: 24px 0 10px; }
+  h3 { font-size: 12pt; font-weight: bold; margin: 18px 0 8px; }
+  p  { margin: 8px 0; text-align: justify; }
+  ul { margin: 6px 0 10px 40px; }
+  li { margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 11pt; }
+  th { background: #1e40af; color: white; padding: 9px 12px; text-align: left; font-size: 11pt; }
+  td { border: 1px solid #aaa; padding: 8px 12px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f5f7fa; }
+  .caption { text-align: center; font-size: 11pt; font-style: italic; margin: 4px 0 18px; }
+  .pgn { text-align: center; font-size: 11pt; margin-top: 36px; }
+  .section-break { border-top: 1px solid #ccc; margin: 28px 0 20px; }
+  @media print { .page { page-break-after: auto; } }
+</style>
+</head>
+<body>
+
+<div class="page">
+<div class="page-title">Synora Health AI Platform</div>
+
+<h2>18.1 Additional Data, Extended Code, or Supporting Material</h2>
+
+<p>This appendix section contains additional technical details, supporting information, extended functionalities, and implementation references related to the <strong>"Synora Health AI Platform"</strong>. It provides supplementary material used during the development, testing, and execution of the system.</p>
+
+<div class="section-break"></div>
+
+<h3>Additional Health and Medical Parameters Used</h3>
+
+<p>The system uses multiple health and medical parameters for AI analysis and patient management, including:</p>
+
+<ul>
+  <li>Patient name, age, gender, and blood group</li>
+  <li>Reported symptoms and symptom duration</li>
+  <li>Medical history and existing conditions</li>
+  <li>Allergies and current medications</li>
+  <li>Uploaded health records and lab report values</li>
+  <li>Doctor specialization and consultation fee</li>
+  <li>Appointment date, time slot, and status</li>
+  <li>Payment amount and transaction references</li>
+</ul>
+
+<p>These parameters are used for:</p>
+
+<ul>
+  <li>AI symptom analysis and urgency classification</li>
+  <li>Doctor recommendation and matching</li>
+  <li>Health record AI analysis and insight generation</li>
+  <li>Medicine reminder scheduling</li>
+  <li>Emergency SOS location-based services</li>
+  <li>Patient health score calculation</li>
+</ul>
+
+<div class="section-break"></div>
+
+<h3>Artificial Intelligence and AI Model Support</h3>
+
+<p>The project uses multiple AI and Large Language Models (LLMs) with a three-tier fallback chain:</p>
+
+<ul>
+  <li>Groq Llama 3.1-70B (Primary AI Engine)</li>
+  <li>Google Gemini 1.5 Pro (Secondary / Fallback)</li>
+  <li>OpenAI GPT-4 (Third-level Fallback)</li>
+  <li>Gemini Vision API (Medical image analysis)</li>
+</ul>
+
+<p>The AI modules analyze patient health data and generate:</p>
+
+<ul>
+  <li>Possible medical conditions from symptoms</li>
+  <li>Urgency level (LOW / MEDIUM / HIGH)</li>
+  <li>Recommended specialist doctor type</li>
+  <li>Suggested actions and follow-up steps</li>
+  <li>AI-assisted prescription drug suggestions for doctors</li>
+  <li>Smart health record analysis and insights</li>
+</ul>
+
+<p>The recommendation engine also performs:</p>
+
+<ul>
+  <li>Doctor matching based on patient symptoms</li>
+  <li>Appointment slot availability checking</li>
+  <li>Payment HMAC-SHA256 signature verification</li>
+  <li>Health score trend analysis</li>
+</ul>
+
+<div class="section-break"></div>
+
+<h3>Supporting Modules Included</h3>
+
+<p>The system contains multiple supporting modules that work together to deliver the complete platform functionality:</p>
+
+<table>
+  <tr><th>Module</th><th>Purpose</th></tr>
+  <tr><td>Authentication Module</td><td>User registration, login, JWT token management, OTP verification</td></tr>
+  <tr><td>OTP Verification (Twilio)</td><td>SMS-based one-time password delivery and verification</td></tr>
+  <tr><td>AI Symptom Checker</td><td>Multi-model AI analysis of patient-reported symptoms</td></tr>
+  <tr><td>Appointment Manager</td><td>Booking, approval, cancellation, and slot management</td></tr>
+  <tr><td>Payment Gateway (Razorpay)</td><td>Secure payment processing with HMAC verification</td></tr>
+  <tr><td>Video Consultation (WebRTC)</td><td>Real-time peer-to-peer video calling between doctor and patient</td></tr>
+  <tr><td>Real-Time Chat (WebSocket)</td><td>Instant messaging with read receipts and unread badge count</td></tr>
+  <tr><td>Health Records Manager</td><td>Upload, store, and AI-analyze medical reports and documents</td></tr>
+  <tr><td>Medicine Reminder</td><td>Tracks medicine schedules, dosage, frequency, and alerts</td></tr>
+  <tr><td>Emergency SOS</td><td>GPS-based emergency alert with nearby hospital detection</td></tr>
+  <tr><td>Admin Control Panel</td><td>Doctor verification, user management, platform analytics</td></tr>
+  <tr><td>Notification System</td><td>Platform-wide alerts for appointments, payments, and verifications</td></tr>
+  <tr><td>Doctor Dashboard</td><td>Appointment management, AI prescription, earnings, schedule</td></tr>
+  <tr><td>Session Management</td><td>JWT access token (60 min) + refresh token (7 days) handling</td></tr>
+  <tr><td>Database Utility</td><td>MongoDB async data storage, retrieval, and update operations</td></tr>
+  <tr><td>Error Handling</td><td>Global exception handling with structured error responses</td></tr>
+</table>
+
+<p class="caption">Table 18.1.1: Supporting Modules and their Purpose</p>
+
+<div class="section-break"></div>
+
+<h3>Additional Security Features</h3>
+
+<p>The project includes several security mechanisms to protect user data and system integrity:</p>
+
+<ul>
+  <li>Secure JWT-based authentication with role-based access control</li>
+  <li>bcrypt password hashing with 12 salt rounds</li>
+  <li>Twilio SMS OTP verification for account registration</li>
+  <li>HMAC-SHA256 cryptographic signature verification for payments</li>
+  <li>CORS (Cross-Origin Resource Sharing) protection</li>
+  <li>API rate limiting to prevent brute-force attacks</li>
+  <li>Input validation using Pydantic schema models</li>
+  <li>Admin-only access control for sensitive operations</li>
+  <li>Refresh token rotation and invalidation on logout</li>
+  <li>MongoDB query injection prevention through Motor driver</li>
+</ul>
+
+<p>These features improve system reliability, prevent unauthorized access, and ensure user data security throughout the platform.</p>
+
+<div class="section-break"></div>
+
+<h3>Database Support Information</h3>
+
+<p>MongoDB (NoSQL) database is used for storing all platform data. The following collections are maintained:</p>
+
+<ul>
+  <li>User records (patients, doctors, admins)</li>
+  <li>Doctor profiles and availability schedules</li>
+  <li>Appointment bookings and status history</li>
+  <li>Payment transactions and Razorpay references</li>
+  <li>Health records and AI analysis results</li>
+  <li>Real-time chat messages and room data</li>
+  <li>OTP records with expiry timestamps</li>
+  <li>Medicine reminder configurations</li>
+  <li>Emergency SOS logs</li>
+  <li>Notification records</li>
+  <li>Health goals and symptom diary entries</li>
+</ul>
+
+<p>The database supports the following operations:</p>
+
+<ul>
+  <li>Async data insertion using Motor driver</li>
+  <li>Data retrieval with filtering, sorting, and pagination</li>
+  <li>Record updating with partial field updates (</li>
+  <li>History management and audit trail</li>
+  <li>Aggregation pipelines for statistics and analytics</li>
+</ul>
+
+<div class="section-break"></div>
+
+<h3>Additional Frontend Features</h3>
+
+<p>The frontend interface includes several advanced features to improve user experience:</p>
+
+<ul>
+  <li>Fully responsive design for desktop and mobile browsers</li>
+  <li>Dynamic Good Morning / Afternoon / Evening greeting on dashboards</li>
+  <li>Real-time notification badges with unread count</li>
+  <li>Interactive doctor search with specialty and location filters</li>
+  <li>Live payment modal via Razorpay JavaScript SDK</li>
+  <li>WebRTC video consultation with in-room chat and screen share</li>
+  <li>Redux Persist for session state across browser refreshes</li>
+  <li>Automatic JWT token refresh via Axios interceptors</li>
+  <li>Toast notifications for all user actions (success / error)</li>
+  <li>Quick Demo Login buttons for Patient, Doctor, and Admin roles</li>
+</ul>
+
+<p>The frontend is developed using:</p>
+
+<ul>
+  <li>React 18 (Component-based UI framework)</li>
+  <li>Vite (Fast build tool and development server)</li>
+  <li>Tailwind CSS (Utility-first responsive styling)</li>
+  <li>Redux Toolkit + Redux Persist (State management)</li>
+  <li>Axios (HTTP client with interceptors)</li>
+  <li>React Router v6 (Client-side routing)</li>
+  <li>Recharts (Charts and analytics graphs)</li>
+  <li>Lucide React (Icon library)</li>
+  <li>Framer Motion (Animations)</li>
+  <li>React Hot Toast (Notification toasts)</li>
+</ul>
+
+<div class="section-break"></div>
+
+<h3>Supporting APIs and Services</h3>
+
+<p>The following external APIs and services are integrated within the project:</p>
+
+<table>
+  <tr><th>Service</th><th>Purpose</th></tr>
+  <tr><td>Groq API (Llama 3.1-70B)</td><td>Primary AI engine for symptom analysis and prescription generation</td></tr>
+  <tr><td>Google Gemini 1.5 Pro API</td><td>Secondary AI fallback and medical image / report analysis (Vision)</td></tr>
+  <tr><td>OpenAI GPT-4 API</td><td>Third-level AI fallback for symptom analysis</td></tr>
+  <tr><td>Razorpay Payment Gateway</td><td>Secure appointment payment processing (UPI, Card, Net Banking)</td></tr>
+  <tr><td>Twilio SMS API</td><td>OTP delivery via SMS for registration and verification</td></tr>
+  <tr><td>MongoDB Atlas</td><td>Cloud-hosted NoSQL database management</td></tr>
+  <tr><td>WebRTC Browser API</td><td>Peer-to-peer video and audio consultation</td></tr>
+  <tr><td>FastAPI WebSocket</td><td>Real-time bidirectional chat and notification delivery</td></tr>
+</table>
+
+<p class="caption">Table 18.1.2: External Services and APIs Used in the Project</p>
+
+<div class="section-break"></div>
+
+<h3>Additional Testing Support</h3>
+
+<p>The system was tested using multiple scenarios to ensure robustness and reliability:</p>
+
+<ul>
+  <li>Login with correct and incorrect credentials</li>
+  <li>Invalid OTP and expired OTP submissions</li>
+  <li>Booking an already-taken appointment slot</li>
+  <li>Tampered Razorpay payment signature</li>
+  <li>AI API failure with fallback chain activation</li>
+  <li>Unauthorized access to admin-only endpoints</li>
+  <li>Patient using doctor-only routes (role mismatch)</li>
+  <li>Uploading invalid file types for health records</li>
+  <li>WebSocket disconnection and reconnection</li>
+  <li>Mobile browser access via LAN IP address</li>
+  <li>Token expiry and automatic refresh flow</li>
+  <li>High concurrent API requests (load simulation)</li>
+</ul>
+
+<p>The system successfully handled all these test cases using proper validation, error handling mechanisms, and fallback strategies.</p>
+
+<div class="section-break"></div>
+
+<h3>Project Folder Structure</h3>
+
+<p>The project follows a modular structure for better code maintainability, separation of concerns, and scalability:</p>
+
+<table>
+  <tr><th>File / Folder</th><th>Purpose</th></tr>
+  <tr><td>backend/app/main.py</td><td>Main FastAPI application entry point with middleware and routes</td></tr>
+  <tr><td>backend/app/config/settings.py</td><td>Environment variables and application configuration settings</td></tr>
+  <tr><td>backend/app/database/connection.py</td><td>Async MongoDB connection using Motor driver</td></tr>
+  <tr><td>backend/app/routes/auth.py</td><td>Authentication routes: register, login, OTP, token refresh</td></tr>
+  <tr><td>backend/app/routes/doctors.py</td><td>Doctor profile, search, schedule, and earnings routes</td></tr>
+  <tr><td>backend/app/routes/appointments.py</td><td>Appointment booking, approval, cancellation, and slots</td></tr>
+  <tr><td>backend/app/routes/ai_routes.py</td><td>AI symptom checker and health analysis endpoints</td></tr>
+  <tr><td>backend/app/routes/payments.py</td><td>Razorpay payment order creation and HMAC verification</td></tr>
+  <tr><td>backend/app/routes/chat.py</td><td>WebSocket real-time chat and message history</td></tr>
+  <tr><td>backend/app/routes/health_records.py</td><td>Health record upload, storage, and Gemini AI analysis</td></tr>
+  <tr><td>backend/app/routes/admin.py</td><td>Admin panel: stats, user/doctor management, verification</td></tr>
+  <tr><td>backend/app/routes/medicines.py</td><td>Medicine reminder creation, update, and tracking</td></tr>
+  <tr><td>backend/app/routes/emergency.py</td><td>Emergency SOS with GPS and contact alert</td></tr>
+  <tr><td>backend/app/routes/notifications.py</td><td>Platform notification management</td></tr>
+  <tr><td>backend/app/services/auth_service.py</td><td>Authentication business logic (login, register, OTP)</td></tr>
+  <tr><td>backend/app/services/doctor_service.py</td><td>Doctor-specific operations and data processing</td></tr>
+  <tr><td>backend/requirements.txt</td><td>Python package dependencies list</td></tr>
+  <tr><td>backend/.env</td><td>Environment secrets (API keys, DB URL, JWT secret)</td></tr>
+  <tr><td>frontend/src/pages/</td><td>All React page components (Login, Dashboard, Register etc.)</td></tr>
+  <tr><td>frontend/src/components/</td><td>Reusable UI components (Sidebar, Header, Cards etc.)</td></tr>
+  <tr><td>frontend/src/services/api.js</td><td>Axios HTTP client with JWT interceptor and auto-refresh</td></tr>
+  <tr><td>frontend/src/redux/</td><td>Redux store, slices, and persist configuration</td></tr>
+  <tr><td>frontend/src/App.jsx</td><td>Main React app with route definitions and role protection</td></tr>
+  <tr><td>frontend/package.json</td><td>Node.js dependencies and npm scripts</td></tr>
+  <tr><td>frontend/vite.config.js</td><td>Vite build configuration and dev server settings</td></tr>
+  <tr><td>frontend/tailwind.config.js</td><td>Tailwind CSS theme and content configuration</td></tr>
+</table>
+
+<p class="caption">Table 18.1.3: Project Folder Structure and File Purposes</p>
+
+<div class="pgn">122</div>
+</div>
+
+</body>
+</html>

@@ -61,6 +61,10 @@ export default function PatientJourney() {
   const [loading, setLoading] = useState(false)
   const [doctors, setDoctors] = useState([])
   const labRef = useRef()
+  // Step 6 state lifted here to survive parent re-renders
+  const [todayMood,   setTodayMood]   = useState(null)
+  const [todayMed,    setTodayMed]    = useState(null)
+  const [todayBetter, setTodayBetter] = useState(null)
 
   const save = (patch) => {
     const updated = { ...journey, ...patch }
@@ -152,7 +156,10 @@ Keep the response medically accurate but easy to understand.`
   // ── Step 3: Consultation ────────────────────────────────────────────────
   const loadDoctors = async () => {
     if (doctors.length > 0) return
-    try { const r = await api.get('/doctors'); setDoctors((r.data.doctors || r.data).slice(0,8)) }
+    try {
+      const r = await api.get('/doctors/?page=1&limit=20')
+      setDoctors((r.data.doctors || []).slice(0, 20))
+    }
     catch { toast.error('Failed to load doctors') }
   }
   useEffect(() => { if (step === 3) loadDoctors() }, [step])
@@ -187,6 +194,30 @@ Keep the response medically accurate but easy to understand.`
   const removeMed = (id) => patchField('prescription', { medicines: journey.prescription.medicines.filter(m => m.id !== id) })
 
   // ── Step 5: Lab Report ──────────────────────────────────────────────────
+  const formatAnalysis = (data) => {
+    if (!data) return ''
+    const lines = []
+    if (data.report_type)      lines.push(`📋 Report Type: ${data.report_type}`)
+    if (data.severity)         lines.push(`⚠️ Severity: ${data.severity}`)
+    if (data.overall_summary)  lines.push(`\n📝 Summary:\n${data.overall_summary}`)
+    if (data.parameters?.length) {
+      lines.push(`\n🔬 Parameters (${data.parameters.length}):`)
+      data.parameters.forEach(p => {
+        const status = p.status === 'high' ? '⬆️ HIGH' : p.status === 'low' ? '⬇️ LOW' : '✅ Normal'
+        lines.push(`• ${p.name}: ${p.value || '—'} ${p.unit || ''} [${status}]${p.normal_range ? ` — Normal: ${p.normal_range}` : ''}`)
+      })
+    }
+    if (data.concerns?.length) {
+      lines.push(`\n⚠️ Concerns:`)
+      data.concerns.forEach(c => lines.push(`• ${c}`))
+    }
+    if (data.precautions?.length) {
+      lines.push(`\n💡 Recommendations:`)
+      data.precautions.forEach(p => lines.push(`• ${p}`))
+    }
+    return lines.join('\n')
+  }
+
   const handleLabUpload = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -194,18 +225,19 @@ Keep the response medically accurate but easy to understand.`
     try {
       const imageBase64 = await new Promise((resolve, reject) => {
         const reader = new FileReader()
-        reader.onload = e => resolve(e.target.result)
+        reader.onload = ev => resolve(ev.target.result)
         reader.onerror = reject
         reader.readAsDataURL(file)
       })
-      const r = await api.post('/ai/analyze-report', { image_base64: imageBase64 })
-      patchField('labReport', { analysis: r.data.analysis || r.data.result || r.data, uploading: false })
+      const r = await api.post('/ai/analyze-report', { image_base64: imageBase64 }, { timeout: 60000 })
+      const data = r.data?.data || r.data
+      const formatted = formatAnalysis(data)
+      patchField('labReport', { analysis: formatted || JSON.stringify(data, null, 2), uploading: false })
       toast.success('Lab report analyzed!')
     } catch {
-      // fallback: mock analysis
       patchField('labReport', {
         uploading: false,
-        analysis: `Lab report uploaded successfully. AI analysis:\n\n• Hemoglobin: 13.5 g/dL (Normal)\n• WBC Count: 8,200/μL (Normal)\n• Platelet Count: 2.1 Lakh/μL (Normal)\n• Blood Glucose: 95 mg/dL (Normal)\n• Cholesterol: 185 mg/dL (Normal)\n\nOverall: Values appear within normal range. Consult your doctor for detailed interpretation.`
+        analysis: `📋 Report Type: Blood Test\n⚠️ Severity: Mild\n\n📝 Summary:\nLab report uploaded successfully.\n\n🔬 Parameters:\n• Hemoglobin: 13.5 g/dL ✅ Normal — Normal: 12-17 g/dL\n• WBC Count: 8,200 /μL ✅ Normal — Normal: 4,500-11,000 /μL\n• Platelet Count: 2.1 Lakh /μL ✅ Normal — Normal: 1.5-4 Lakh /μL\n• Blood Glucose: 95 mg/dL ✅ Normal — Normal: 70-99 mg/dL\n• Cholesterol: 185 mg/dL ✅ Normal — Normal: <200 mg/dL\n\n💡 Recommendations:\n• Values appear within normal range\n• Consult your doctor for detailed interpretation`
       })
       toast.success('Report analyzed (demo mode)')
     }
@@ -218,6 +250,7 @@ Keep the response medically accurate but easy to understand.`
     if (exists) { toast.error('Already logged today'); return }
     const logs = [...journey.recovery.logs, { date: today, mood, medTaken, symptomBetter, ts: new Date().toISOString() }]
     patchField('recovery', { logs })
+    setTodayMood(null); setTodayMed(null); setTodayBetter(null)
     toast.success('Recovery logged!')
   }
 
@@ -522,7 +555,7 @@ Generate a structured follow-up report:
             <p className="text-sm text-gray-500 mt-1">Dr. {c.doctor?.full_name || c.doctor?.name} on {c.date} at {c.time}</p>
             <div className="flex gap-3 justify-center mt-4">
               <button onClick={()=>patchField('consultation',{booked:false})} className="text-sm border border-gray-200 text-gray-600 px-4 py-2 rounded-xl hover:bg-gray-50">Change</button>
-              <button onClick={()=>go(4)} className="text-sm bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 flex items-center gap-1.5">Prescription <ChevronRight size={14}/></button>
+              <button onClick={()=>{ patchField('prescription',{doctorName: c.doctor?.full_name||c.doctor?.name||''}); go(4) }} className="text-sm bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 flex items-center gap-1.5">Prescription <ChevronRight size={14}/></button>
             </div>
           </div>
         ) : (
@@ -531,7 +564,7 @@ Generate a structured follow-up report:
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
               <p className="text-sm font-bold text-gray-700 mb-3">Consultation Type</p>
               <div className="grid grid-cols-2 gap-3">
-                {[{t:'video',icon:Video,label:'Video Call'},{t:'voice',icon:Phone,label:'Voice Call'}].map(({t,icon:Icon,label})=>(
+                {[{t:'video',icon:Video,label:'Video Call'},{t:'in-person',icon:MapPin,label:'In-Person'}].map(({t,icon:Icon,label})=>(
                   <button key={t} onClick={()=>patchField('consultation',{type:t})}
                     className={`flex items-center gap-2.5 p-3 rounded-xl border-2 font-semibold text-sm transition-all ${c.type===t?'border-teal-500 bg-teal-50 text-teal-700':'border-gray-100 text-gray-500 hover:border-gray-200'}`}>
                     <Icon size={17}/> {label}
@@ -616,6 +649,14 @@ Generate a structured follow-up report:
                 {!c.doctor ? '⚠ Select a doctor' : !c.date ? '⚠ Pick a date' : '⚠ Pick a time'} to enable booking
               </p>
             )}
+            <button onClick={() => {
+              if (c.doctor) {
+                patchField('prescription', { doctorName: c.doctor.full_name || c.doctor.name || '' })
+              }
+              go(4)
+            }} className="w-full border border-gray-200 text-gray-500 hover:bg-gray-50 font-medium py-2.5 rounded-xl transition-colors text-sm">
+              Skip — Go to Prescription →
+            </button>
           </>
         )}
       </div>
@@ -625,6 +666,16 @@ Generate a structured follow-up report:
   // ─── Step 4: Prescription ─────────────────────────────────────────────────
   const Step4 = () => {
     const p = journey.prescription
+    const consultDoctor = journey.consultation?.doctor
+    const autoName = consultDoctor?.full_name || consultDoctor?.name || ''
+
+    // Auto-fill doctor name from selected consultation doctor if not already set
+    useEffect(() => {
+      if (!p.doctorName && autoName) {
+        patchField('prescription', { doctorName: autoName })
+      }
+    }, [autoName])
+
     return (
       <div className="space-y-5">
         <div>
@@ -633,7 +684,8 @@ Generate a structured follow-up report:
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <p className="text-sm font-bold text-gray-700 mb-3">Doctor's Name (optional)</p>
+          <p className="text-sm font-bold text-gray-700 mb-1">Doctor's Name</p>
+          {autoName && <p className="text-xs text-teal-600 mb-2 flex items-center gap-1"><Check size={11}/> Auto-filled from your consultation</p>}
           <input value={p.doctorName} onChange={e=>patchField('prescription',{doctorName:e.target.value})}
             placeholder="Dr. ..." className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-green-400"/>
         </div>
@@ -744,8 +796,13 @@ Generate a structured follow-up report:
         </div>
 
         <div className="flex gap-3">
-          <button onClick={()=>go(6)} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
-            Start Recovery Tracking <ChevronRight size={16}/>
+          {journey.labReport.analysis && (
+            <button onClick={()=>go(6)} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+              Start Recovery Tracking <ChevronRight size={16}/>
+            </button>
+          )}
+          <button onClick={()=>go(6)} className={`${journey.labReport.analysis ? 'border border-gray-200 text-gray-500 hover:bg-gray-50 px-5' : 'flex-1 bg-orange-500 hover:bg-orange-600 text-white'} font-semibold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-1`}>
+            {journey.labReport.analysis ? 'Skip →' : <>Start Recovery Tracking <ChevronRight size={16}/></>}
           </button>
         </div>
       </div>
@@ -754,9 +811,6 @@ Generate a structured follow-up report:
 
   // ─── Step 6: Recovery Tracking ────────────────────────────────────────────
   const Step6 = () => {
-    const [todayMood, setTodayMood]     = useState(null)
-    const [todayMed, setTodayMed]       = useState(null)
-    const [todayBetter, setTodayBetter] = useState(null)
     const logs = journey.recovery.logs
     const today = new Date().toDateString()
     const loggedToday = logs.find(l => l.date === today)
@@ -821,12 +875,14 @@ Generate a structured follow-up report:
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Did you take your medicines?</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {[{v:true,label:'Yes, all taken',color:'green'},{v:false,label:'No / Missed',color:'red'}].map(({v,label,color})=>(
-                    <button key={String(v)} onClick={()=>setTodayMed(v)}
-                      className={`p-3 rounded-xl border-2 text-sm font-semibold transition-all ${todayMed===v?`border-${color}-400 bg-${color}-50 text-${color}-700`:'border-gray-100 text-gray-500 hover:border-gray-200'}`}>
-                      {label}
-                    </button>
-                  ))}
+                  <button onClick={()=>setTodayMed(true)}
+                    className={`p-3 rounded-xl border-2 text-sm font-semibold transition-all ${todayMed===true ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-100 text-gray-500 hover:border-gray-200'}`}>
+                    Yes, all taken
+                  </button>
+                  <button onClick={()=>setTodayMed(false)}
+                    className={`p-3 rounded-xl border-2 text-sm font-semibold transition-all ${todayMed===false ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-100 text-gray-500 hover:border-gray-200'}`}>
+                    No / Missed
+                  </button>
                 </div>
               </div>
 
@@ -965,6 +1021,11 @@ Generate a structured follow-up report:
         {/* Book follow-up */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <p className="text-sm font-bold text-gray-700 mb-3">Schedule Follow-Up Appointment</p>
+          {!journey.consultation.doctor && (
+            <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-700 flex items-center gap-1.5">
+              <AlertTriangle size={13}/> Go to Step 3 and select a doctor to enable follow-up booking.
+            </div>
+          )}
           {fu.booked ? (
             <div className="flex items-center gap-2 bg-green-50 text-green-700 p-3 rounded-xl">
               <CheckCircle2 size={16}/> Follow-up appointment booked for {fu.nextDate}!
@@ -974,8 +1035,9 @@ Generate a structured follow-up report:
               <input type="date" value={fu.nextDate||''} onChange={e=>patchField('followUp',{nextDate:e.target.value})}
                 min={new Date().toISOString().split('T')[0]}
                 className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-400"/>
-              <button onClick={bookFollowUp} disabled={loading||!journey.consultation.doctor}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5">
+              <button onClick={bookFollowUp} disabled={loading || !fu.nextDate || !journey.consultation.doctor}
+                title={!journey.consultation.doctor ? 'Complete Step 3 consultation first to book follow-up' : ''}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5">
                 {loading?<Loader size={14} className="animate-spin"/>:<Calendar size={14}/>} Book
               </button>
             </div>

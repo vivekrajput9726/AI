@@ -144,6 +144,42 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
     l.code.toLowerCase().includes(langSearch.toLowerCase())
   )
 
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showSearchDrop, setShowSearchDrop] = useState(false)
+
+  const SEARCH_SHORTCUTS = [
+    { keywords: ['doctor','specialist','physician','consult'], label: 'Find Doctors', path: '/patient/doctors', icon: '🩺' },
+    { keywords: ['symptom','pain','fever','sick','ill','checkup'], label: 'AI Symptom Checker', path: '/patient/symptoms', icon: '🧠' },
+    { keywords: ['appointment','book','schedule','slot'], label: 'Book Appointment', path: '/patient/doctors', icon: '📅' },
+    { keywords: ['record','report','lab','test','upload'], label: 'Health Records', path: '/patient/laboratory', icon: '📋' },
+    { keywords: ['medicine','drug','pill','reminder','prescription'], label: 'Medicine Reminder', path: '/patient/medicines', icon: '💊' },
+    { keywords: ['chat','ai','copilot','assistant'], label: 'AI Copilot Chat', path: '/patient/copilot', icon: '💬' },
+    { keywords: ['nearby','hospital','clinic','location','map'], label: 'Nearby Hospitals', path: '/patient/nearby', icon: '📍' },
+    { keywords: ['goal','target','wellness','fitness'], label: 'Health Goals', path: '/patient/goals', icon: '🎯' },
+    { keywords: ['family','member','parent','child'], label: 'Family Health', path: '/patient/family', icon: '👨‍👩‍👧' },
+    { keywords: ['profile','setting','account'], label: 'My Profile', path: '/patient/profile', icon: '👤' },
+  ]
+
+  const filteredShortcuts = searchQuery.trim().length > 0
+    ? SEARCH_SHORTCUTS.filter(s =>
+        s.keywords.some(k => k.includes(searchQuery.toLowerCase())) ||
+        s.label.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : SEARCH_SHORTCUTS.slice(0, 5)
+
+  const handleSearchKey = (e) => {
+    if (e.key === 'Enter' && searchQuery.trim()) {
+      const match = SEARCH_SHORTCUTS.find(s =>
+        s.keywords.some(k => k.includes(searchQuery.toLowerCase())) ||
+        s.label.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      navigate(match ? match.path : `/patient/doctors?q=${encodeURIComponent(searchQuery)}`)
+      setSearchQuery('')
+      setShowSearchDrop(false)
+    }
+    if (e.key === 'Escape') { setShowSearchDrop(false) }
+  }
+
   return (
     <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
       <div className="flex items-center justify-between px-4 md:px-6 h-16 gap-4">
@@ -162,15 +198,37 @@ function Navbar({ onMenuToggle, sidebarOpen }) {
         </div>
 
         {/* Center — Search */}
-        <div className="flex-1 max-w-lg hidden sm:block">
+        <div className="flex-1 max-w-lg hidden sm:block relative">
           <div className="relative">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setShowSearchDrop(true) }}
+              onFocus={() => setShowSearchDrop(true)}
+              onBlur={() => setTimeout(() => setShowSearchDrop(false), 150)}
+              onKeyDown={handleSearchKey}
               placeholder="Search doctors, symptoms, tests..."
               className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
             />
           </div>
+          {showSearchDrop && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 overflow-hidden">
+              <p className="text-[10px] font-bold text-gray-400 px-4 pt-3 pb-1 uppercase tracking-wider">
+                {searchQuery ? 'Results' : 'Quick Navigate'}
+              </p>
+              {filteredShortcuts.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-gray-400">No results found</p>
+              ) : filteredShortcuts.map((s, i) => (
+                <button key={i}
+                  onMouseDown={() => { navigate(s.path); setSearchQuery(''); setShowSearchDrop(false) }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors text-left">
+                  <span className="text-lg">{s.icon}</span>
+                  <span className="text-sm font-medium text-gray-700">{s.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right */}
