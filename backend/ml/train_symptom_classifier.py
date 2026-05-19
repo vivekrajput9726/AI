@@ -1,7 +1,9 @@
 """
 Synora Health — Symptom Classifier Training Script
 ====================================================
-Trains a multi-output Random Forest classifier on medical symptom data.
+Trains a multi-output LogisticRegression classifier on medical symptom data.
+LogisticRegression with TF-IDF significantly outperforms RandomForest on
+high-dimensional sparse text features.
 
 Outputs:
   - models/symptom_classifier.pkl  (trained pipeline)
@@ -15,7 +17,6 @@ Run:
 """
 
 import os
-import json
 import pickle
 import numpy as np
 import sys
@@ -28,9 +29,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.multioutput import MultiOutputClassifier
-from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
@@ -58,50 +59,52 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 
 def load_data():
     data = get_dataset()
-    texts      = [d["text"]       for d in data]
-    age_groups = [d["age_group"]  for d in data]
+    texts       = [d["text"]       for d in data]
+    age_groups  = [d["age_group"]  for d in data]
     specialists = [d["specialist"] for d in data]
     severities  = [d["severity"]   for d in data]
     return texts, age_groups, specialists, severities
 
 
-def build_features(texts, age_groups):
-    """Combine TF-IDF on symptom text + one-hot on age group."""
-    import pandas as pd
-    df = pd.DataFrame({"text": texts, "age_group": age_groups})
-    return df
-
-
 # ──────────────────────────────────────────────────────────────────────────────
 # 2. Build sklearn pipeline
+# LogisticRegression + TF-IDF (word & char n-grams) + OneHot age
 # ──────────────────────────────────────────────────────────────────────────────
 
 def build_pipeline():
-    text_transformer = TfidfVectorizer(
-        ngram_range=(1, 3),
-        max_features=3000,
-        sublinear_tf=True,
-        analyzer="word",
-        min_df=1,
-    )
-    age_transformer = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
-
+    # ColumnTransformer applies both TF-IDF variants + age OneHot in one pass.
+    # Specifying the same column ("text") twice is valid in ColumnTransformer.
     preprocessor = ColumnTransformer(
         transformers=[
-            ("tfidf", text_transformer, "text"),
-            ("age",   age_transformer,  ["age_group"]),
+            # Word n-grams: captures medical terms and multi-word phrases
+            ("word_tfidf", TfidfVectorizer(
+                ngram_range=(1, 3),
+                max_features=5000,
+                sublinear_tf=True,
+                analyzer="word",
+                min_df=1,
+            ), "text"),
+            # Char n-grams: catches abbreviations, partial words, and typos
+            ("char_tfidf", TfidfVectorizer(
+                ngram_range=(3, 5),
+                max_features=3000,
+                sublinear_tf=True,
+                analyzer="char_wb",
+                min_df=2,
+            ), "text"),
+            ("age", OneHotEncoder(handle_unknown="ignore", sparse_output=False), ["age_group"]),
         ]
     )
 
+    # LogisticRegression: best accuracy on sparse text features
+    # C=2.0 slight regularisation, class_weight handles imbalance
     classifier = MultiOutputClassifier(
-        RandomForestClassifier(
-            n_estimators=300,
-            max_depth=None,
-            min_samples_split=2,
-            min_samples_leaf=1,
+        LogisticRegression(
+            C=2.0,
+            max_iter=2000,
             class_weight="balanced",
+            solver="lbfgs",
             random_state=42,
-            n_jobs=-1,
         )
     )
 
@@ -113,7 +116,7 @@ def build_pipeline():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 3. Train & evaluate
+# 3. Visualisations
 # ──────────────────────────────────────────────────────────────────────────────
 
 def plot_confusion_matrix(cm, labels, title, filename):
@@ -136,38 +139,45 @@ def plot_confusion_matrix(cm, labels, title, filename):
     print(f"  Saved: {path}")
 
 
-def plot_feature_importance(pipeline, top_n=30):
+def plot_top_words(pipeline, le_spec, top_n=10):
+    """Show top TF-IDF word features per specialist class."""
     if not PLOTS_ENABLED:
         return
     try:
-        rf_spec = pipeline.named_steps["classifier"].estimators_[0]
-        rf_sev  = pipeline.named_steps["classifier"].estimators_[1]
+        preprocessor  = pipeline.named_steps["preprocessor"]
+        word_vec      = preprocessor.named_transformers_["word_tfidf"]
+        feature_names = np.array(word_vec.get_feature_names_out().tolist())
 
-        tfidf_names = pipeline.named_steps["preprocessor"] \
-            .named_transformers_["tfidf"].get_feature_names_out().tolist()
-        age_names = pipeline.named_steps["preprocessor"] \
-            .named_transformers_["age"].get_feature_names_out().tolist()
-        feature_names = tfidf_names + age_names
-
-        importances = (rf_spec.feature_importances_ + rf_sev.feature_importances_) / 2
-        indices = np.argsort(importances)[::-1][:top_n]
-
-        fig, ax = plt.subplots(figsize=(10, 8))
-        ax.barh(
-            [feature_names[i] for i in reversed(indices)],
-            [importances[i] for i in reversed(indices)],
-            color="steelblue"
-        )
-        ax.set_xlabel("Mean Feature Importance", fontsize=12)
-        ax.set_title(f"Top {top_n} Most Important Symptom Features", fontsize=14, fontweight="bold")
+        lr        = pipeline.named_steps["classifier"].estimators_[0]
+        n_classes = len(lr.classes_)
+        cols      = 4
+        rows      = (n_classes + cols - 1) // cols
+        fig, axes = plt.subplots(rows, cols, figsize=(20, 4 * rows))
+        axes = axes.flatten()
+        for i, cls in enumerate(lr.classes_):
+            coef    = lr.coef_[i][:len(feature_names)]
+            top_idx = np.argsort(coef)[::-1][:top_n]
+            axes[i].barh(
+                [feature_names[j] for j in reversed(top_idx)],
+                [coef[j] for j in reversed(top_idx)],
+                color="steelblue"
+            )
+            axes[i].set_title(le_spec.inverse_transform([cls])[0], fontsize=10)
+        for j in range(i + 1, len(axes)):
+            axes[j].axis("off")
+        plt.suptitle("Top Features per Specialist Class", fontsize=14, fontweight="bold")
         plt.tight_layout()
         path = os.path.join(MODELS_DIR, "feature_importance.png")
-        plt.savefig(path, dpi=150, bbox_inches="tight")
+        plt.savefig(path, dpi=120, bbox_inches="tight")
         plt.close()
         print(f"  Saved: {path}")
     except Exception as e:
-        print(f"  [WARNING] Feature importance plot failed: {e}")
+        print(f"  [WARNING] Feature plot failed: {e}")
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 4. Train & evaluate
+# ──────────────────────────────────────────────────────────────────────────────
 
 def train():
     import pandas as pd
@@ -192,14 +202,14 @@ def train():
     # Build feature dataframe
     df = pd.DataFrame({"text": texts, "age_group": age_groups})
 
-    # Train/test split
+    # Train/test split — stratify on specialist
     X_train, X_test, y_train, y_test = train_test_split(
         df, y, test_size=0.2, random_state=42, stratify=y_spec
     )
     print(f"\n[2/6] Train/test split: {len(X_train)} train / {len(X_test)} test")
 
     # Build & train
-    print("\n[3/6] Training Random Forest classifier (n_estimators=300) ...")
+    print("\n[3/6] Training LogisticRegression classifier ...")
     pipeline = build_pipeline()
     pipeline.fit(X_train, y_train)
     print("      Training complete.")
@@ -222,6 +232,17 @@ def train():
     print(f"  {'Accuracy':<30} {spec_accuracy*100:>11.1f}%  {sev_accuracy*100:>9.1f}%")
     print(f"  {'Weighted F1-Score':<30} {spec_f1:>12.3f}  {sev_f1:>10.3f}")
 
+    # Emergency recall — critical safety metric
+    try:
+        emergency_idx = list(le_sev.classes_).index("Emergency")
+        em_mask = y_true_sev == emergency_idx
+        if em_mask.sum() > 0:
+            em_recall = (y_pred_sev[em_mask] == emergency_idx).mean()
+            print(f"\n  *** SAFETY: Emergency recall = {em_recall*100:.1f}% "
+                  f"({em_mask.sum()} emergency cases in test set) ***")
+    except ValueError:
+        pass
+
     spec_report = classification_report(
         y_true_spec, y_pred_spec,
         target_names=le_spec.classes_,
@@ -240,23 +261,31 @@ def train():
     print("[5/6] Generating visualisations ...")
     cm_spec = confusion_matrix(y_true_spec, y_pred_spec)
     cm_sev  = confusion_matrix(y_true_sev,  y_pred_sev)
-    plot_confusion_matrix(cm_spec, le_spec.classes_, "Specialist Prediction — Confusion Matrix", "confusion_matrix_specialist.png")
-    plot_confusion_matrix(cm_sev,  le_sev.classes_,  "Severity Prediction — Confusion Matrix",   "confusion_matrix_severity.png")
-    plot_feature_importance(pipeline)
+    plot_confusion_matrix(
+        cm_spec, le_spec.classes_,
+        "Specialist Prediction — Confusion Matrix",
+        "confusion_matrix_specialist.png"
+    )
+    plot_confusion_matrix(
+        cm_sev, le_sev.classes_,
+        "Severity Prediction — Confusion Matrix",
+        "confusion_matrix_severity.png"
+    )
+    plot_top_words(pipeline, le_spec)
 
     # Save model + encoders
     print("\n[6/6] Saving model artifacts ...")
     model_data = {
-        "pipeline":    pipeline,
-        "le_specialist": le_spec,
-        "le_severity":   le_sev,
+        "pipeline":           pipeline,
+        "le_specialist":      le_spec,
+        "le_severity":        le_sev,
         "specialist_classes": le_spec.classes_.tolist(),
         "severity_classes":   le_sev.classes_.tolist(),
         "metrics": {
             "specialist_accuracy": round(spec_accuracy, 4),
-            "severity_accuracy":   round(sev_accuracy, 4),
+            "severity_accuracy":   round(sev_accuracy,  4),
             "specialist_f1":       round(spec_f1, 4),
-            "severity_f1":         round(sev_f1, 4),
+            "severity_f1":         round(sev_f1,  4),
             "train_samples":       len(X_train),
             "test_samples":        len(X_test),
         }
@@ -273,13 +302,19 @@ def train():
         f.write("=" * 60 + "\n\n")
         f.write(f"Dataset size : {len(texts)} samples\n")
         f.write(f"Train / Test : {len(X_train)} / {len(X_test)}\n")
-        f.write(f"Model        : Random Forest (n_estimators=300, TF-IDF + Age features)\n\n")
+        f.write(f"Model        : LogisticRegression (TF-IDF word+char n-grams + Age)\n\n")
         f.write(f"SPECIALIST PREDICTION\n")
         f.write(f"  Accuracy : {spec_accuracy*100:.1f}%\n")
         f.write(f"  F1-Score : {spec_f1:.3f}\n\n")
         f.write(f"SEVERITY PREDICTION\n")
         f.write(f"  Accuracy : {sev_accuracy*100:.1f}%\n")
         f.write(f"  F1-Score : {sev_f1:.3f}\n\n")
+        try:
+            if em_mask.sum() > 0:
+                f.write(f"SAFETY METRIC\n")
+                f.write(f"  Emergency recall : {em_recall*100:.1f}%\n\n")
+        except Exception:
+            pass
         f.write("--- Specialist Classification Report ---\n")
         f.write(spec_report + "\n")
         f.write("--- Severity Classification Report ---\n")
